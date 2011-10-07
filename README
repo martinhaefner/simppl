@@ -1,0 +1,50 @@
+This library was developed as an education project for learning how to 
+implement more advanced C++ patterns as used e.g. by the boost (and in the meanwhile tr1) 
+libary. That's why you can find interfaces directly compatible with boost classes.
+
+
+These are:
+
+ * generic functors and binders
+ * tribool
+ * calltraits
+ * typetraits
+ * signals and slots
+ * tuple
+ * if_
+ * typelists and appropriate algorithms
+
+
+The more sophisticated library parts built on-top of these intrinsics are:
+
+ * generative commandline parser framework
+ * generative inifile parser framework
+ * generative service-oriented IPC library introducing a C++ embedded DSL for defining service 
+   interfaces
+
+So you can use all these generative frameworks without installing boost on your computer 
+(which may be a problem for some people working in companies that do explicitly not allow
+the use of boost libraries).
+
+
+Where is the source?
+
+Most of the code is header-only. Some functions should be implemented in C++ source files
+but for simplicity reasons when developing prototypes I have never split the code.
+
+
+Compilers:
+
+Well, I only developed on GCC >4.4. Due to the extreme usage of templating techniques
+I will not guarantee that any of the code will work with other compilers (especially VS compiler).
+
+
+Status:
+
+Most of the source is rapid prototyping. It may work or it may not. Feel free to make a 
+real good project from any of the parts.
+
+
+CopyLeft:
+
+Feel free to do with the code whatever you want. It's free open-source code. 

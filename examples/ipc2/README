@@ -1,0 +1,27 @@
+Generic service oriented IPC libary framework for generating skeleton and stub code 
+from a high-level interface description directly in C++ by the C++ compiler.
+
+
+Features
+========
+
+Interface level
+
+ * shoot-and-forget requests
+ * requests with associated responses
+ * signals 
+ * event driven interface
+ * blocking (RPC) call interface
+
+
+Transport level
+
+ * currently only connection-oriented UNIX domain sockets (local transport only) 
+
+
+Possible future features
+
+ * TCP transport
+ * UDP/datagram transport for signals and shoot-and-forget requests
+ * Attributes with appropriate notifications (value changes...)
+ * Error responses
