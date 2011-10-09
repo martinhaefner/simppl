@@ -224,6 +224,25 @@ void* server(void* dispatcher)
 }
 
 
+struct CheckMeToo
+{
+   typedef Tuple<int, std::map<std::string, std::string> > type;
+   
+   int i;
+   std::map<std::string, std::string> s;
+};
+
+
+struct CheckMe
+{
+   typedef Tuple<int, double, CheckMeToo> type;
+   
+   int i;
+   double d;
+   CheckMeToo t;
+};
+
+
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
@@ -255,5 +274,6 @@ int main()
    server_dispatcher.stop();
    pthread_join(tid, 0);
    
+   STATIC_CHECK(isValidType<CheckMe>::value, ooops);   // FIXME doesn't work, but should!!!
    return 0;
 }
