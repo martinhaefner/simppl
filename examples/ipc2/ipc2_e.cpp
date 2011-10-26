@@ -274,6 +274,6 @@ int main()
    server_dispatcher.stop();
    pthread_join(tid, 0);
    
-   STATIC_CHECK(isValidType<CheckMe>::value, ooops);   // FIXME doesn't work, but should!!!
+   STATIC_CHECK(isValidType<CheckMe>::value, ooops);
    return 0;
 }

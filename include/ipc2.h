@@ -7,6 +7,8 @@
 #include <cassert>
 #include <vector>
 #include <algorithm>
+#include <pthread.h>
+#include <signal.h>
 
 #include <tr1/functional>
 
@@ -28,6 +30,7 @@
 #include "noninstantiable.h"
 
 #define INVALID_SEQUENCE_NR 0xFFFFFFFF
+#define INVALID_SERVER_ID 0u
 
 #ifdef NDEBUG
 #   define safe_cast static_cast
@@ -213,6 +216,27 @@ struct isValidType
 // ------------------------------------------------------------------------------------
 
 
+struct SignalBlocker 
+{
+   inline
+   SignalBlocker()
+   {
+      sigset_t set;
+      sigfillset(&set);
+      
+      pthread_sigmask(SIG_BLOCK, &set, &old_);
+   }
+   
+   inline
+   ~SignalBlocker()
+   {
+      pthread_sigmask(SIG_SETMASK, &old_, 0);
+   }
+   
+   sigset_t old_;
+};
+
+
 template<typename VariableT>
 struct StackSafe
 {
@@ -233,6 +257,37 @@ struct StackSafe
    VariableT& var_;
    undofunction_type undo_;
 };
+
+
+inline
+std::string fullQualifiedName(const char* ifname, const char* rolename)
+{
+   std::string ret(ifname);
+   ret += "::";
+   ret += rolename;
+   
+   return ret;
+}
+
+
+template<typename StubT>
+inline
+std::string fullQualifiedName(const StubT& stub)
+{
+   std::string ret(stub.iface());
+   ret += "::";
+   ret += stub.role() ;
+   
+   return ret;
+}
+
+
+inline
+const char* fullQualifiedName(char* buf, const char* ifname, const char* rolename)
+{
+   sprintf(buf, "%s::%s", ifname, rolename);
+   return buf;
+}
 
 
 // ------------------------------------------------------------------------------------
@@ -301,28 +356,28 @@ struct TupleDeserializer // : noncopable
 
 
 struct Serializer // : noncopyable
-{
+{   
    inline
    Serializer(size_t initial = 64)
     : capacity_(initial)
-    , buf_(capacity_ > 0 ? (char*)::malloc(capacity_) : 0)
+    , buf_(capacity_ > 0 ? (char*)malloc(capacity_) : 0)
     , current_(buf_)
    {
       // NOOP
    }
-   
+
    inline
    ~Serializer()
    {
       free(buf_);
    }
- 
-   static inline
-   void free(void* buf)
-   {
-      ::free(buf);
-   }
    
+   static inline
+   void free(void* ptr)
+   {
+      return ::free(ptr);
+   }
+ 
    /// any subsequent calls to the object are invalid
    inline
    void* release()
@@ -424,7 +479,7 @@ struct Serializer // : noncopyable
       for_each(tuple, TupleSerializer<Serializer>(*this));
       return *this;
    }
-   
+ 
 private:
    
    template<typename KeyT, typename ValueT>
@@ -444,7 +499,7 @@ private:
          while (capacity_ < estimated_capacity)
             capacity_ <<=1 ;
          
-         buf_ = (char*)::realloc(buf_, capacity_);
+         buf_ = (char*)realloc(buf_, capacity_);
          current_ = buf_ + current;
       }
    }
@@ -791,7 +846,7 @@ struct ServerRequestBase
 {
    friend struct ServerRequestBaseSetter;
    
-   virtual void eval(void* payload, size_t length) = 0;
+   virtual void eval(const void* payload, size_t length) = 0;
 
    inline
    bool hasResponse() const
@@ -858,6 +913,8 @@ protected:
 #define FRAME_TYPE_SIGNAL                      0x8u
 #define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x9u
 
+#define MAXIMUM_FRAME_SIZE 4096
+
 
 struct FrameHeader
 {
@@ -865,6 +922,7 @@ struct FrameHeader
    FrameHeader()
     : magic_(0)
     , type_(0)
+    , flags_(0)
     , payloadsize_(0)
     , sequence_nr_(0)
    {
@@ -875,6 +933,7 @@ struct FrameHeader
    FrameHeader(uint32_t type)
     : magic_(FRAME_MAGIC)
     , type_(type)
+    , flags_(0)
     , payloadsize_(0)
     , sequence_nr_(0)
    {
@@ -888,7 +947,9 @@ struct FrameHeader
    }
    
    uint32_t magic_;
-   uint32_t type_;   
+   
+   uint16_t type_;   
+   uint16_t flags_;
    
    uint32_t payloadsize_;
    uint32_t sequence_nr_;
@@ -937,39 +998,12 @@ struct InterfaceResolveResponseFrame : FrameHeader
 };
 
 
-struct NamedRequestFrame : FrameHeader
-{
-   inline
-   NamedRequestFrame()
-    : FrameHeader()
-   {
-      memset(this, 0, sizeof(*this));
-   }
-   
-   inline
-   NamedRequestFrame(const char* iface, const char* role, uint32_t func)
-    : FrameHeader(FRAME_TYPE_NAMED_REQUEST)
-    , func_(func)
-   {
-      assert(strlen(iface) < sizeof(iface_));
-      assert(strlen(role) < sizeof(role_));
-      
-      strcpy(iface_, iface);
-      strcpy(role_, role);
-   }
-   
-   char iface_[28];
-   char role_[16];
-   uint32_t func_;
-};
-
-
 struct RequestFrame : FrameHeader
 {
    inline
    RequestFrame()
     : FrameHeader()
-    , serverid_(0)
+    , serverid_(INVALID_SERVER_ID)
     , func_(0)
    {
       // NOOP
@@ -1019,26 +1053,26 @@ struct RegisterSignalFrame : FrameHeader
    inline
    RegisterSignalFrame()
     : FrameHeader()
+    , serverid_(0)
+    , sig_(0)
+    , id_(INVALID_SERVER_ID)
    {
-      memset(this, 0, sizeof(*this));
+      // NOOP
    }
    
    inline
-   RegisterSignalFrame(const char* iface, const char* role, uint32_t sig)
+   RegisterSignalFrame(uint32_t serverid, uint32_t sig, uint32_t clientsid)
     : FrameHeader(FRAME_TYPE_REGISTER_SIGNAL)
+    , serverid_(serverid)
     , sig_(sig)
+    , id_(clientsid)
    {
-      assert(strlen(iface) < sizeof(iface_));
-      assert(strlen(role) < sizeof(role_));
-      
-      strcpy(iface_, iface);
-      strcpy(role_, role);
+      // NOOP
    }
    
-   char iface_[28];
-   char role_[16];
+   uint32_t serverid_;
    uint32_t sig_;
-   uint32_t reserved_;
+   uint32_t id_;    ///< dispatcher-unique identifier ("cookie") for handler lookup on client side
 };
 
 
@@ -1068,22 +1102,22 @@ struct SignalEmitFrame : FrameHeader
    inline
    SignalEmitFrame()
     : FrameHeader()
-    , registrationid_(0)
+    , id_(0)
     , reserved_(0)
    {
       // NOOP
    }
    
    inline
-   SignalEmitFrame(uint32_t registrationid)
+   SignalEmitFrame(uint32_t id)
     : FrameHeader(FRAME_TYPE_SIGNAL)
-    , registrationid_(registrationid)
+    , id_(id)
     , reserved_(0)
    {
       // NOOP
    }
    
-   uint32_t registrationid_;
+   uint32_t id_;
    uint32_t reserved_;
 };
 
@@ -1094,22 +1128,22 @@ struct SignalResponseFrame : FrameHeader
    SignalResponseFrame()
     : FrameHeader()
     , registrationid_(0)
-    , reserved_(0)
+    , id_(0)
    {
       // NOOP
    }
    
    inline
-   SignalResponseFrame(uint32_t registrationid)
+   SignalResponseFrame(uint32_t registrationid, uint32_t id)
     : FrameHeader(FRAME_TYPE_REGISTER_SIGNAL_RESPONSE)
     , registrationid_(registrationid)
-    , reserved_(0)
+    , id_(id)
    {
       // NOOP
    }
    
-   uint32_t registrationid_; 
-   uint32_t reserved_;
+   uint32_t registrationid_;  ///< server provided registration id for deregistration purpose
+   uint32_t id_;              ///< client provided "cookie" id
 };
 
 
@@ -1118,11 +1152,10 @@ struct SignalResponseFrame : FrameHeader
 
 struct HeaderSize
 {
-   typedef TYPELIST_9( \
+   typedef TYPELIST_8( \
       InterfaceResolveFrame, \
       InterfaceResolveResponseFrame, \
       RequestFrame, \
-      NamedRequestFrame, \
       ResponseFrame, \
       RegisterSignalFrame, \
       UnregisterSignalFrame, \
@@ -1133,19 +1166,17 @@ struct HeaderSize
 
    enum { max = Max<headertypes, SizeFunc>::value };
    
-   // FIXME make this part of typelist algorithms
-   static const unsigned int size[10];
+   static const unsigned int size[9];
 };
 
 
 /*static*/ 
-const unsigned int HeaderSize::size[10] = {
+const unsigned int HeaderSize::size[9] = {
    0
  , sizeof(RequestFrame)
  , sizeof(ResponseFrame)
  , sizeof(InterfaceResolveFrame)
  , sizeof(InterfaceResolveResponseFrame) 
- , sizeof(NamedRequestFrame)
  , sizeof(RegisterSignalFrame)
  , sizeof(UnregisterSignalFrame)
  , sizeof(SignalEmitFrame)
@@ -1157,24 +1188,34 @@ STATIC_CHECK((sizeof(HeaderSize::size) / sizeof(HeaderSize::size[0])) == Size<He
 
 // -------------------------------------------------------------------------------------------
 
-
+   
 template<typename FrameT>
 bool genericSend(int fd, const FrameT& f, const void* payload)
 {
-   iovec iov[2] = { { const_cast<FrameT*>(&f), sizeof(FrameT) }, { const_cast<void*>(payload), f.payloadsize_ } };
+   static size_t max_payload = MAXIMUM_FRAME_SIZE - sizeof(FrameT);
+
+   size_t payload_first_frame = f.payloadsize_ > max_payload ? max_payload : f.payloadsize_;
+   size_t rest_payload = payload_first_frame == f.payloadsize_ ? 0 : f.payloadsize_ - payload_first_frame;
+   
+   iovec iov[2] = { { const_cast<FrameT*>(&f), sizeof(FrameT) }, { const_cast<void*>(payload), payload_first_frame } };
    
    msghdr msg;
    memset(&msg, 0, sizeof(msg));
    msg.msg_iov = iov;
    msg.msg_iovlen = payload ? 2 : 1;
    
-   if (::sendmsg(fd, &msg, MSG_NOSIGNAL) < 0)
+   SignalBlocker block;
+   
+   ssize_t rc = ::sendmsg(fd, &msg, MSG_NOSIGNAL|MSG_EOR);
+   
+   if (rc > 0 && rest_payload > 0)
    {
-      ::perror("sendmsg failed");
-      return false;
+      payload = (const char*)payload + payload_first_frame;
+      
+      rc = ::send(fd, payload, rest_payload, MSG_NOSIGNAL|MSG_EOR);
    }
    
-   return true;
+   return rc > 0;
 }
 
 
@@ -1281,7 +1322,7 @@ struct StubBase
 protected:
    
    // friendship inheritence
-   int connect(bool block);
+   bool connect(bool block);
    
    inline
    ~StubBase()
@@ -1314,6 +1355,24 @@ public:
       strcpy(boundname_, boundname);
    }
    
+   inline
+   const char* iface() const
+   {
+      return iface_;
+   }
+   
+   inline
+   const char* role() const
+   {
+      return role_;
+   }
+   
+   Dispatcher& disp()
+   {
+      assert(disp_);
+      return *disp_;
+   }
+   
 protected:
    
    uint32_t sendRequest(ClientResponseBase* handler, uint32_t requestid, const Serializer& s);
@@ -1331,7 +1390,7 @@ protected:
    const char* iface_;
    const char* role_;
    
-   char boundname_[24];
+   char boundname_[24];     ///< where to find the server
    uint32_t id_;            ///< as given from server
    
    Dispatcher* disp_;
@@ -1456,6 +1515,30 @@ void operator>>(ClientSignal<T1, T2, T3>& sig, const FuncT& func)
 }
 
 
+struct SignalRecipient
+{
+   inline
+   SignalRecipient(int fd, uint32_t clientsid)
+    : fd_(fd)
+    , clientsid_(clientsid)
+   {
+      // NOOP
+   }
+   
+   // Never call directly, for std::map only
+   inline
+   SignalRecipient()
+    : fd_(-1)
+    , clientsid_(0)
+   {
+      // NOOP
+   }
+   
+   int fd_;
+   uint32_t clientsid_;   ///< client side id of recipient (for routing on client side)
+};
+
+
 struct SignalSender
 {
    inline
@@ -1467,13 +1550,13 @@ struct SignalSender
    }
    
    inline
-   void operator()(const std::pair<uint32_t, int>& info)
+   void operator()(const std::pair<uint32_t, SignalRecipient>& info)
    {
-      SignalEmitFrame f(info.first);
+      SignalEmitFrame f(info.second.clientsid_);
       f.payloadsize_ = len_;
       
       // FIXME need to remove socket on EPIPE 
-      genericSend(info.second, f, data_);
+      genericSend(info.second.fd_, f, data_);
    }
    
    const void* data_;
@@ -1490,9 +1573,9 @@ struct ServerSignalBase
    }
    
    inline
-   void addRecipient(int fd, uint32_t registrationid)
+   void addRecipient(int fd, uint32_t registrationid, uint32_t clientsid)
    {
-      recipients_[registrationid] = fd;
+      recipients_[registrationid] = SignalRecipient(fd, clientsid);
    }
 
    inline
@@ -1509,7 +1592,7 @@ protected:
       // NOOP
    }
    
-   std::map<uint32_t/*registrationid*/, int/*fd*/> recipients_;
+   std::map<uint32_t/*registrationid*/, SignalRecipient> recipients_;
 };
 
 
@@ -1729,7 +1812,7 @@ struct ServerRequest : ServerRequestBase
       f_ = func;
    }
       
-   void eval(void* payload, size_t length)
+   void eval(const void* payload, size_t length)
    {
       if (f_)
       {
@@ -1797,8 +1880,6 @@ struct ServerResponse : ServerResponseBase
 };
 
 
-typedef void(*caller_func_type)(void*, const NamedRequestFrame&, int, void*, size_t);
-
 struct ServerHolderBase
 {
    virtual ~ServerHolderBase()
@@ -1806,9 +1887,9 @@ struct ServerHolderBase
       // NOOP
    }
    
-   virtual void eval(uint32_t funcid, uint32_t sequence_nr, int fd, void* payload, size_t len) = 0;
+   virtual void eval(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t len) = 0;
    
-   virtual ServerSignalBase* addSignalRecipient(uint32_t id, int fd, uint32_t registrationid) = 0;
+   virtual ServerSignalBase* addSignalRecipient(uint32_t id, int fd, uint32_t registrationid, uint32_t clientsid) = 0;
 };
 
 
@@ -1831,20 +1912,20 @@ struct ServerHolder : ServerHolderBase
    }
    
    /*virtual*/
-   void eval(uint32_t funcid, uint32_t sequence_nr, int fd, void* payload, size_t len)
+   void eval(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t len)
    {
       handler_->handleRequest(funcid, sequence_nr, fd, payload, len);
    }
    
    /*virtual*/
-   ServerSignalBase* addSignalRecipient(uint32_t id, int fd, uint32_t registrationid)
+   ServerSignalBase* addSignalRecipient(uint32_t id, int fd, uint32_t registrationid, uint32_t clientsid)
    {
       ServerSignalBase* rc = 0;
       
       std::map<uint32_t, ServerSignalBase*>::iterator iter = handler_->signals_.find(id);
       if (iter != handler_->signals_.end())
       {
-         iter->second->addRecipient(fd, registrationid);
+         iter->second->addRecipient(fd, registrationid, clientsid);
          rc = iter->second;
       }
       
@@ -1859,20 +1940,32 @@ struct Dispatcher
 {
    friend struct StubBase;
    
-   typedef std::map<std::string, ServerHolderBase*> servermap_type;
-   typedef std::map<uint32_t, ServerHolderBase*> servermapid_type;
-   typedef std::multimap<std::string, StubBase*> clientmap_type;
-   typedef std::map<uint32_t, StubBase*> clientmapid_type;
-   typedef std::map<uint32_t, ClientResponseBase*> outstanding_requests_type;
-   typedef std::map<uint32_t, ClientSignalBase*> outstanding_signalregistrations_type;
-   typedef std::map<uint32_t, ClientSignalBase*> sighandlers_type;   // FIXME BUG the registrationid (index of this container) is not world unique
-   typedef std::map<uint32_t, ServerSignalBase*> serversignalers_type;
+   // resolve server name to id
+   typedef std::map<std::string/*=server::role*/, ServerHolderBase*> servermap_type;  
+   
+   // signal registration and request resolution
+   typedef std::map<uint32_t/*=serverid*/, ServerHolderBase*> servermapid_type;
+   
+   // all registered clients
+   typedef std::multimap<std::string/*=server::role the client is connected to*/, StubBase*> clientmap_type;
+   
+   // all client side socket connections (good for multiplexing) FIXME need refcounting, transport type and reconnect strategy
+   typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
+   
+   // temporary maps, should always shrink again
+   typedef std::map<uint32_t/*=sequencenr*/, ClientResponseBase*> outstanding_requests_type;
+   typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
+   typedef std::map<uint32_t/*=sequencenr*/, StubBase*> outstanding_interface_resolves_type;
+   
+   // signal handling client- and server-side
+   typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
+   typedef std::map<uint32_t/*=serverside_id*/, ServerSignalBase*> serversignalers_type;
    
    Dispatcher(const char* boundname = 0)
     : running_(false)
     , acceptor_(-1)
     , sequence_(0)
-    , nextserverid_(0)
+    , nextid_(0)
    {
       ::memset(fds_, 0, sizeof(fds_));
       
@@ -1880,7 +1973,7 @@ struct Dispatcher
       {
          ::mkdir("/tmp/dispatcher", 0777);
          
-         acceptor_ = ::socket(PF_UNIX, SOCK_STREAM, 0);
+         acceptor_ = ::socket(PF_UNIX, SOCK_SEQPACKET, 0);
          
          struct sockaddr_un addr;
          addr.sun_family = AF_UNIX;
@@ -1905,21 +1998,34 @@ struct Dispatcher
       }
    }
    
+   /// attach multiple transport endpoints (e.g. tcp socket or datagram transport endpoint)
+   /// e.g.   attach("unix.stream:/server1")
+   ///        attach("tcp:127.0.0.1:8888")
+   bool attach(const char* endpoint)
+   {
+      // need implementation
+      return false;
+   }
+   
    template<typename ServerT>
    void addServer(ServerT& serv)
    {
       STATIC_CHECK(isServer<ServerT>::value, only_add_servers_here);
       
-      std::string name = InterfaceNamer<typename ServerT::interface_type>::name();
-      name += "::";
-      name += serv.role_;
-    
+      std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
+      
       assert(servers_.find(name) == servers_.end());
       
       std::cout << "Adding server for '" << name << "'" << std::endl;
       ServerHolder<ServerT>* holder = new ServerHolder<ServerT>(serv);
       servers_[name] = holder;
-      servers_by_id_[++nextserverid_] = holder;
+      servers_by_id_[generateId()] = holder;
+   }
+   
+   inline
+   uint32_t generateId()
+   {
+      return ++nextid_;
    }
    
    inline
@@ -1976,16 +2082,19 @@ struct Dispatcher
    
    uint32_t generateSequenceNr() 
    {
-      return ++sequence_;
+      ++sequence_;
+      return sequence_ == INVALID_SEQUENCE_NR ? ++sequence_ : sequence_;
    }
    
    void addClient(StubBase& clnt)
    {
-      // FIXME if added if the event loop is already running we have to connect the client here...
-      assert(!clnt.disp_);
+      assert(!clnt.disp_);   // don't add it twice
       
       clnt.disp_ = this;
-      clients_.insert(std::make_pair(clnt.boundname_, &clnt)); 
+      clients_.insert(std::make_pair(fullQualifiedName(clnt), &clnt)); 
+      
+      if (isRunning())
+         connect(clnt);
    }
    
    template<typename T1>
@@ -2057,9 +2166,6 @@ struct Dispatcher
       return rc == 0;
    }
 
-   // FIXME private internal
-   // FIXME INVALID_SEQUENCE_NR is not a good idea. Must think about this. Maybe we should make the sequence_nr an uint64_t
-   // or use special counters for registrations since an overflow is not good in this case!
    int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, void** argData = 0, size_t* argLen = 0, unsigned int timeoutMs = 2000)
    {
       int retval = 0;
@@ -2107,60 +2213,40 @@ private:
             {
                if (fds_[i].revents & POLLIN)
                {
-                  FrameHeader f;
+                  char bufferarea[MAXIMUM_FRAME_SIZE] __attribute__((aligned(4)));
                      
-                  ssize_t len = ::recv(fds_[i].fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
+                  ssize_t len = ::recv(fds_[i].fd, bufferarea, sizeof(bufferarea), MSG_NOSIGNAL);
                   
-                  if (len == sizeof(f) && f)
+                  bool can_continue = false;
+                  std::auto_ptr<char> buf(0);   // it's safe since POD array though scoped_array would be better here!
+                  const void* payload = 0;
+                  
+                  if (len > 0)
                   {
-                     len = 0;
-                     std::auto_ptr<char> buf(0);   // it's safe since POD array though scoped_array would be better here!
-                     
-                     char hdr[HeaderSize::max] __attribute__((aligned(4)));
-
-                     struct msghdr msg;
-                     memset(&msg, 0, sizeof(msg));
-                     
-                     struct iovec v[2] = { { hdr, HeaderSize::size[f.type_] }, { 0, 0 } };
-                     msg.msg_iov = v;
-                     
-                     if (f.payloadsize_ > 0)
+                     FrameHeader* hdr = (FrameHeader*)bufferarea;
+                     if (*hdr)
                      {
-                        msg.msg_iovlen = 2;
-                        
-                        buf.reset(new char[f.payloadsize_]);        
-                        
-                        v[1].iov_base = buf.get();
-                        v[1].iov_len = f.payloadsize_;
-                     }
-                     else
-                        msg.msg_iovlen = 1;
-                                                
-                     len = ::recvmsg(fds_[i].fd, &msg, MSG_NOSIGNAL|MSG_WAITALL);
-
-                     // all data read?
-                     if (len == v[0].iov_len + v[1].iov_len)
-                     {
-                        switch(f.type_)
+                        can_continue = true;
+                     
+                        payload = bufferarea + HeaderSize::size[hdr->type_];
+                        size_t max_initial_payload = MAXIMUM_FRAME_SIZE - HeaderSize::size[hdr->type_];
+                  
+                        // must read rest of data in separate frame
+                        if (hdr->payloadsize_ > max_initial_payload)
                         {
-                        case FRAME_TYPE_NAMED_REQUEST:
-                           {
-                              NamedRequestFrame* nrf = (NamedRequestFrame*)hdr;
-                              
-                              std::string name(nrf->iface_);
-                              name += "::";
-                              name += nrf->role_;
-                              
-                              servermap_type::iterator iter = servers_.find(name);
-                              if (iter != servers_.end())
-                              {
-                                 iter->second->eval(nrf->func_, nrf->sequence_nr_, fds_[i].fd, buf.get(), nrf->payloadsize_);
-                              }
-                              else
-                                 std::cerr << "No service '" << name << "' found." << std::endl;
-                           }
-                           break;
-                        
+                           buf.reset(new char[hdr->payloadsize_]);
+                           ::memcpy(buf.get(), payload, max_initial_payload);
+                           payload = buf.get();
+                           
+                           len = ::recv(fds_[i].fd, (char*)buf.get() + max_initial_payload, hdr->payloadsize_ - max_initial_payload, MSG_NOSIGNAL);
+                           can_continue = len > 0;
+                        }
+                     }
+                     
+                     if (can_continue)
+                     {
+                        switch(hdr->type_)
+                        {
                         case FRAME_TYPE_REQUEST:
                            {
                               RequestFrame* rf = (RequestFrame*)hdr;
@@ -2168,7 +2254,7 @@ private:
                               servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
                               if (iter != servers_by_id_.end())
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 iter->second->eval(rf->func_, rf->sequence_nr_, fds_[i].fd, payload, rf->payloadsize_);
                               }
                               else
                                  std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
@@ -2182,10 +2268,9 @@ private:
                               outstanding_requests_type::iterator iter;
                               if ((iter = outstandings_.find(rf->sequence_nr_)) != outstandings_.end())
                               {
-                                 // FIXME that stuff with the sequence nr does not yet fit...
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
                                  {
-                                    iter->second->eval(buf.get(), rf->payloadsize_);
+                                    iter->second->eval(payload, rf->payloadsize_);
                                  }
                                  else
                                  {
@@ -2193,7 +2278,15 @@ private:
                                     {
                                        assert(argData && argLen);
                                     
-                                       *argData = buf.release();
+                                       if (buf.get() == 0)
+                                       {
+                                          // must copy payload in this case
+                                          *argData = new char[rf->payloadsize_];
+                                          ::memcpy(*argData, payload, rf->payloadsize_);
+                                       }
+                                       else
+                                          *argData = buf.release();
+                                       
                                        *argLen = rf->payloadsize_;
                                     }
                                        running_ = false;
@@ -2210,27 +2303,23 @@ private:
                            {
                               RegisterSignalFrame* rsf = (RegisterSignalFrame*)hdr;
                               
-                              std::string name(rsf->iface_);
-                              name += "::";
-                              name += rsf->role_;
-                              
-                              servermap_type::iterator iter = servers_.find(name);
-                              if (iter != servers_.end())
+                              servermapid_type::iterator iter = servers_by_id_.find(rsf->serverid_);
+                              if (iter != servers_by_id_.end())
                               {
-                                 uint32_t registrationid = generateSequenceNr();
+                                 uint32_t registrationid = generateId();
                                  
-                                 ServerSignalBase* sig = iter->second->addSignalRecipient(rsf->sig_, fds_[i].fd, registrationid);
+                                 ServerSignalBase* sig = iter->second->addSignalRecipient(rsf->sig_, fds_[i].fd, registrationid, rsf->id_);
                                  
                                  if (sig)
                                     server_sighandlers_[registrationid] = sig;
                                  
-                                 SignalResponseFrame rf(registrationid);
+                                 SignalResponseFrame rf(registrationid, rsf->id_);
                                  rf.sequence_nr_ = rsf->sequence_nr_;
                                  
                                  genericSend(fds_[i].fd, rf, 0);
                               }
                               else
-                                 std::cerr << "No server '" << name << "' found." << std::endl;
+                                 std::cerr << "No server with id=" << rsf->serverid_ << " found." << std::endl;
                            }
                            break;
                            
@@ -2255,16 +2344,14 @@ private:
                               outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(srf->sequence_nr_);
                               if (iter != outstanding_sig_registrs_.end())
                               {
-                                 sighandlers_[srf->registrationid_] = iter->second;
+                                 sighandlers_[srf->id_] = iter->second;
                                  outstanding_sig_registrs_.erase(iter);
                               }
                               else
                                  std::cerr << "No such signal registration found." << std::endl;
                               
                               if (sequence_nr == srf->sequence_nr_)
-                              {   
                                  running_ = false;
-                              }
                            }
                            break;
 
@@ -2272,10 +2359,10 @@ private:
                            {
                               SignalEmitFrame* sef = (SignalEmitFrame*)hdr;
                               
-                              sighandlers_type::iterator iter = sighandlers_.find(sef->registrationid_);
+                              sighandlers_type::iterator iter = sighandlers_.find(sef->id_);
                               if (iter != sighandlers_.end())
                               {
-                                 iter->second->eval(buf.get(), sef->payloadsize_);
+                                 iter->second->eval(payload, sef->payloadsize_);
                               }
                               else
                                  std::cerr << "No such signal handler found." << std::endl;
@@ -2289,7 +2376,7 @@ private:
                               InterfaceResolveResponseFrame rf(0);
                               rf.sequence_nr_ = irf->sequence_nr_;
                                  
-                              servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
+                              servermap_type::iterator iter = servers_.find(std::string((char*)payload));
                               if (iter != servers_.end())
                               {
                                  for(servermapid_type::iterator iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
@@ -2312,7 +2399,7 @@ private:
                            {
                               InterfaceResolveResponseFrame* irrf = (InterfaceResolveResponseFrame*)hdr;
                               
-                              clientmapid_type::iterator iter = dangling_interface_resolves_.find(irrf->sequence_nr_);
+                              outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(irrf->sequence_nr_);
                               if (iter != dangling_interface_resolves_.end())
                               {
                                  StubBase* stub = iter->second;
@@ -2322,13 +2409,7 @@ private:
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
                                  {
                                     // eventloop driven
-                                    for (clientmap_type::iterator it = clients_.begin(); it != clients_.end(); ++it)
-                                    {
-                                       if (!strcmp(stub->boundname_, it->first.c_str()))
-                                       {
-                                          it->second->connected();
-                                       }
-                                    } 
+                                    iter->second->connected();
                                  }
                                  else if (sequence_nr == irrf->sequence_nr_)
                                     running_ = false;
@@ -2337,7 +2418,7 @@ private:
                            break;
                         
                         default:
-                           std::cerr << "Unimplemented frame type=" << f.type_ << std::endl;
+                           std::cerr << "Unimplemented frame type=" << hdr->type_ << std::endl;
                            break;
                         }
                      }
@@ -2370,31 +2451,13 @@ public:
    {
       running_ = true;
       
-      // FIXME whole connection algorithm is broken?!
       for(clientmap_type::iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
       {
          if (iter->second->fd_ <= 0)
-         {
-            std::string current = iter->first;
-            
-            int fd = connect(*iter->second);
-            
-            if (fd > 0)
-            {
-               iter->second->fd_ = fd;
-               
-               ++iter;
-               while(iter != clients_.end() && iter->first == current)
-               {
-                  iter->second->fd_ = fd;
-                  ++iter;
-               }
-               --iter;
-            }
-            // else FIXME maybe we could initialize asynchronous connect here
-         }
+            assert(connect(*iter->second));
       }
       
+      // now enter infinite eventloop
       loopUntil();
    }
    
@@ -2420,54 +2483,67 @@ public:
    
 private:
    
-   // FIXME first look in dispatchers connected sockets...
-   int connect(StubBase& stub, bool blockUntilResponse = false)
+   bool connect(StubBase& stub, bool blockUntilResponse = false)
    {
-      int fd = socket(PF_UNIX, SOCK_STREAM, 0);
-      
-      struct sockaddr_un addr;
-      addr.sun_family = AF_UNIX;
-      sprintf(addr.sun_path, "/tmp/dispatcher/%s", stub.boundname_);
-      
-      int rc = ::connect(fd, (struct sockaddr*)&addr, sizeof(addr));
-      
-      if (rc < 0)
+      // 1. connect the socket physically - if not yet done
+      socketsmap_type::iterator iter = socks_.find(stub.boundname_);
+      if (iter != socks_.end())
       {
-         ::close(fd);
-         return -1;
+         stub.fd_ = iter->second;
       }
       else
       {
-         fds_[fd].fd = fd;
-         fds_[fd].events = POLLIN;
-         
+         stub.fd_ = socket(PF_UNIX, SOCK_SEQPACKET, 0);
+      
+         struct sockaddr_un addr;
+         addr.sun_family = AF_UNIX;
+         sprintf(addr.sun_path, "/tmp/dispatcher/%s", stub.boundname_);
+      
+         int rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
+      
+         if (rc == 0)
+         {
+            fds_[stub.fd_].fd = stub.fd_;
+            fds_[stub.fd_].events = POLLIN;
+            
+            socks_[stub.boundname_] = stub.fd_;
+         }
+         else
+         {
+            while(::close(stub.fd_) < 0 && errno == EINTR);
+            stub.fd_ = -1;
+         }
+      }
+      
+      // 2. initialize interface resolution
+      if (stub.fd_ > 0)
+      {
+         // FIXME could use cache here
          InterfaceResolveFrame f(42);
          char buf[128];
          
          assert(strlen(stub.iface_) + 2 + strlen(stub.role_) < sizeof(buf));
-         strcpy(buf, stub.iface_);
-         strcat(buf, "::");
-         strcat(buf, stub.role_);
+         fullQualifiedName(buf, stub.iface_, stub.role_);
                                  
          f.payloadsize_ = strlen(buf)+1;
          f.sequence_nr_ = generateSequenceNr();
    
          dangling_interface_resolves_[f.sequence_nr_] = &stub;
-         genericSend(fd, f, buf);
+         genericSend(stub.fd_, f, buf);
          
          if (blockUntilResponse)
             loopUntil(f.sequence_nr_);
-         
-         return fd;
       }
+         
+      return stub.fd_ > 0;
    }
    
    //registered servers
    servermap_type servers_;
    servermapid_type servers_by_id_;
-   clientmapid_type dangling_interface_resolves_;
+   outstanding_interface_resolves_type dangling_interface_resolves_;
    
-   uint32_t nextserverid_;
+   uint32_t nextid_;
    bool running_;
    
    // incoming acceptor socket
@@ -2484,37 +2560,25 @@ private:
    outstanding_signalregistrations_type outstanding_sig_registrs_;
    sighandlers_type sighandlers_;
    serversignalers_type server_sighandlers_;
+   
+   socketsmap_type socks_;
 };
 
 
 uint32_t StubBase::sendRequest(ClientResponseBase* handler, uint32_t id, const Serializer& s)
 {
-   if (id_)
+   assert(disp_);
+ 
+   RequestFrame f(id_, id);
+   f.payloadsize_ = s.size();
+   f.sequence_nr_ = disp_->generateSequenceNr();
+   
+   if (genericSend(fd(), f, s.data()))
    {
-      RequestFrame f(id_, id);
-      f.payloadsize_ = s.size();
-      f.sequence_nr_ = disp_->generateSequenceNr();
-      
-      if (genericSend(fd(), f, s.data()))
-      {
-         if (handler)
-            disp_->addRequest(*handler, f.sequence_nr_);
-      }
-      return f.sequence_nr_;
+      if (handler)
+         disp_->addRequest(*handler, f.sequence_nr_);
    }
-   else
-   {
-      NamedRequestFrame f(iface_, role_, id);
-      f.payloadsize_ = s.size();
-      f.sequence_nr_ = disp_->generateSequenceNr();
-      
-      if (genericSend(fd(), f, s.data()))
-      {
-         if (handler)
-            disp_->addRequest(*handler, f.sequence_nr_);
-      }
-      return f.sequence_nr_;
-   }
+   return f.sequence_nr_;
 }
 
 
@@ -2522,7 +2586,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
    
-   RegisterSignalFrame f(iface_, role_, sigbase.id());
+   RegisterSignalFrame f(id_, sigbase.id(), disp_->generateId());
    f.payloadsize_ = 0;
    f.sequence_nr_ = disp_->generateSequenceNr();
    
@@ -2538,7 +2602,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 
 
 inline
-int StubBase::connect(bool block)
+bool StubBase::connect(bool block)
 {
    return disp_->connect(*this, block);
 }
@@ -2581,20 +2645,12 @@ public:
    inline
    bool connect()
    {
-      bool rc = false;
+      assert(!disp_->isRunning());
+      
+      bool rc = true;
       
       if (fd_ <= 0)
-      {
-         int fd = StubBase::connect(true);   // inherited friendship
-         
-         if (fd > 0)
-         {
-            fd_ = fd;
-            rc = true;
-         }
-      }
-      else 
-         rc = true;
+         rc = StubBase::connect(true);   // inherited friendship
       
       return rc;
    }
@@ -2721,7 +2777,7 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
    
 private:
    
-   void handleRequest(uint32_t funcid, uint32_t sequence_nr, int fd, void* payload, size_t length)
+   void handleRequest(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t length)
    {
       //std::cout << "Skeleton::handleRequest '" << funcid << "'" << std::endl;
       std::map<uint32_t, ServerRequestBase*>::iterator iter = ((interface_type*)this)->container_.find(funcid);

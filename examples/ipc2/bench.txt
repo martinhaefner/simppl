@@ -1,0 +1,50 @@
+Benchmark
+---------
+
+* Optimierung des Streamings (andere Argumentübergabe, Rückgabewerte) bringt nichts
+
+
+Noch mit StreamSockets
+----------------------
+
+./client --pings=50000
+Proxy connected to server
+No arg: 50000 calls in 3614 ms, 27670 msgs/s
+1 struct: 50000 calls in 3768 ms, 26539 msgs/s
+10 x struct: 50000 calls in 3911 ms, 25568 msgs/s
+100 x struct: 50000 calls in 5107 ms, 19580 msgs/s
+1000 x struct: 50000 calls in 29732 ms, 3363 msgs/s
+
+./client --pings=150000
+Proxy connected to server
+No arg: 150000 calls in 10223 ms, 29345 msgs/s
+1 struct: 150000 calls in 11012 ms, 27243 msgs/s
+10 x struct: 150000 calls in 12031 ms, 24935 msgs/s
+
+
+Mit SeqPacket Socket und 4 kB Static-Recv-RAM
+---------------------------------------------
+
+./client --pings=50000
+Proxy connected to server
+No arg: 50000 calls in 3523 ms, 28384 msgs/s
+1 struct: 50000 calls in 3697 ms, 27048 msgs/s
+10 x struct: 50000 calls in 4385 ms, 22805 msgs/s
+100 x struct: 50000 calls in 6317 ms, 15830 msgs/s
+1000 x struct: 50000 calls in 29876 ms, 3347 msgs/s
+
+./client --pings=150000
+Proxy connected to server
+No arg: 150000 calls in 10346 ms, 28996 msgs/s
+1 struct: 150000 calls in 11001 ms, 27270 msgs/s
+10 x struct: 150000 calls in 12348 ms, 24295 msgs/s
+100 x struct: 150000 calls in 16115 ms, 18616 msgs/s
+
+Man sieht: sobald er den Buffer intern kopieren muss bleibt von der Performance nichts übrig.
+Das memcpy zum Kopieren des initialen Frames in den dynamischen Speicher ist sehr teuer 
+(sobald 4kB überschritten werden).
+
+
+Mit size calculation before allocation in serializer and static RAM of 4 kB
+---------------------------------------------------------------------------
+
