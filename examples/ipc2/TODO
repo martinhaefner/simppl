@@ -1,0 +1,48 @@
+TODOs 
+
+ThreadingModel as a Policy
+==========================
+
+ * SingleThreaded (as-is)
+ * MultiThreaded (thread-pool)
+   * server side
+   * client side
+
+   server side: requests are handled within a thread pool, the sockets are handled by the main thread, but
+   all request handlers are called within the pool. Therefore, the requests are queued and the threads will
+   take the requests in a FIFO order. For response dispatch we need a way back to the dispatcher since in 
+   this case the thread may _never_ send anything blocking on any socket (in order to avoid event scattering
+   on the wire).
+
+   poll loop -------------> queue <------------- thread 1
+               (request)      ^ ^
+                              | +--------------- thread 2
+                              +------------------thread 3
+
+   thread x --------------> back-queue <----------- poll loop
+              (response)                  
+
+   The Stubs (-> Policy) thereby may be 
+ 
+    * reentrant 
+      -> we have nothing to be concerned about (just catch the event from the queue)
+
+    * non-reentrant 
+      -> the same server may not be called twice if it is already active in a thread
+         * need activity flag
+         * events may only be extracted from the queue if the corresponding stub is ready
+
+
+Add further interaction device to event-loop
+============================================
+
+Add a generic fd based device to the dispatcher interface. This would be much easier if I base the whole
+thing on top of the async IO framework.
+
+Then, we can add further endpoints to the dispatcher to allow to handle also tcp based requests.
+
+
+Transport error detection
+=========================
+
+Still missing. No concept yet.
