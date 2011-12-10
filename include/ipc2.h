@@ -15,6 +15,9 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <cstdio>
@@ -210,6 +213,133 @@ struct isValidType
       || isString<T>::value
       || isValidTuple<T>::value 
    };
+};
+
+
+// ------------------------------------------------------------------------------------
+
+
+/// Base class for all IPC related exceptions.
+struct IPCException : std::exception
+{
+   inline
+   IPCException()
+    : sequence_nr_(INVALID_SEQUENCE_NR)
+   {
+      // NOOP
+   }
+
+   explicit inline
+   IPCException(uint32_t sequence_nr)
+    : sequence_nr_(sequence_nr)
+   {
+      // NOOP
+   }
+   
+   inline
+   uint32_t sequenceNr() const
+   {
+      return sequence_nr_;
+   }
+   
+private:
+   
+   uint32_t sequence_nr_;
+};
+
+
+/// blocking calls will throw, eventloop driven approach will call separate handlers
+struct RuntimeError : IPCException
+{
+   explicit inline
+   RuntimeError(int error)
+    : IPCException()
+    , error_(error)
+    , message_(nullmsg_)
+   {
+      assert(error);   // zero is reserved value for "no error"
+   }
+   
+   inline
+   RuntimeError(int error, const char* message)
+    : IPCException()
+    , error_(error)
+    , message_(message ? new char[::strlen(message)+1] : nullmsg_)
+   {
+      assert(error);
+      
+      if (message)
+         ::strcpy(message_, message);
+   }
+   
+   ~RuntimeError() throw()
+   {
+      if (message_ != nullmsg_)
+         delete[] message_;
+   }
+   
+   const char* what() const throw()
+   {
+      return message_;
+   }
+   
+   inline
+   int error() const
+   {
+      return error_;
+   }
+   
+private:
+   
+   friend struct Dispatcher;
+   
+   /// only for dispatcher
+   inline
+   RuntimeError(int error, const char* message, uint32_t sequence_nr)
+    : IPCException(sequence_nr)
+    , error_(error)
+    , message_(message ? new char[::strlen(message)+1] : nullmsg_)
+   {
+      assert(error);
+      
+      if (message)
+         ::strcpy(message_, message);
+   }
+   
+   int error_;
+   char* message_;
+   char nullmsg_[1];
+};
+
+
+// add a global handler function for transport errors to dispatcher (onTransportError) 
+// since this is the only possible solution if requests/responses are not sent inline aka
+// non-blocking but event loop driven.
+struct TransportError : IPCException
+{
+   explicit inline
+   TransportError(int errno__)
+    : errno_(errno__)
+   {
+      buf_[0] = '\0';
+   }
+   
+   inline
+   int getErrno() const
+   {
+      return errno_;
+   }
+   
+   const char* what() const throw()
+   {
+      if (!buf_[0])
+         ::strerror_r(errno_, buf_, sizeof(buf_));
+      
+      return buf_;
+   }
+   
+   int errno_;
+   mutable char buf_[128];
 };
 
 
@@ -907,13 +1037,10 @@ protected:
 #define FRAME_TYPE_RESPONSE                    0x2u
 #define FRAME_TYPE_RESOLVE_INTERFACE           0x3u
 #define FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE  0x4u
-#define FRAME_TYPE_NAMED_REQUEST               0x5u
-#define FRAME_TYPE_REGISTER_SIGNAL             0x6u
-#define FRAME_TYPE_UNREGISTER_SIGNAL           0x7u
-#define FRAME_TYPE_SIGNAL                      0x8u
-#define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x9u
-
-#define MAXIMUM_FRAME_SIZE 4096
+#define FRAME_TYPE_REGISTER_SIGNAL             0x5u
+#define FRAME_TYPE_UNREGISTER_SIGNAL           0x6u
+#define FRAME_TYPE_SIGNAL                      0x7u
+#define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x8u
 
 
 struct FrameHeader
@@ -1192,30 +1319,20 @@ STATIC_CHECK((sizeof(HeaderSize::size) / sizeof(HeaderSize::size[0])) == Size<He
 template<typename FrameT>
 bool genericSend(int fd, const FrameT& f, const void* payload)
 {
-   static size_t max_payload = MAXIMUM_FRAME_SIZE - sizeof(FrameT);
-
-   size_t payload_first_frame = f.payloadsize_ > max_payload ? max_payload : f.payloadsize_;
-   size_t rest_payload = payload_first_frame == f.payloadsize_ ? 0 : f.payloadsize_ - payload_first_frame;
-   
-   iovec iov[2] = { { const_cast<FrameT*>(&f), sizeof(FrameT) }, { const_cast<void*>(payload), payload_first_frame } };
+   iovec iov[2] = { { const_cast<FrameT*>(&f), sizeof(FrameT) }, { const_cast<void*>(payload), f.payloadsize_ } };
    
    msghdr msg;
-   memset(&msg, 0, sizeof(msg));
+   ::memset(&msg, 0, sizeof(msg));
    msg.msg_iov = iov;
    msg.msg_iovlen = payload ? 2 : 1;
    
-   SignalBlocker block;
-   
-   ssize_t rc = ::sendmsg(fd, &msg, MSG_NOSIGNAL|MSG_EOR);
-   
-   if (rc > 0 && rest_payload > 0)
+   if (::sendmsg(fd, &msg, MSG_NOSIGNAL) != sizeof(FrameT) + f.payloadsize_)
    {
-      payload = (const char*)payload + payload_first_frame;
-      
-      rc = ::send(fd, payload, rest_payload, MSG_NOSIGNAL|MSG_EOR);
+      ::perror("sendmsg failed");
+      return false;
    }
    
-   return rc > 0;
+   return true;
 }
 
 
@@ -1273,6 +1390,7 @@ struct ServerResponseHolder
 struct Parented
 {
    friend struct StubBase;
+   friend struct Dispatcher;
    
 protected:
  
@@ -1342,6 +1460,17 @@ public:
       // NOOP
    }
    
+   /// @param request the request that yield the error
+   virtual void handleRuntimeError(const Parented& /*request*/, const RuntimeError& err)
+   {
+      std::cerr << "Caught runtime error: value=" << err.error();
+      
+      if (err.what())
+         std::cerr << ", message: " << err.what();
+      
+      std::cerr << std::endl;
+   }
+   
    StubBase(const char* iface, const char* role, const char* boundname)
     : iface_(iface) 
     , role_(role)
@@ -1375,7 +1504,7 @@ public:
    
 protected:
    
-   uint32_t sendRequest(ClientResponseBase* handler, uint32_t requestid, const Serializer& s);
+   uint32_t sendRequest(Parented& requestor, ClientResponseBase* handler, uint32_t requestid, const Serializer& s);
    
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
@@ -1687,7 +1816,7 @@ struct ClientRequest : Parented
       STATIC_CHECK(isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, invalid_function_call_due_to_arguments_mismatch);
       
       static Serializer s(0);
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(handler_, id_, s));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s));
    }
    
    inline
@@ -1696,7 +1825,7 @@ struct ClientRequest : Parented
       STATIC_CHECK(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, invalid_function_call_due_to_arguments_mismatch);
       
       Serializer s(sizeof(typename remove_ref<T1>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(handler_, id_, s << t1));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1));
    }
 
    inline
@@ -1705,7 +1834,7 @@ struct ClientRequest : Parented
       STATIC_CHECK(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, invalid_function_call_due_to_arguments_mismatch);
       
       Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(handler_, id_, s << t1 << t2));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2));
    }
    
    inline
@@ -1714,7 +1843,7 @@ struct ClientRequest : Parented
       STATIC_CHECK(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, invalid_function_call_due_to_arguments_mismatch);
       
       Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type) + sizeof(typename remove_ref<T3>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(handler_, id_, s << t1 << t2 << t3));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2 << t3));
    }
    
    ClientResponseBase* handler_;
@@ -1936,6 +2065,9 @@ struct ServerHolder : ServerHolderBase
 };
    
 
+static std::auto_ptr<char> NullAutoPtr(0);
+   
+
 struct Dispatcher
 {
    friend struct StubBase;
@@ -1949,11 +2081,11 @@ struct Dispatcher
    // all registered clients
    typedef std::multimap<std::string/*=server::role the client is connected to*/, StubBase*> clientmap_type;
    
-   // all client side socket connections (good for multiplexing) FIXME need refcounting, transport type and reconnect strategy
+   // all client side socket connections (good for multiplexing) FIXME need refcounting and reconnect strategy
    typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
    
-   // temporary maps, should always shrink again
-   typedef std::map<uint32_t/*=sequencenr*/, ClientResponseBase*> outstanding_requests_type;
+   // temporary maps, should always shrink again, maybe could drop entries on certain timeouts
+   typedef std::map<uint32_t/*=sequencenr*/, Tuple<Parented*, ClientResponseBase*> > outstanding_requests_type;
    typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
    typedef std::map<uint32_t/*=sequencenr*/, StubBase*> outstanding_interface_resolves_type;
    
@@ -1961,31 +2093,37 @@ struct Dispatcher
    typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
    typedef std::map<uint32_t/*=serverside_id*/, ServerSignalBase*> serversignalers_type;
    
+   
+   static
+   void makeInetAddress(struct sockaddr_in& addr, const char* endpoint)
+   {
+      assert(strlen(endpoint) < 64);
+      
+      char tmp[64];
+      ::strcpy(tmp, endpoint);
+      char* port = tmp + 4;
+      while(*++port != ':');
+      *port = '\0';
+      ++port;
+      std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
+      addr.sin_family = AF_INET;
+      addr.sin_port = htons(::atoi(port));
+      addr.sin_addr.s_addr = ::inet_addr(tmp + 4);
+   }
+
+   
+   /// boundname may be 0 for handling clients without any servers
    Dispatcher(const char* boundname = 0)
     : running_(false)
-    , acceptor_(-1)
     , sequence_(0)
     , nextid_(0)
    {
       ::memset(fds_, 0, sizeof(fds_));
+      ::memset(af_, 0, sizeof(af_));
       
       if (boundname)
       {
-         ::mkdir("/tmp/dispatcher", 0777);
-         
-         acceptor_ = ::socket(PF_UNIX, SOCK_SEQPACKET, 0);
-         
-         struct sockaddr_un addr;
-         addr.sun_family = AF_UNIX;
-         sprintf(addr.sun_path, "/tmp/dispatcher/%s", boundname);
-         
-         ::unlink(addr.sun_path);         
-         ::bind(acceptor_, (struct sockaddr*)&addr, sizeof(addr));
-         
-         ::listen(acceptor_, 16);
-         
-         fds_[0].fd = acceptor_;
-         fds_[0].events = POLLIN;
+         assert(attach(boundname));
       }
    }
    
@@ -1999,13 +2137,53 @@ struct Dispatcher
    }
    
    /// attach multiple transport endpoints (e.g. tcp socket or datagram transport endpoint)
-   /// e.g.   attach("unix.stream:/server1")
+   /// e.g.   attach("unix:/server1")
    ///        attach("tcp:127.0.0.1:8888")
    bool attach(const char* endpoint)
    {
-      // need implementation
+      if (!strncmp(endpoint, "unix:", 5) && strlen(endpoint) > 5)
+      {
+         // unix acceptor
+         ::mkdir("/tmp/dispatcher", 0777);
+         
+         int acceptor = ::socket(PF_UNIX, SOCK_STREAM, 0);
+         
+         struct sockaddr_un addr;
+         addr.sun_family = AF_UNIX;
+         sprintf(addr.sun_path, "/tmp/dispatcher/%s", endpoint + 5);
+         
+         ::unlink(addr.sun_path);         
+         ::bind(acceptor, (struct sockaddr*)&addr, sizeof(addr));
+         
+         ::listen(acceptor, 16);
+         
+         fds_[acceptor].fd = acceptor;
+         fds_[acceptor].events = POLLIN;
+         
+         af_[acceptor] = &Dispatcher::accept_socket;
+         return true;
+      }
+      else if (!strncmp(endpoint, "tcp:", 4) && strlen(endpoint) > 4)
+      {
+         // tcp acceptor
+         int acceptor = ::socket(PF_INET, SOCK_STREAM, 0);
+       
+         struct sockaddr_in addr;
+         makeInetAddress(addr, endpoint);
+         ::bind(acceptor, (struct sockaddr*)&addr, sizeof(addr));
+         
+         ::listen(acceptor, 16);
+         
+         fds_[acceptor].fd = acceptor;
+         fds_[acceptor].events = POLLIN;
+         
+         af_[acceptor] = &Dispatcher::accept_socket;
+         return true;
+      }
+      
       return false;
    }
+   
    
    template<typename ServerT>
    void addServer(ServerT& serv)
@@ -2020,6 +2198,8 @@ struct Dispatcher
       ServerHolder<ServerT>* holder = new ServerHolder<ServerT>(serv);
       servers_[name] = holder;
       servers_by_id_[generateId()] = holder;
+      
+      serv.disp_ = this;
    }
    
    inline
@@ -2029,9 +2209,9 @@ struct Dispatcher
    }
    
    inline
-   void addRequest(ClientResponseBase& r, uint32_t sequence_nr)
+   void addRequest(Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
    {
-      outstandings_[sequence_nr] = &r;
+      outstandings_[sequence_nr] = Tuple<Parented*, ClientResponseBase*>(&req, &resp);
    }
    
    inline
@@ -2103,17 +2283,17 @@ struct Dispatcher
       assert(resp.r_);
       assert(!running_);
       
-      void* data = 0;
+      std::auto_ptr<char> data = NullAutoPtr;
       size_t len = 0;
       
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
+      int rc = loopUntil(resp.sequence_nr_, data, &len);
       
       if (rc == 0)
       {
          ClientResponse<T1, Void, Void>* r = safe_cast<ClientResponse<T1, Void, Void>*>(resp.r_ );
          assert(r);
          
-         Deserializer d(data, len);
+         Deserializer d(data.get(), len);
          d >> t1;
       }
       
@@ -2126,17 +2306,17 @@ struct Dispatcher
       assert(resp.r_);
       assert(!running_);
       
-      void* data = 0;
+      std::auto_ptr<char> data = NullAutoPtr;
       size_t len = 0;
       
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
+      int rc = loopUntil(resp.sequence_nr_, data, &len);
       
       if (rc == 0)
       {
          ClientResponse<T1, T2, Void>* r = safe_cast<ClientResponse<T1, T2, Void>*>(resp.r_ );
          assert(r);
          
-         Deserializer d(data, len);
+         Deserializer d(data.get(), len);
          d >> t1 >> t2;
       }
       
@@ -2149,24 +2329,24 @@ struct Dispatcher
       assert(resp.r_);
       assert(!running_);
       
-      void* data = 0;
+      std::auto_ptr<char> data = NullAutoPtr;
       size_t len = 0;
       
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
+      int rc = loopUntil(resp.sequence_nr_, data, &len);
       
       if (rc == 0)
       {
          ClientResponse<T1, T2, T3>* r = safe_cast<ClientResponse<T1, T2, T3>*>(resp.r_ );
          assert(r);
          
-         Deserializer d(data, len);
+         Deserializer d(data.get(), len);
          d >> t1 >> t2 >> t3;
       }
       
       return rc == 0;
    }
 
-   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, void** argData = 0, size_t* argLen = 0, unsigned int timeoutMs = 2000)
+   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, std::auto_ptr<char>& argData = NullAutoPtr, size_t* argLen = 0, unsigned int timeoutMs = 2000)
    {
       int retval = 0;
       running_ = true;
@@ -2180,72 +2360,89 @@ struct Dispatcher
       return retval;
    }
    
+   inline
    int once(unsigned int timeoutMs = 2000)
    {
-      return once_(INVALID_SEQUENCE_NR, 0, 0, timeoutMs);
+      return once_(INVALID_SEQUENCE_NR, NullAutoPtr, 0, timeoutMs);
    }
    
 private:
    
-   int once_(uint32_t sequence_nr, void** argData, size_t* argLen, unsigned int timeoutMs)
+   void accept_socket(int acceptor)
+   {
+      // doesn't matter which type of socket here
+      union
+      {
+         struct sockaddr_un u_addr;
+         struct sockaddr_in i_addr;
+      } u;
+      
+      socklen_t len = sizeof(u);
+
+      int fd = ::accept(acceptor, (struct sockaddr*)&u, &len);
+      if (fd > 0)
+      {
+         fds_[fd].fd = fd;
+         fds_[fd].events = POLLIN;
+      }
+   }
+   
+   
+   int once_(uint32_t sequence_nr, std::auto_ptr<char>& argData, size_t* argLen, unsigned int timeoutMs)
    {
       int retval = 0;
       
-      int rc = poll(fds_, sizeof(fds_)/sizeof(fds_[0]), timeoutMs);
+      int rc = ::poll(fds_, sizeof(fds_)/sizeof(fds_[0]), timeoutMs);
             
       if (rc > 0)
       {
-         if (fds_[0].revents & POLLIN)
+         for(unsigned int i=1; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
          {
-            struct sockaddr_un addr;
-            socklen_t len = sizeof(addr);
-      
-            int fd = accept(acceptor_, (struct sockaddr*)&addr, &len);
-            if (fd > 0)
+            if (fds_[i].revents & POLLIN)
             {
-               fds_[fd].fd = fd;
-               fds_[fd].events = POLLIN;
-            }
-         }
-         else
-         {
-            for(unsigned int i=1; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
-            {
-               if (fds_[i].revents & POLLIN)
+               if (af_[i] != 0)
                {
-                  char bufferarea[MAXIMUM_FRAME_SIZE] __attribute__((aligned(4)));
+                  // acceptor socket
+                  (this->*af_[i])(fds_[i].fd);
+               }
+               else
+               {
+                  // ordinary stream socket
+                  FrameHeader f;
                      
-                  ssize_t len = ::recv(fds_[i].fd, bufferarea, sizeof(bufferarea), MSG_NOSIGNAL);
+                  ssize_t len = ::recv(fds_[i].fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
                   
-                  bool can_continue = false;
-                  std::auto_ptr<char> buf(0);   // it's safe since POD array though scoped_array would be better here!
-                  const void* payload = 0;
-                  
-                  if (len > 0)
+                  if (len == sizeof(f) && f)
                   {
-                     FrameHeader* hdr = (FrameHeader*)bufferarea;
-                     if (*hdr)
-                     {
-                        can_continue = true;
+                     len = 0;
+                     std::auto_ptr<char> buf(0);   // it's safe since POD array though scoped_array would be better here!
                      
-                        payload = bufferarea + HeaderSize::size[hdr->type_];
-                        size_t max_initial_payload = MAXIMUM_FRAME_SIZE - HeaderSize::size[hdr->type_];
-                  
-                        // must read rest of data in separate frame
-                        if (hdr->payloadsize_ > max_initial_payload)
-                        {
-                           buf.reset(new char[hdr->payloadsize_]);
-                           ::memcpy(buf.get(), payload, max_initial_payload);
-                           payload = buf.get();
-                           
-                           len = ::recv(fds_[i].fd, (char*)buf.get() + max_initial_payload, hdr->payloadsize_ - max_initial_payload, MSG_NOSIGNAL);
-                           can_continue = len > 0;
-                        }
+                     char hdr[HeaderSize::max] __attribute__((aligned(4)));
+
+                     struct msghdr msg;
+                     memset(&msg, 0, sizeof(msg));
+                     
+                     struct iovec v[2] = { { hdr, HeaderSize::size[f.type_] }, { 0, 0 } };
+                     msg.msg_iov = v;
+                     
+                     if (f.payloadsize_ > 0)
+                     {
+                        msg.msg_iovlen = 2;
+                        
+                        buf.reset(new char[f.payloadsize_]);        
+                        
+                        v[1].iov_base = buf.get();
+                        v[1].iov_len = f.payloadsize_;
                      }
-                     
-                     if (can_continue)
+                     else
+                        msg.msg_iovlen = 1;
+                                                
+                     len = ::recvmsg(fds_[i].fd, &msg, MSG_NOSIGNAL|MSG_WAITALL);
+
+                     // all data read?
+                     if (len == v[0].iov_len + v[1].iov_len)
                      {
-                        switch(hdr->type_)
+                        switch(f.type_)
                         {
                         case FRAME_TYPE_REQUEST:
                            {
@@ -2254,7 +2451,7 @@ private:
                               servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
                               if (iter != servers_by_id_.end())
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, fds_[i].fd, payload, rf->payloadsize_);
+                                 iter->second->eval(rf->func_, rf->sequence_nr_, fds_[i].fd, buf.get(), rf->payloadsize_);
                               }
                               else
                                  std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
@@ -2270,26 +2467,39 @@ private:
                               {
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
                                  {
-                                    iter->second->eval(payload, rf->payloadsize_);
+                                    if (rf->result_ == 0)   // normal result
+                                    {
+                                       iter->second.get<1>()->eval(buf.get(), rf->payloadsize_);
+                                    }
+                                    else   // error result
+                                    {
+                                       RuntimeError err(rf->result_, (const char*)buf.get(), rf->sequence_nr_);
+                                       iter->second.get<0>()->parent<StubBase>()->handleRuntimeError(*iter->second.get<0>(), err);
+                                    }
                                  }
                                  else
                                  {
                                     if (rf->sequence_nr_ == sequence_nr)
                                     {
-                                       assert(argData && argLen);
-                                    
-                                       if (buf.get() == 0)
+                                       assert(argLen);
+                                       running_ = false;
+                                       
+                                       if (rf->result_ == 0)
                                        {
-                                          // must copy payload in this case
-                                          *argData = new char[rf->payloadsize_];
-                                          ::memcpy(*argData, payload, rf->payloadsize_);
+                                          if (buf.get() == 0)
+                                          {
+                                             // must copy payload in this case
+                                             argData.reset(new char[rf->payloadsize_]);
+                                             ::memcpy(argData.get(), buf.get(), rf->payloadsize_);
+                                          }
+                                          else
+                                             argData = buf;
+                                          
+                                          *argLen = rf->payloadsize_;
                                        }
                                        else
-                                          *argData = buf.release();
-                                       
-                                       *argLen = rf->payloadsize_;
+                                          throw RuntimeError(rf->result_, (const char*)buf.get(), rf->sequence_nr_);
                                     }
-                                       running_ = false;
                                  }
                                  
                                  outstandings_.erase(iter);
@@ -2362,7 +2572,7 @@ private:
                               sighandlers_type::iterator iter = sighandlers_.find(sef->id_);
                               if (iter != sighandlers_.end())
                               {
-                                 iter->second->eval(payload, sef->payloadsize_);
+                                 iter->second->eval(buf.get(), sef->payloadsize_);
                               }
                               else
                                  std::cerr << "No such signal handler found." << std::endl;
@@ -2376,7 +2586,7 @@ private:
                               InterfaceResolveResponseFrame rf(0);
                               rf.sequence_nr_ = irf->sequence_nr_;
                                  
-                              servermap_type::iterator iter = servers_.find(std::string((char*)payload));
+                              servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
                               if (iter != servers_.end())
                               {
                                  for(servermapid_type::iterator iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
@@ -2418,7 +2628,7 @@ private:
                            break;
                         
                         default:
-                           std::cerr << "Unimplemented frame type=" << hdr->type_ << std::endl;
+                           std::cerr << "Unimplemented frame type=" << f.type_ << std::endl;
                            break;
                         }
                      }
@@ -2426,11 +2636,11 @@ private:
                         clearSlot(i);
                   }
                   else
-                     clearSlot(i);                           
+                     clearSlot(i);                      
                   
                   break;
-               }                  
-            }
+               }
+            }                  
          }
       }
       else if (rc < 0)
@@ -2493,13 +2703,35 @@ private:
       }
       else
       {
-         stub.fd_ = socket(PF_UNIX, SOCK_SEQPACKET, 0);
+         int rc = -1;
+         
+         if (!strncmp(stub.boundname_, "unix:", 5))
+         {
+            stub.fd_ = ::socket(PF_UNIX, SOCK_STREAM, 0);
       
-         struct sockaddr_un addr;
-         addr.sun_family = AF_UNIX;
-         sprintf(addr.sun_path, "/tmp/dispatcher/%s", stub.boundname_);
+            struct sockaddr_un addr;
+            addr.sun_family = AF_UNIX;
+            sprintf(addr.sun_path, "/tmp/dispatcher/%s", stub.boundname_ + 5);
+            
+            rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
+         }
+         else if (!strncmp(stub.boundname_, "tcp:", 4))
+         {
+            stub.fd_ = ::socket(PF_INET, SOCK_STREAM, 0);
       
-         int rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
+            struct sockaddr_in addr;
+            makeInetAddress(addr, stub.boundname_);
+            
+            rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
+            
+            if (rc == 0)
+            {
+               int on = 1;
+               rc = ::setsockopt(stub.fd_, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+            }
+         }
+         else
+            return false;
       
          if (rc == 0)
          {
@@ -2518,7 +2750,7 @@ private:
       // 2. initialize interface resolution
       if (stub.fd_ > 0)
       {
-         // FIXME could use cache here
+         // FIXME could use local cache here
          InterfaceResolveFrame f(42);
          char buf[128];
          
@@ -2538,6 +2770,13 @@ private:
       return stub.fd_ > 0;
    }
    
+   template<typename FunctorT>
+   void onTransportError(const FunctorT& f)
+   {
+      assert(!errorfunc_);
+      errorfunc_ = f;
+   }
+   
    //registered servers
    servermap_type servers_;
    servermapid_type servers_by_id_;
@@ -2546,10 +2785,10 @@ private:
    uint32_t nextid_;
    bool running_;
    
-   // incoming acceptor socket
-   int acceptor_;
-   
    pollfd fds_[32];
+   
+   typedef void(Dispatcher::*acceptfunction_type)(int);
+   acceptfunction_type af_[32];   ///< may have different kind of sockets here (tcp or unix)
    
    // registered clients
    clientmap_type clients_;
@@ -2562,10 +2801,12 @@ private:
    serversignalers_type server_sighandlers_;
    
    socketsmap_type socks_;
+   
+   std::tr1::function<void(const TransportError&)> errorfunc_;
 };
 
 
-uint32_t StubBase::sendRequest(ClientResponseBase* handler, uint32_t id, const Serializer& s)
+uint32_t StubBase::sendRequest(Parented& requestor, ClientResponseBase* handler, uint32_t id, const Serializer& s)
 {
    assert(disp_);
  
@@ -2576,7 +2817,7 @@ uint32_t StubBase::sendRequest(ClientResponseBase* handler, uint32_t id, const S
    if (genericSend(fd(), f, s.data()))
    {
       if (handler)
-         disp_->addRequest(*handler, f.sequence_nr_);
+         disp_->addRequest(requestor, *handler, f.sequence_nr_);
    }
    return f.sequence_nr_;
 }
@@ -2721,8 +2962,7 @@ struct ServerRequestDescriptor
 
 template<template<template<typename,typename,typename> class, 
                   template<typename, typename, typename> class,
-                  template<typename,typename,typename> class> 
-   class IfaceT>
+                  template<typename,typename,typename> class> class IfaceT>
 struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
 {
    friend struct Dispatcher;
@@ -2732,11 +2972,28 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
    
    Skeleton(const char* role)
     : role_(role)
+    , disp_(0)
    {
       assert(role_);
    }
    
-   /// only valid within request handler
+   Dispatcher& disp()
+   {
+      assert(disp_);
+      return *disp_;
+   }
+   
+   /// only valid within request handler - must be called in order to respond to the request later in time
+   inline
+   ServerRequestDescriptor deferResponse()
+   {
+      assert(current_request_);
+      assert(current_request_.requestor_->hasResponse());  
+      
+      return current_request_;   // invalidates the current request!
+   }
+   
+   /// only valid to call within request handler
    void respondWith(ServerResponseHolder response)
    {
       assert(current_request_);
@@ -2750,16 +3007,6 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
       current_request_.clear();   // only respond once!!!
    }
    
-   /// only valid within request handler - must be called in order to respond to the request later in time
-   inline
-   ServerRequestDescriptor deferResponse()
-   {
-      assert(current_request_);
-      assert(current_request_.requestor_->hasResponse());  
-      
-      return current_request_;   // invalidates the current request!
-   }
-   
    /// send deferred response as retrieved by calling deferResponse()
    void respondOn(ServerRequestDescriptor& req, ServerResponseHolder response)
    {
@@ -2771,6 +3018,34 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
       r.sequence_nr_ = req.sequence_nr_;
       
       genericSend(req.fd_, r, response.payload_);
+      req.clear();
+   }
+   
+   /// send error response - only valid to call within request handler
+   void respondWith(const RuntimeError& err)
+   {
+      assert(current_request_);
+      assert(current_request_.requestor_->hasResponse());
+      
+      ResponseFrame r(err.error());
+      r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
+      r.sequence_nr_ = current_request_.sequence_nr_;
+      
+      genericSend(current_request_.fd_, r, err.what());
+      current_request_.clear();   // only respond once!!!
+   }
+   
+   /// send deferred error response as retrieved by calling deferResponse()
+   void respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
+   {
+      assert(req);
+      assert(req.requestor_->hasResponse());
+      
+      ResponseFrame r(err.error());
+      r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
+      r.sequence_nr_ = req.sequence_nr_;
+      
+      genericSend(req.fd_, r, err.what());
       req.clear();
    }
    
@@ -2797,8 +3072,22 @@ private:
                current_request_.clear();
             }
          }
+         catch(const RuntimeError& err)
+         {
+            if (current_request_.requestor_->hasResponse())
+            {
+               respondWith(err);
+               current_request_.clear();
+            }
+         }
          catch(...)
          {
+            if (current_request_.requestor_->hasResponse())
+            {
+               RuntimeError err(-1, "Unknown unhandled exception occured on server");
+               respondWith(err);
+            }
+               
             current_request_.clear();
             throw;
          }
@@ -2809,6 +3098,7 @@ private:
    
    
    const char* role_;
+   Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
 };
 

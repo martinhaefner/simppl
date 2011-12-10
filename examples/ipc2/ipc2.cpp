@@ -77,7 +77,7 @@ INTERFACE(Interface)
 struct InterfaceClient : Stub<Interface>
 {
    InterfaceClient(const char* role)
-    : Stub<Interface>(role, "myserver")   // connect the client to 'myserver'
+    : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
       // NOOP
    }
@@ -158,7 +158,7 @@ void* server(void* dispatcher)
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("myserver");
+   Dispatcher server_dispatcher("unix:myserver");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);

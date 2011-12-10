@@ -77,7 +77,7 @@ INTERFACE(Interface)
 struct InterfaceClient : Stub<Interface>
 {
    InterfaceClient(const char* role)
-    : Stub<Interface>(role, "myserver")   // connect the client to 'myserver'
+    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       resultOfAdd >> std::tr1::bind(&InterfaceClient::handleResultAdd, this, _1);
       resultOfSub >> std::tr1::bind(&InterfaceClient::handleResultSub, this, _1);
@@ -118,7 +118,7 @@ struct InterfaceClient : Stub<Interface>
 struct InterfaceClient2 : Stub<Interface>
 {
    InterfaceClient2(const char* role)
-    : Stub<Interface>(role, "myserver")   // connect the client to 'myserver'
+    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       // NOOP
    }
@@ -139,7 +139,7 @@ struct InterfaceClient2 : Stub<Interface>
 struct InterfaceClient3 : Stub<Interface>
 {
    InterfaceClient3(const char* role)
-    : Stub<Interface>(role, "myserver")   // connect the client to 'myserver'
+    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       // NOOP
    }
@@ -151,7 +151,8 @@ struct InterfaceClient3 : Stub<Interface>
    
    void handleCleared()
    {
-      std::cout << "CPU was cleared..." << std::endl;
+      std::cout << "CPU was cleared...stopping..." << std::endl;
+      disp().stop();
    }
 };
 
@@ -246,7 +247,7 @@ struct CheckMe
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("myserver");
+   Dispatcher server_dispatcher("tcp:127.0.0.1:9978");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);

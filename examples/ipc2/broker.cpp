@@ -127,7 +127,7 @@ struct HelloWorldClient : Stub<HelloWorld>
 struct BrokerClientOnServerSide : Stub<Broker>
 {
    BrokerClientOnServerSide()
-    : Stub<Broker>("broker", "the_broker")
+    : Stub<Broker>("broker", "unix:the_broker")
    {
       // NOOP
    }
@@ -135,7 +135,7 @@ struct BrokerClientOnServerSide : Stub<Broker>
    void connected()
    {
       std::cout << "Got connected to broker, registering..." << std::endl;
-      registerService("HelloWorld::helloworld", "the_server");
+      registerService("HelloWorld::helloworld", "unix:the_server");
    }
 };
 
@@ -143,7 +143,7 @@ struct BrokerClientOnServerSide : Stub<Broker>
 struct BrokerClientOnClientSide : Stub<Broker>
 {
    BrokerClientOnClientSide()
-    : Stub<Broker>("broker", "the_broker")
+    : Stub<Broker>("broker", "unix:the_broker")
    {
       serviceReady >> std::tr1::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1);
    }
@@ -172,7 +172,7 @@ struct BrokerClientOnClientSide : Stub<Broker>
 
 int main()
 {
-   Dispatcher d("the_broker");
+   Dispatcher d("unix:the_broker");
    
    BrokerImpl brk;
    d.addServer(brk);
@@ -184,7 +184,7 @@ int main()
 
 int main()
 {
-   Dispatcher d("the_server");
+   Dispatcher d("unix:the_server");
 
    HelloWorldImpl hwi;
    d.addServer(hwi);
@@ -201,7 +201,7 @@ int main()
 {
    Dispatcher d;
    
-   Stub<Broker> brk("broker", "the_broker");
+   Stub<Broker> brk("broker", "unix:the_broker");
    d.addClient(brk);
    
    if (brk.connect())

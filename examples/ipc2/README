@@ -8,7 +8,7 @@ Features
 Interface level
 
  * shoot-and-forget requests
- * requests with associated responses
+ * requests with associated responses or error responses
  * signals 
  * event driven interface
  * blocking (RPC) call interface
@@ -16,7 +16,7 @@ Interface level
 
 Transport level
 
- * currently only connection-oriented UNIX domain sockets (local transport only) 
+ * currently only sequential packet UNIX domain sockets (local transport only) 
 
 
 Possible future features
@@ -24,4 +24,6 @@ Possible future features
  * TCP transport
  * UDP/datagram transport for signals and shoot-and-forget requests
  * Attributes with appropriate notifications (value changes...)
- * Error responses
+ * multithread support 
+   * send requests from other threads
+   * receive events in thread-pool
