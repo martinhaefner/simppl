@@ -1605,7 +1605,7 @@ struct ClientSignal : ClientSignalBase
       f_ = func;
    }
    
-   /// send registration to the server
+   /// send registration to the server - only attach after the interface is connected.
    inline
    ClientSignal& attach()
    {
@@ -1613,7 +1613,7 @@ struct ClientSignal : ClientSignalBase
       return *this;
    }
    
-   /// send de-registration to the server
+   /// send de-registration to the server - only attach after the interface is connected.
    inline
    ClientSignal& detach()
    {
@@ -1681,11 +1681,17 @@ struct SignalSender
    inline
    void operator()(const std::pair<uint32_t, SignalRecipient>& info)
    {
-      SignalEmitFrame f(info.second.clientsid_);
+      operator()(info.second);
+   }
+   
+   inline
+   void operator()(const SignalRecipient& info)
+   {
+      SignalEmitFrame f(info.clientsid_);
       f.payloadsize_ = len_;
       
       // FIXME need to remove socket on EPIPE 
-      genericSend(info.second.fd_, f, data_);
+      genericSend(info.fd_, f, data_);
    }
    
    const void* data_;
@@ -1693,8 +1699,83 @@ struct SignalSender
 };
 
 
-struct ServerSignalBase
+// --------------------------------------------------------------------------------------
+
+
+template<typename DataT>
+struct ClientAttribute
 {
+   inline
+   ClientAttribute(uint32_t id, std::vector<Parented*>& parent)
+    : signal_(id, parent)
+    , data_()
+   {
+      // NOOP
+   }
+   
+   inline
+   const DataT& value() const
+   {
+      return data_;
+   }
+   
+   
+   template<typename FunctorT>
+   inline
+   void onChange(FunctorT func)
+   {
+      assert(!f_);
+      f_ = func;
+   }
+   
+   /// only call this after the server is connected.
+   inline
+   ClientAttribute& attach()
+   {
+      signal_.handledBy(std::tr1::bind(&ClientAttribute<DataT>::valueChanged, this, _1));
+      
+      (void)signal_.attach();
+      return *this;
+   }
+   
+   /// only call this after the server is connected.
+   inline
+   ClientAttribute& detach()
+   {
+      (void)signal_.detach();
+      return *this;
+   }
+   
+private:
+   
+   void valueChanged(typename ClientSignal<DataT, Void, Void>::arg1_type arg)
+   {
+      data_ = arg;
+      
+      if (f_)
+         f_(data_);
+   }
+   
+   ClientSignal<DataT, Void, Void> signal_;
+   DataT data_;
+   
+   std::tr1::function<void(typename ClientSignal<DataT, Void, Void>::arg1_type)> f_;
+};
+
+
+template<typename DataT, typename FuncT>
+inline
+void operator>>(ClientAttribute<DataT>& attr, const FuncT& func)
+{
+   attr.onChange(func);
+}
+
+
+// --------------------------------------------------------------------------------------
+
+
+struct ServerSignalBase
+{   
    inline
    void sendSignal(const Serializer& s)
    {
@@ -1704,13 +1785,19 @@ struct ServerSignalBase
    inline
    void addRecipient(int fd, uint32_t registrationid, uint32_t clientsid)
    {
-      recipients_[registrationid] = SignalRecipient(fd, clientsid);
+      SignalRecipient rcpt(fd, clientsid);
+      recipients_[registrationid] = rcpt;
    }
 
    inline
    void removeRecipient(uint32_t registrationid)
    {
       recipients_.erase(registrationid);
+   }
+   
+   virtual void onAttach(uint32_t /*registrationid*/)
+   {
+      // NOOP
    }
    
 protected:
@@ -1773,6 +1860,42 @@ struct ServerSignal : ServerSignalBase
       Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));
       sendSignal(s << arg1 << arg2 << arg3);
    }
+};
+
+
+template<typename DataT>
+struct ServerAttribute : ServerSignal<DataT, Void, Void>
+{
+   inline
+   ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : ServerSignal<DataT, Void, Void>(id, _signals)
+    , data_()
+   {
+      // NOOP
+   }
+   
+   inline
+   ServerAttribute& operator=(const DataT& data)
+   {
+      if (data != data_)
+      {
+         data_ = data;
+         emit(data_);
+      }
+      
+      return *this;
+   }
+   
+   void onAttach(uint32_t registrationid)
+   {
+      Serializer s(sizeof(DataT));
+      s << data_;
+      SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
+   }
+   
+private:
+   
+   DataT data_;
 };
 
 
@@ -2219,6 +2342,8 @@ struct Dispatcher
    {
       bool alreadyAttached = false;
       
+      // FIXME check attached list here...
+      
       for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
       {
          if (iter->second == &s)
@@ -2234,6 +2359,7 @@ struct Dispatcher
       return !alreadyAttached;
    }
    
+   /// @return 0 if signal is not registered, the id otherwise
    uint32_t removeSignalRegistration(ClientSignalBase& s)
    {
       uint32_t rc = 0;
@@ -2247,6 +2373,7 @@ struct Dispatcher
             break;
          }
       }
+      
       // maybe still outstanding?
       for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
       {
@@ -2523,10 +2650,14 @@ private:
                                  if (sig)
                                     server_sighandlers_[registrationid] = sig;
                                  
+                                 // FIXME error handling, what if sig is 0???
                                  SignalResponseFrame rf(registrationid, rsf->id_);
                                  rf.sequence_nr_ = rsf->sequence_nr_;
                                  
                                  genericSend(fds_[i].fd, rf, 0);
+                                 
+                                 if (sig)
+                                    sig->onAttach(registrationid);
                               }
                               else
                                  std::cerr << "No server with id=" << rsf->serverid_ << " found." << std::endl;
@@ -2838,6 +2969,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
          if (!disp_->isRunning())
             disp_->loopUntil(f.sequence_nr_);
       }
+      //else FIXME remove signal registration again
    }
 }
 
@@ -2854,24 +2986,29 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
    assert(disp_);
    
    UnregisterSignalFrame f(disp_->removeSignalRegistration(sigbase));
-   f.payloadsize_ = 0;
-   f.sequence_nr_ = disp_->generateSequenceNr();
    
-   genericSend(fd(), f, 0);
+   if (f.registrationid_ != 0)
+   {
+      f.payloadsize_ = 0;
+      f.sequence_nr_ = disp_->generateSequenceNr();
+      
+      genericSend(fd(), f, 0);
+   }
 }
 
 
 template<template<template<typename, typename, typename> class, 
                   template<typename, typename, typename> class,
-                  template<typename, typename, typename> class> 
+                  template<typename, typename, typename> class,
+                  template<typename> class> 
    class IfaceT>
-struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal>
+struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
 {   
    friend struct Dispatcher;
    
 private:
 
-   typedef IfaceT<ClientRequest, ClientResponse, ClientSignal> interface_type;
+   typedef IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> interface_type;
    
 public:
    
@@ -2962,13 +3099,14 @@ struct ServerRequestDescriptor
 
 template<template<template<typename,typename,typename> class, 
                   template<typename, typename, typename> class,
-                  template<typename,typename,typename> class> class IfaceT>
-struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal>
+                  template<typename,typename,typename> class,
+                  template<typename> class> class IfaceT>
+struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
    template<typename SkelT> friend struct ServerHolder;
    
-   typedef IfaceT<ServerRequest, ServerResponse, ServerSignal> interface_type;
+   typedef IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> interface_type;
    
    Skeleton(const char* role)
     : role_(role)
@@ -3111,7 +3249,8 @@ private:
    
    template<template<template<typename,typename,typename> class, 
                      template<typename, typename, typename> class,
-                     template<typename,typename,typename> class> 
+                     template<typename,typename,typename> class,
+                     template<typename> class> 
    class IfaceT>
    static int testFunc(const Skeleton<IfaceT>*);
 
@@ -3207,14 +3346,16 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 #define INTERFACE(iface) \
    template<template<typename=Void,typename=Void,typename=Void> class Request, \
             template<typename, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal> \
+            template<typename=Void,typename=Void,typename=Void> class Signal, \
+            template<typename> class Attribute> \
       struct iface; \
             \
-   template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal> > { static inline const char* const name() { return #  iface ; } }; \
-   template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal> > { static inline const char* const name() { return #  iface ; } }; \
+   template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
+   template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
    template<template<typename=Void,typename=Void,typename=Void> class Request, \
             template<typename, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal> \
+            template<typename=Void,typename=Void,typename=Void> class Signal, \
+            template<typename> class Attribute> \
       struct iface : InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
@@ -3225,5 +3366,9 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 
 #define INIT_SIGNAL(signal) \
    signal(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->signals_)
+
+// an attribute is nothing more that an encapsulated signal
+#define INIT_ATTRIBUTE(attr) \
+   attr(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->signals_)
 
 #endif   // IPC2_H

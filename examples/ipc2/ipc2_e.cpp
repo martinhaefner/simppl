@@ -50,6 +50,8 @@ INTERFACE(Interface)
    
    Signal<int> sig1;
    Signal<> cleared;
+
+   Attribute<int> myInt;
    
    Request<Tuple<int, double, std::string> > reqt;
      
@@ -66,6 +68,7 @@ INTERFACE(Interface)
     , INIT_RESPONSE(resultOfSub)
     , INIT_SIGNAL(sig1)
     , INIT_SIGNAL(cleared)
+    , INIT_ATTRIBUTE(myInt)
     , INIT_REQUEST(reqt)
    {
       add >> resultOfAdd;
