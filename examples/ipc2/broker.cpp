@@ -17,7 +17,7 @@ INTERFACE(Broker)
    Request<std::string/*servicename*/> waitForService;
    Request<std::string/*servicename*/, std::string/*location*/> registerService;
    
-   Response<std::string/*location*/> serviceReady;
+   Response<std::string/*servicename*/, std::string/*location*/> serviceReady;
    
    inline
    Broker()
@@ -68,7 +68,7 @@ struct BrokerImpl : Skeleton<Broker>
       
       for(waitersmap_type::iterator iter = p.first; iter != p.second; ++iter)
       {
-         respondOn(iter->second, serviceReady(loc));
+         respondOn(iter->second, serviceReady(serv, loc));
       }
    }
    
@@ -79,7 +79,7 @@ struct BrokerImpl : Skeleton<Broker>
       servicemap_type::iterator iter = services_.find(serv);
       if (iter != services_.end())
       {
-         respondWith(serviceReady(iter->second));
+         respondWith(serviceReady(serv, iter->second));
       }
       else
          waiters_.insert(std::pair<std::string, ServerRequestDescriptor>(serv, deferResponse()));
@@ -145,7 +145,7 @@ struct BrokerClientOnClientSide : Stub<Broker>
    BrokerClientOnClientSide()
     : Stub<Broker>("broker", "unix:the_broker")
    {
-      serviceReady >> std::tr1::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1);
+      serviceReady >> std::tr1::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1, _2);
    }
    
    void connected()
@@ -155,9 +155,9 @@ struct BrokerClientOnClientSide : Stub<Broker>
       waitForService("HelloWorld::helloworld");
    }
    
-   void handleServiceReady(const std::string& loc)
+   void handleServiceReady(const std::string& service, const std::string& loc)
    {
-      std::cout << "Got service ready signal from broker, connecting to " << loc << std::endl;
+      std::cout << "Got service ready signal from broker, connecting to '" << service << "' at location '" << loc << "'" << std::endl;
       
       HelloWorldClient* impl = new HelloWorldClient(loc.c_str());
       disp().addClient(*impl);
