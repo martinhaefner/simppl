@@ -563,11 +563,11 @@ struct Serializer // : noncopyable
    
    Serializer& write(const std::string& str)
    {
-      int32_t len = str.size() + 1;
-      enlarge(len+sizeof(len));
+      int32_t len = str.size();
+      enlarge(len + sizeof(len));
       
       memcpy(current_, &len, sizeof(len));
-      current_  += sizeof(len);
+      current_ += sizeof(len);
       memcpy(current_, str.c_str(), len);
       current_ += len;
       
@@ -780,7 +780,7 @@ struct Deserializer // : noncopyable
       if (len > 0)
       {
          str.assign(current_, len);
-         current_  += len;
+         current_ += len;
       }
       else
          str.clear();
@@ -1502,6 +1502,11 @@ public:
       return *disp_;
    }
    
+   bool isConnected() const
+   {
+      return id_ != 0 && fd_ != -1;
+   }
+   
 protected:
    
    uint32_t sendRequest(Parented& requestor, ClientResponseBase* handler, uint32_t requestid, const Serializer& s);
@@ -1875,6 +1880,12 @@ struct ServerAttribute : ServerSignal<DataT, Void, Void>
    }
    
    inline
+   const DataT& value() const
+   {
+      return data_;
+   }
+   
+   inline
    ServerAttribute& operator=(const DataT& data)
    {
       if (data != data_)
@@ -2191,6 +2202,8 @@ struct ServerHolder : ServerHolderBase
 static std::auto_ptr<char> NullAutoPtr(0);
    
 
+// FIXME Must implement generic exception response if request handler is not implemented and is correlated 
+// with a response
 struct Dispatcher
 {
    friend struct StubBase;
@@ -2251,12 +2264,22 @@ struct Dispatcher
    }
    
    inline
-   ~Dispatcher()
+   virtual ~Dispatcher()
    {
       for(servermap_type::iterator iter = servers_.begin(); iter != servers_.end(); ++iter)
       {
          delete iter->second;
       }
+   }
+   
+   virtual void socketConnected(int /*fd*/)
+   {
+      // NOOP
+   }
+   
+   virtual void socketDisconnected(int /*fd*/)
+   {
+      // NOOP
    }
    
    /// attach multiple transport endpoints (e.g. tcp socket or datagram transport endpoint)
@@ -2495,7 +2518,7 @@ struct Dispatcher
    
 private:
    
-   void accept_socket(int acceptor)
+   int accept_socket(int acceptor)
    {
       // doesn't matter which type of socket here
       union
@@ -2512,6 +2535,8 @@ private:
          fds_[fd].fd = fd;
          fds_[fd].events = POLLIN;
       }
+      
+      return fd;
    }
    
    
@@ -2530,7 +2555,10 @@ private:
                if (af_[i] != 0)
                {
                   // acceptor socket
-                  (this->*af_[i])(fds_[i].fd);
+                  int new_fd = (this->*af_[i])(fds_[i].fd);
+                  
+                  if (new_fd > 0)
+                     socketConnected(new_fd);
                }
                else
                {
@@ -2805,6 +2833,8 @@ public:
    void clearSlot(int idx)
    {
       while(::close(fds_[idx].fd) && errno == EINTR);
+      
+      socketDisconnected(fds_[idx].fd);
                         
       fds_[idx].fd = 0;
       fds_[idx].events = 0;
@@ -2918,7 +2948,7 @@ private:
    
    pollfd fds_[32];
    
-   typedef void(Dispatcher::*acceptfunction_type)(int);
+   typedef int(Dispatcher::*acceptfunction_type)(int);
    acceptfunction_type af_[32];   ///< may have different kind of sockets here (tcp or unix)
    
    // registered clients
@@ -3086,7 +3116,7 @@ struct ServerRequestDescriptor
    }
    
    inline
-   operator const void*()
+   operator const void*() const
    {
       return requestor_;
    }
@@ -3185,6 +3215,13 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttr
       
       genericSend(req.fd_, r, err.what());
       req.clear();
+   }
+   
+   inline
+   const ServerRequestDescriptor& currentRequest() const
+   {
+      assert(current_request_);
+      return current_request_;
    }
    
    
