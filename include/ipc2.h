@@ -1714,12 +1714,7 @@ struct OnChange
    static inline 
    bool eval(T& lhs, const T& rhs)
    {
-      if (lhs != rhs)
-      {
-         lhs = rhs;
-         return true;
-      }
-      return false;
+      return lhs != rhs;
    }
 };
 
@@ -1728,11 +1723,8 @@ struct Always
 {
    template<typename T>
    static inline 
-   bool eval(T& lhs, const T& rhs)
+   bool eval(const T&, const T&)
    {
-      if (lhs != rhs)
-         lhs = rhs;
-      
       return true;
    }
 };
@@ -1938,6 +1930,7 @@ struct ServerAttribute : ServerSignal<DataT, Void, Void>
    {
       if (EmitPolicyT::eval(data_, data))
       {
+         data_ = data;
          emit(data_);
       }
       

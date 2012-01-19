@@ -13,7 +13,7 @@ INTERFACE(Calculator)
    Request<double> add;
    Request<double> sub;
    
-   Attribute<double> value;
+   Attribute<double, Always> value;
 
    inline
    Calculator()
