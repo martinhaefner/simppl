@@ -1,6 +1,11 @@
+//
+// integrated broker interface handling
+//
+
+#include "include/ipc2.h"
+#include "brokerclient.h"
 #include "sbroker.h"
 #include "calculator.h"
-#include "brokerclient.h"
 
 
 struct CalculatorImpl : Skeleton<Calculator>
@@ -39,10 +44,8 @@ int main(int argc, char** argv)
       role = argv[1];
    
    Dispatcher disp("unix:calculator");
+   disp.enableBrokerage();
 
-   BrokerClient broker(disp);
-   broker.registerService(fullQualifiedName("Calculator", role), "unix:calculator");
-   
    CalculatorImpl calc(role);
    disp.addServer(calc);   
    

@@ -50,6 +50,7 @@ struct InterfaceNamer;
 template<typename ServerT>
 struct isServer;
 
+struct BrokerClient;
 struct Dispatcher;
 
 // no forward decl, just a type definition
@@ -1707,7 +1708,37 @@ struct SignalSender
 // --------------------------------------------------------------------------------------
 
 
-template<typename DataT>
+struct OnChange
+{
+   template<typename T>
+   static inline 
+   bool eval(T& lhs, const T& rhs)
+   {
+      if (lhs != rhs)
+      {
+         lhs = rhs;
+         return true;
+      }
+      return false;
+   }
+};
+
+
+struct Always
+{
+   template<typename T>
+   static inline 
+   bool eval(T& lhs, const T& rhs)
+   {
+      if (lhs != rhs)
+         lhs = rhs;
+      
+      return true;
+   }
+};
+
+
+template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
    inline
@@ -1727,7 +1758,7 @@ struct ClientAttribute
    
    template<typename FunctorT>
    inline
-   void onChange(FunctorT func)
+   void handledBy(FunctorT func)
    {
       assert(!f_);
       f_ = func;
@@ -1737,7 +1768,7 @@ struct ClientAttribute
    inline
    ClientAttribute& attach()
    {
-      signal_.handledBy(std::tr1::bind(&ClientAttribute<DataT>::valueChanged, this, _1));
+      signal_.handledBy(std::tr1::bind(&ClientAttribute<DataT, EmitPolicyT>::valueChanged, this, _1));
       
       (void)signal_.attach();
       return *this;
@@ -1768,11 +1799,11 @@ private:
 };
 
 
-template<typename DataT, typename FuncT>
+template<typename DataT, typename EmitPolicyT, typename FuncT>
 inline
-void operator>>(ClientAttribute<DataT>& attr, const FuncT& func)
+void operator>>(ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
 {
-   attr.onChange(func);
+   attr.handledBy(func);
 }
 
 
@@ -1803,6 +1834,23 @@ struct ServerSignalBase
    virtual void onAttach(uint32_t /*registrationid*/)
    {
       // NOOP
+   }
+   
+   /// remove all recipients which may emit to the file descriptor 'fd'
+   inline
+   void removeAllWithFd(int fd)
+   {
+      // algorithm could be better, mmmhh?!
+      for(std::map<uint32_t, SignalRecipient>::iterator iter = recipients_.begin(); iter != recipients_.end(); )
+      {
+         if (iter->second.fd_ == fd)
+         {
+            recipients_.erase(iter);
+            iter = recipients_.begin();
+         }
+         else
+            ++iter;
+      }
    }
    
 protected:
@@ -1868,7 +1916,7 @@ struct ServerSignal : ServerSignalBase
 };
 
 
-template<typename DataT>
+template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute : ServerSignal<DataT, Void, Void>
 {
    inline
@@ -1888,9 +1936,8 @@ struct ServerAttribute : ServerSignal<DataT, Void, Void>
    inline
    ServerAttribute& operator=(const DataT& data)
    {
-      if (data != data_)
+      if (EmitPolicyT::eval(data_, data))
       {
-         data_ = data;
          emit(data_);
       }
       
@@ -2200,7 +2247,7 @@ struct ServerHolder : ServerHolderBase
    
 
 static std::auto_ptr<char> NullAutoPtr(0);
-   
+
 
 // FIXME Must implement generic exception response if request handler is not implemented and is correlated 
 // with a response
@@ -2253,6 +2300,7 @@ struct Dispatcher
     : running_(false)
     , sequence_(0)
     , nextid_(0)
+    , broker_(0)
    {
       ::memset(fds_, 0, sizeof(fds_));
       ::memset(af_, 0, sizeof(af_));
@@ -2263,14 +2311,17 @@ struct Dispatcher
       }
    }
    
-   inline
-   virtual ~Dispatcher()
+   /// allow clients to send requests from threads other the dispatcher is running in
+   void enableThreadedClient()
    {
-      for(servermap_type::iterator iter = servers_.begin(); iter != servers_.end(); ++iter)
-      {
-         delete iter->second;
-      }
+      // FIXME
    }
+   
+   /// allow dispatcher to talk to broker for registering new services and to
+   /// wait for clients to attach services
+   void enableBrokerage();
+   
+   virtual ~Dispatcher();
    
    virtual void socketConnected(int /*fd*/)
    {
@@ -2287,6 +2338,8 @@ struct Dispatcher
    ///        attach("tcp:127.0.0.1:8888")
    bool attach(const char* endpoint)
    {
+      bool rc = false;
+      
       if (!strncmp(endpoint, "unix:", 5) && strlen(endpoint) > 5)
       {
          // unix acceptor
@@ -2307,7 +2360,7 @@ struct Dispatcher
          fds_[acceptor].events = POLLIN;
          
          af_[acceptor] = &Dispatcher::accept_socket;
-         return true;
+         rc = true;
       }
       else if (!strncmp(endpoint, "tcp:", 4) && strlen(endpoint) > 4)
       {
@@ -2324,29 +2377,18 @@ struct Dispatcher
          fds_[acceptor].events = POLLIN;
          
          af_[acceptor] = &Dispatcher::accept_socket;
-         return true;
+         rc = true;
       }
       
-      return false;
+      if (rc)
+         endpoints_.push_back(endpoint);
+         
+      return rc;
    }
    
    
    template<typename ServerT>
-   void addServer(ServerT& serv)
-   {
-      STATIC_CHECK(isServer<ServerT>::value, only_add_servers_here);
-      
-      std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
-      
-      assert(servers_.find(name) == servers_.end());
-      
-      std::cout << "Adding server for '" << name << "'" << std::endl;
-      ServerHolder<ServerT>* holder = new ServerHolder<ServerT>(serv);
-      servers_[name] = holder;
-      servers_by_id_[generateId()] = holder;
-      
-      serv.disp_ = this;
-   }
+   void addServer(ServerT& serv);
    
    inline
    uint32_t generateId()
@@ -2416,16 +2458,7 @@ struct Dispatcher
       return sequence_ == INVALID_SEQUENCE_NR ? ++sequence_ : sequence_;
    }
    
-   void addClient(StubBase& clnt)
-   {
-      assert(!clnt.disp_);   // don't add it twice
-      
-      clnt.disp_ = this;
-      clients_.insert(std::make_pair(fullQualifiedName(clnt), &clnt)); 
-      
-      if (isRunning())
-         connect(clnt);
-   }
+   void addClient(StubBase& clnt);
    
    template<typename T1>
    bool waitForResponse(const ClientResponseHolder& resp, T1& t1)
@@ -2517,6 +2550,14 @@ struct Dispatcher
    }
    
 private:
+   
+   
+   void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location)
+   {
+      assert(fullQualifiedName(*stub) == fullName);
+      connect(*stub, false, location.c_str());
+   }
+   
    
    int accept_socket(int acceptor)
    {
@@ -2822,8 +2863,11 @@ public:
       
       for(clientmap_type::iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
       {
-         if (iter->second->fd_ <= 0)
-            assert(connect(*iter->second));
+         if (strcmp(iter->second->boundname_, "auto:"))
+         {
+            if (iter->second->fd_ <= 0)
+               assert(connect(*iter->second));
+         }
       }
       
       // now enter infinite eventloop
@@ -2833,6 +2877,11 @@ public:
    void clearSlot(int idx)
    {
       while(::close(fds_[idx].fd) && errno == EINTR);
+      
+      for (serversignalers_type::iterator iter = server_sighandlers_.begin(); iter != server_sighandlers_.end(); ++iter)
+      {
+         iter->second->removeAllWithFd(fds_[idx].fd);
+      }
       
       socketDisconnected(fds_[idx].fd);
                         
@@ -2854,10 +2903,14 @@ public:
    
 private:
    
-   bool connect(StubBase& stub, bool blockUntilResponse = false)
+   bool connect(StubBase& stub, bool blockUntilResponse = false, const char* location = 0)
    {
+      const char* the_location = location ? location : stub.boundname_;
+      
+      assert(strcmp(the_location, "auto:"));
+      
       // 1. connect the socket physically - if not yet done
-      socketsmap_type::iterator iter = socks_.find(stub.boundname_);
+      socketsmap_type::iterator iter = socks_.find(the_location);
       if (iter != socks_.end())
       {
          stub.fd_ = iter->second;
@@ -2866,22 +2919,22 @@ private:
       {
          int rc = -1;
          
-         if (!strncmp(stub.boundname_, "unix:", 5))
+         if (!strncmp(the_location, "unix:", 5))
          {
             stub.fd_ = ::socket(PF_UNIX, SOCK_STREAM, 0);
       
             struct sockaddr_un addr;
             addr.sun_family = AF_UNIX;
-            sprintf(addr.sun_path, "/tmp/dispatcher/%s", stub.boundname_ + 5);
+            sprintf(addr.sun_path, "/tmp/dispatcher/%s", the_location + 5);
             
             rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
          }
-         else if (!strncmp(stub.boundname_, "tcp:", 4))
+         else if (!strncmp(the_location, "tcp:", 4))
          {
             stub.fd_ = ::socket(PF_INET, SOCK_STREAM, 0);
       
             struct sockaddr_in addr;
-            makeInetAddress(addr, stub.boundname_);
+            makeInetAddress(addr, the_location);
             
             rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
             
@@ -2899,7 +2952,7 @@ private:
             fds_[stub.fd_].fd = stub.fd_;
             fds_[stub.fd_].events = POLLIN;
             
-            socks_[stub.boundname_] = stub.fd_;
+            socks_[the_location] = stub.fd_;
          }
          else
          {
@@ -2958,12 +3011,15 @@ private:
    
    outstanding_requests_type outstandings_;
    outstanding_signalregistrations_type outstanding_sig_registrs_;
-   sighandlers_type sighandlers_;
+   sighandlers_type sighandlers_;   
    serversignalers_type server_sighandlers_;
    
    socketsmap_type socks_;
    
    std::tr1::function<void(const TransportError&)> errorfunc_;
+   
+   BrokerClient* broker_;
+   std::vector<std::string> endpoints_;
 };
 
 
@@ -3027,10 +3083,10 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 }
 
 
-template<template<template<typename, typename, typename> class, 
-                  template<typename, typename, typename> class,
-                  template<typename, typename, typename> class,
-                  template<typename> class> 
+template<template<template<typename,typename,typename> class, 
+                  template<typename,typename,typename> class,
+                  template<typename,typename,typename> class,
+                  template<typename,typename> class> 
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
 {   
@@ -3128,9 +3184,9 @@ struct ServerRequestDescriptor
 
 
 template<template<template<typename,typename,typename> class, 
-                  template<typename, typename, typename> class,
                   template<typename,typename,typename> class,
-                  template<typename> class> class IfaceT>
+                  template<typename,typename,typename> class,
+                  template<typename,typename> class> class IfaceT>
 struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
@@ -3285,9 +3341,9 @@ struct isServer
 private:
    
    template<template<template<typename,typename,typename> class, 
-                     template<typename, typename, typename> class,
                      template<typename,typename,typename> class,
-                     template<typename> class> 
+                     template<typename,typename,typename> class,
+                     template<typename,typename> class> 
    class IfaceT>
    static int testFunc(const Skeleton<IfaceT>*);
 
@@ -3384,7 +3440,7 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
    template<template<typename=Void,typename=Void,typename=Void> class Request, \
             template<typename, typename=Void, typename=Void> class Response, \
             template<typename=Void,typename=Void,typename=Void> class Signal, \
-            template<typename> class Attribute> \
+            template<typename,typename=OnChange> class Attribute> \
       struct iface; \
             \
    template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
@@ -3392,7 +3448,7 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
    template<template<typename=Void,typename=Void,typename=Void> class Request, \
             template<typename, typename=Void, typename=Void> class Response, \
             template<typename=Void,typename=Void,typename=Void> class Signal, \
-            template<typename> class Attribute> \
+            template<typename,typename=OnChange> class Attribute> \
       struct iface : InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
@@ -3407,5 +3463,76 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 // an attribute is nothing more that an encapsulated signal
 #define INIT_ATTRIBUTE(attr) \
    attr(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->signals_)
+
+   
+#include "brokerclient.h"
+
+
+Dispatcher::~Dispatcher()
+{
+   for(servermap_type::iterator iter = servers_.begin(); iter != servers_.end(); ++iter)
+   {
+      delete iter->second;
+   }
+   
+   if (broker_)
+   {
+      delete broker_;
+      broker_ = 0;
+   }
+}
+
+
+void Dispatcher::addClient(StubBase& clnt)
+{
+   assert(!clnt.disp_);   // don't add it twice
+   
+   clnt.disp_ = this;
+   clients_.insert(std::make_pair(fullQualifiedName(clnt), &clnt)); 
+   
+   if (!strcmp(clnt.boundname_, "auto:"))
+   {
+      assert(broker_);
+      broker_->waitForService(fullQualifiedName(clnt), std::tr1::bind(&Dispatcher::serviceReady, this, &clnt, _1, _2));
+   }
+   else
+   {
+      if (isRunning())
+         connect(clnt);
+   }
+}
+
+
+template<typename ServerT>
+void Dispatcher::addServer(ServerT& serv)
+{
+   STATIC_CHECK(isServer<ServerT>::value, only_add_servers_here);
+   assert(!endpoints_.empty());
+   
+   std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
+   
+   assert(servers_.find(name) == servers_.end());
+   std::cout << "Adding server for '" << name << "'" << std::endl;
+   
+   if (broker_)
+   {
+      // FIXME must register service for multiple endpoints
+      // FIXME must resolve INADDR_ANY to senseful address list for registration
+      broker_->registerService(name, endpoints_.front());
+   }
+   
+   ServerHolder<ServerT>* holder = new ServerHolder<ServerT>(serv);
+   servers_[name] = holder;
+   servers_by_id_[generateId()] = holder;
+   
+   serv.disp_ = this;
+}
+
+inline
+void Dispatcher::enableBrokerage()
+{
+   broker_ = new BrokerClient(*this);
+}
+
 
 #endif   // IPC2_H

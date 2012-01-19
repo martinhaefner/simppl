@@ -1,5 +1,5 @@
 //
-// example of self-made broker interface handling
+// example of integrated broker interface handling
 //
 
 #include "calculator.h"
@@ -7,16 +7,16 @@
 #include <pthread.h>
 
 
+static const char* rolename = "calculator";
+   
 struct CalculatorClient;
 static CalculatorClient* calc = 0;
 
-static const char* rolename = "calculator";
-   
 
 struct CalculatorClient : Stub<Calculator>
 {
-   CalculatorClient(const char* location)
-    : Stub<Calculator>(rolename, location)
+   CalculatorClient()
+    : Stub<Calculator>(rolename, "auto:")
    {
       // NOOP
    }
@@ -24,6 +24,7 @@ struct CalculatorClient : Stub<Calculator>
    void connected()
    {
       value.attach() >> std::tr1::bind(&CalculatorClient::valueChanged, this, _1);
+      calc = this;
    }
    
    void valueChanged(double d)
@@ -33,24 +34,13 @@ struct CalculatorClient : Stub<Calculator>
 };
 
 
-void ClientsFactory(Dispatcher* disp, const std::string& fullName, const std::string& location)
-{
-   if (fullName == fullQualifiedName("Calculator", rolename))
-   {
-      CalculatorClient* new_calc = new CalculatorClient(location.c_str());
-      disp->addClient(*new_calc);
-      
-      calc = new_calc;
-   }
-}
-
-
 void* threadRunner(void* arg)
 {
    Dispatcher disp;
-
-   BrokerClient broker(disp);
-   broker.waitForService(fullQualifiedName("Calculator", rolename), std::tr1::bind(ClientsFactory, &disp, _1, _2));
+   disp.enableBrokerage();
+   
+   CalculatorClient clnt;
+   disp.addClient(clnt);
    
    disp.run();
    return 0;
@@ -75,6 +65,7 @@ int main(int argc, char** argv)
    bool finished = false;
    while(!finished)
    {
+      std::cout << "Input: q(uit),c(lear),+-<value> > ";
       std::cin >> arg;
       switch(arg)
       {
@@ -100,7 +91,7 @@ int main(int argc, char** argv)
             break;
             
          default:
-            std::cout << "Unknown command:" << std::endl;
+            std::cout << "Unknown command: " << arg << std::endl;
             break;
       }
    }   
