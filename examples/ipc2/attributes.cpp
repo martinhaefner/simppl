@@ -38,6 +38,7 @@ INTERFACE(Interface)
 
    Attribute<int> myInt;
    Attribute<MyStruct> myStruct;
+   Attribute<std::vector<int> > myVector;
    
    inline
    Interface()
@@ -45,6 +46,7 @@ INTERFACE(Interface)
     , INIT_RESPONSE(resultOfDoSomething)
     , INIT_ATTRIBUTE(myInt)
     , INIT_ATTRIBUTE(myStruct)
+    , INIT_ATTRIBUTE(myVector)
    {
       doSomething >> resultOfDoSomething;
    }
@@ -66,6 +68,8 @@ struct Server : Skeleton<Interface>
       
       // these assignments raise signals if there is anybody connected to them
       myInt = i;
+      myVector.push_back(i);
+      
       myStruct = MyStruct(i, "The answer to all questions.");
       
       respondWith(resultOfDoSomething(i));
@@ -87,6 +91,7 @@ struct Client : Stub<Interface>
    {
       myInt.attach() >> std::tr1::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification
+      myVector.attach();
       
       doSomething(42);
    }

@@ -65,6 +65,20 @@ struct remove_ref<const T&>
 
 
 // need partial template specialization
+template<typename T> struct remove_const { typedef T type; };
+
+template<typename T> struct remove_const<const T> { typedef T type; };
+template<typename T> struct remove_const<const T*> { typedef T* type; };
+template<typename T> struct remove_const<const T&> { typedef T& type; };
+template<typename T> struct remove_const<volatile const T> { typedef volatile T type; };
+template<typename T> struct remove_const<volatile const T*> { typedef volatile T* type; };
+template<typename T> struct remove_const<volatile const T&> { typedef volatile T& type; };
+
+
+// ---------------------------------------------------------------------------------------
+
+
+// need partial template specialization
 template<typename T>
 struct remove_ptr
 {

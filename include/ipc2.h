@@ -1705,7 +1705,58 @@ struct SignalSender
 };
 
 
+// partial update mode for attributes
+enum How
+{
+   Full = 0,
+   Replace,   ///< replace and/or append (depending on given index)
+   Remove,
+   Insert,
+};
+
+
+// FIXME optimization - create read/write functions in serializer for this type to drop the need of a vector copy here
+template<typename VectorT>
+struct VectorAttributeUpdate
+{
+   typedef Tuple<VectorT, uint32_t, uint32_t> type;
+   
+   VectorAttributeUpdate(VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
+    : how_(how)
+    , where_(from)
+   {
+      if (how != Full)
+      {
+         for(int i=from; i!=from+len; ++i)
+         {
+            data_.push_back(vec[i]);
+         }
+      }
+      else
+         data_ = vec;
+   }
+   
+   VectorT data_;
+   uint32_t how_;
+   uint32_t where_;
+};
+
+
 // --------------------------------------------------------------------------------------
+
+
+template<typename T>
+struct is_vector
+{
+   enum { value = false };
+};
+
+
+template<typename T>
+struct is_vector<std::vector<T> >
+{
+   enum { value = true };
+};
 
 
 struct OnChange
@@ -1784,6 +1835,7 @@ private:
          f_(data_);
    }
    
+   // FIXME have other DataT here for vector based attribute
    ClientSignal<DataT, Void, Void> signal_;
    DataT data_;
    
@@ -1908,30 +1960,237 @@ struct ServerSignal : ServerSignalBase
 };
 
 
-template<typename DataT, typename EmitPolicyT>
-struct ServerAttribute : ServerSignal<DataT, Void, Void>
+template<typename DataT>
+struct BaseAttribute 
+ : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
 {
    inline
+   BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
+   {
+      // NOOP
+   }
+    
+   inline
+   const DataT& value() const
+   {
+      return t_;
+   }
+ 
+protected:
+      
+   DataT t_;
+};
+
+
+// horrible hack to remove the constness of the stl iterator for vector,
+// maybe there are better solutions to achieve this?
+template<typename IteratorT, typename ContainerT>
+inline
+__gnu_cxx::__normal_iterator<typename remove_const<IteratorT>::type, ContainerT>
+unconst(__gnu_cxx::__normal_iterator<IteratorT, ContainerT>& iter)
+{
+   return __gnu_cxx::__normal_iterator<typename remove_const<IteratorT>::type, ContainerT>(
+      const_cast<typename remove_const<IteratorT>::type>(iter.base()));
+}
+
+
+// forward decl
+template<typename T>
+struct VectorAttributeMixin;
+
+
+template<typename T>
+struct VectorValue
+{
+   inline
+   VectorValue(VectorAttributeMixin<std::vector<T> >& mixin, typename std::vector<T>::iterator iter)
+    : mixin_(mixin)
+    , iter_(iter)
+   {
+      // NOOP
+   }
+   
+   T& operator=(const T& t);
+   
+   VectorAttributeMixin<std::vector<T> >& mixin_;
+   typename std::vector<T>::iterator iter_;
+};
+   
+
+// FIXME should either implement OnChange/Always here or say that vectors are Always only
+template<typename T>
+struct VectorAttributeMixin : BaseAttribute<T>
+{
+public:
+   
+   inline
+   VectorAttributeMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : baseclass(id, _signals)
+   {
+      // NOOP
+   }
+   
+   typedef typename T::pointer pointer;
+   typedef typename T::iterator iterator;
+   typedef typename T::const_iterator const_iterator;
+   typedef typename T::value_type value_type;
+   
+   template<typename IteratorT>
+   inline
+   void insert(const_iterator where, IteratorT from, IteratorT to)
+   {
+      insert(unconst(where), from, to, bool_<is_integral<IteratorT>::value>());
+   }
+   
+   inline
+   void insert(const_iterator where, const value_type& value)
+   {
+      t_.insert(unconst(where), value);
+      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), 1));
+   }
+   
+   inline
+   void erase(const_iterator where)
+   {
+      t_.erase(iterator(const_cast<pointer>(where.base())));
+      emit(VectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
+   }
+   
+   inline
+   void erase(const_iterator from, const_iterator to)
+   {
+      t_.erase(unconst(from), unconst(to));
+      emit(VectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
+   }
+   
+   inline
+   void clear()
+   {
+      erase(begin(), end());
+   }
+   
+   inline
+   bool empty() const
+   {
+      return t_.empty();
+   }
+   
+   inline
+   void push_back(const value_type& val)
+   {
+      t_.push_back(val);
+      emit(VectorAttributeUpdate<T>(t_, Replace, t_.size()-1, 1));
+   }
+   
+   inline
+   void pop_back()
+   {
+      t_.pop_back();
+      emit(VectorAttributeUpdate<T>(t_, Remove, t_.size(), 1));
+   }
+   
+   inline
+   size_t size() const
+   {
+      return t_.size();
+   }
+   
+   inline
+   const_iterator begin() const
+   {
+      return t_.begin();
+   }
+   
+   inline
+   const_iterator end() const
+   {
+      return t_.end();
+   }
+   
+   inline
+   VectorValue<value_type> operator[](size_t idx)
+   {
+      return VectorValue<value_type>(*this, t_.begin()+idx);
+   }
+   
+   template<typename IteratorT>
+   inline
+   void replace(const_iterator where, IteratorT from, IteratorT to)
+   {
+      size_t len = std::distance(from, to);
+      for(iterator iter = unconst(where); iter != t_.end() && from != to; ++iter, ++from)
+      {
+         replace(unconst(where), *from);
+      }
+
+      while(from != to)
+      {
+         t_.push_back(*from);
+         ++from;
+      }
+      
+      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
+   }
+   
+   inline
+   void replace(const_iterator where, const value_type& v)
+   {
+      *unconst(where) = v;
+      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
+   }
+   
+protected:
+   
+   typedef BaseAttribute<T> baseclass;
+   using baseclass::t_;
+   
+   inline
+   void insert(const_iterator where, size_t count, const value_type& value, tTrueType)
+   {
+      t_.insert(unconst(where), count, value);
+      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), count));
+   }
+   
+   template<typename IteratorT>
+   inline
+   void insert(const_iterator where, IteratorT from, IteratorT to, tFalseType)
+   {
+      t_.insert(unconst(where), from, to);
+      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), std::distance(from, to)));
+   }
+};
+
+
+template<typename T>
+inline
+T& VectorValue<T>::operator=(const T& t)
+{
+   mixin_.replace(iter_, t);
+   return *iter_;
+}
+
+
+template<typename DataT, typename EmitPolicyT>
+struct ServerAttribute 
+   : if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type
+{
+   typedef typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type baseclass;
+   
+   inline
    ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<DataT, Void, Void>(id, _signals)
-    , data_()
+    : baseclass(id, _signals)
    {
       // NOOP
    }
    
    inline
-   const DataT& value() const
-   {
-      return data_;
-   }
-   
-   inline
    ServerAttribute& operator=(const DataT& data)
    {
-      if (EmitPolicyT::eval(data_, data))
+      if (EmitPolicyT::eval(t_, data))
       {
-         data_ = data;
-         emit(data_);
+         t_ = data;
+         emit(t_);
       }
       
       return *this;
@@ -1940,13 +2199,12 @@ struct ServerAttribute : ServerSignal<DataT, Void, Void>
    void onAttach(uint32_t registrationid)
    {
       Serializer s(sizeof(DataT));
-      s << data_;
+      s << t_;
       SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
    }
    
-private:
-   
-   DataT data_;
+protected:
+   using BaseAttribute<DataT>::t_;
 };
 
 
@@ -2771,7 +3029,7 @@ private:
                                  std::cerr << "No such signal handler found." << std::endl;
                            }
                            break;
-                        
+                      
                         case FRAME_TYPE_RESOLVE_INTERFACE:
                            {
                               InterfaceResolveFrame* irf = (InterfaceResolveFrame*)hdr;
