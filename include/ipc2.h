@@ -1704,6 +1704,9 @@ struct SignalSender
 };
 
 
+// -------------------------------------------------------------------------------
+
+
 // partial update mode for attributes
 enum How
 {
@@ -1715,45 +1718,81 @@ enum How
 };
 
 
-// FIXME optimization - create read/write functions in serializer for this type to drop the need of a vector copy here
 template<typename VectorT>
-struct VectorAttributeUpdate
+struct ClientVectorAttributeUpdate
 {
-   typedef Tuple<VectorT, uint32_t, uint32_t, uint32_t> type;
-
    inline   
-   VectorAttributeUpdate()
+   ClientVectorAttributeUpdate()
     : how_(None)
     , where_(0)
     , len_(0)
    {
       // NOOP
    }
-
-   VectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
-    : how_(how)
-    , where_(from)
-    , len_(len)
-   {
-      if (how != Full)
-      {
-         if (how != Remove)
-         {
-            for(int i=from; i!=from+len; ++i)
-            {
-               data_.push_back(vec[i]);
-            }
-         }
-      }
-      else
-         data_ = vec;
-   }
    
    VectorT data_;
-   uint32_t how_;
+   How how_;
    uint32_t where_;
    uint32_t len_;
 };
+
+
+template<typename VectorT>
+Deserializer& operator>>(Deserializer& istream, ClientVectorAttributeUpdate<VectorT>& updt)
+{
+   istream >> (uint32_t&)updt.how_;
+   istream >> updt.where_;
+   istream >> updt.len_;
+   
+   if (updt.how_ != Remove)
+   {
+      updt.data_.resize(updt.len_);
+      for(int i=0; i<updt.len_; ++i)
+      {
+         istream >> updt.data_[i];
+      }
+   }
+   
+   return istream;
+}
+
+
+template<typename VectorT>
+struct ServerVectorAttributeUpdate
+{
+   ServerVectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
+    : data_(vec)
+    , how_(how)
+    , where_(from)
+    , len_(how == Full ? vec.size() : len)
+   {
+      // NOOP
+   }
+   
+   const VectorT& data_;
+   How how_;
+   uint32_t where_;
+   uint32_t len_;
+};
+
+
+template<typename VectorT>
+Serializer& operator<<(Serializer& ostream, const ServerVectorAttributeUpdate<VectorT>& updt)
+{
+   ostream << (uint32_t)updt.how_;
+   ostream << updt.where_;
+   ostream << updt.len_;
+   
+   if (updt.how_ != Remove)
+   {
+      for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
+      {
+         ostream << updt.data_[i];
+      }
+   }
+   
+   return ostream;
+}
 
 
 // --------------------------------------------------------------------------------------
@@ -1799,7 +1838,11 @@ template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
    typedef typename CallTraits<DataT>::param_type arg_type;
-
+   
+   typedef typename if_<is_vector<DataT>::value, 
+      std::tr1::function<void(arg_type, How, uint32_t, uint32_t)>, 
+      std::tr1::function<void(arg_type)> >::type function_type;
+   
    inline
    ClientAttribute(uint32_t id, std::vector<Parented*>& parent)
     : signal_(id, parent)
@@ -1844,9 +1887,9 @@ struct ClientAttribute
 private:
 
    /// vector argument with partial update support   
-   typedef ClientSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
+   typedef ClientSignal<typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
 
-   void setAndCall(const VectorAttributeUpdate<DataT>& varg)
+   void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
    {
       switch (varg.how_)
       {
@@ -1882,7 +1925,7 @@ private:
       }
 
       if (f_)
-         f_(data_);
+         f_(data_, varg.how_, varg.where_, varg.len_);
    }
 
    /// normal argument
@@ -1903,7 +1946,7 @@ private:
    signal_type signal_;
    DataT data_;
    
-   std::tr1::function<void(arg_type)> f_;
+   function_type f_;
 };
 
 
@@ -2030,18 +2073,17 @@ protected:
       s << arg1;
 
       SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
-
    }
 };
 
 
 template<typename DataT>
 struct BaseAttribute 
- : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
+ : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
 {
    inline
    BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
+    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
    {
       // NOOP
    }
@@ -2122,21 +2164,21 @@ public:
    void insert(const_iterator where, const value_type& value)
    {
       t_.insert(unconst(where), value);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), 1));
+      emit(ServerVectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), 1));
    }
    
    inline
    void erase(const_iterator where)
    {
       t_.erase(iterator(const_cast<pointer>(where.base())));
-      emit(VectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
+      emit(ServerVectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
    }
    
    inline
    void erase(const_iterator from, const_iterator to)
    {
       t_.erase(unconst(from), unconst(to));
-      emit(VectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
+      emit(ServerVectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
    }
    
    inline
@@ -2155,14 +2197,14 @@ public:
    void push_back(const value_type& val)
    {
       t_.push_back(val);
-      emit(VectorAttributeUpdate<T>(t_, Replace, t_.size()-1, 1));
+      emit(ServerVectorAttributeUpdate<T>(t_, Replace, t_.size()-1, 1));
    }
    
    inline
    void pop_back()
    {
       t_.pop_back();
-      emit(VectorAttributeUpdate<T>(t_, Remove, t_.size(), 1));
+      emit(ServerVectorAttributeUpdate<T>(t_, Remove, t_.size(), 1));
    }
    
    inline
@@ -2205,14 +2247,14 @@ public:
          ++from;
       }
       
-      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
+      emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
    }
    
    inline
    void replace(const_iterator where, const value_type& v)
    {
       *unconst(where) = v;
-      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
+      emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
    }
    
 protected:
@@ -2224,7 +2266,7 @@ protected:
    void insert(const_iterator where, size_t count, const value_type& value, tTrueType)
    {
       t_.insert(unconst(where), count, value);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), count));
+      emit(ServerVectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), count));
    }
    
    template<typename IteratorT>
@@ -2232,7 +2274,7 @@ protected:
    void insert(const_iterator where, IteratorT from, IteratorT to, tFalseType)
    {
       t_.insert(unconst(where), from, to);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), std::distance(from, to)));
+      emit(ServerVectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), std::distance(from, to)));
    }
 };
 
@@ -2612,7 +2654,7 @@ struct Dispatcher
       while(*++port != ':');
       *port = '\0';
       ++port;
-      std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
+      //std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
       addr.sin_family = AF_INET;
       addr.sin_port = htons(::atoi(port));
       addr.sin_addr.s_addr = ::inet_addr(tmp + 4);

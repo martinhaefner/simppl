@@ -69,7 +69,6 @@ struct Server : Skeleton<Interface>
       // these assignments raise signals if there is anybody connected to them
       myInt = i;
       myVector.push_back(i);
-      
       myStruct = MyStruct(i, "The answer to all questions.");
       
       respondWith(resultOfDoSomething(i));
@@ -91,7 +90,7 @@ struct Client : Stub<Interface>
    {
       myInt.attach() >> std::tr1::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification
-      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1);
+      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1, _2, _3, _4);
       
       doSomething(42);
    }
@@ -110,9 +109,9 @@ struct Client : Stub<Interface>
       std::cout << "attribute myInt changed: new value=" << i << ", or new value=" << myInt.value() << " respectively." << std::endl;
    }
 
-   void vectorChanged(const std::vector<int>& iv)
+   void vectorChanged(const std::vector<int>& iv, How how, uint32_t where, uint32_t len)
    {
-      std::cout << "Yes, vector changed: ";
+      std::cout << "Yes, vector changed(" << how << "," << where << "," << len << "): ";
 
       if (iv.empty())
       {
