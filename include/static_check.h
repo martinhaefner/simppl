@@ -12,9 +12,14 @@ template<>
 struct CheckOK<false>;  // not implemented
 
 
+#if(__GNUC_MINOR__ > 4)
 #define STATIC_CHECK(condition, message) \
    typedef typename CheckOK<condition>::type message;
-   
+#else 
+#define STATIC_CHECK(condition, message) \
+   int message[condition?1:-1]
+#endif
+
 // template<typename T> struct message; 
 // typedef CheckOK<condition>::type message;
 

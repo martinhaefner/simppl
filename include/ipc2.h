@@ -757,7 +757,6 @@ struct Deserializer // : noncopyable
       uint32_t len;
       read(len);
       
-      // FIXME how is len referenced in string functions (including or excluding the last 0)
       if (len > 0)
       {
          str = allocate(len);
@@ -1708,6 +1707,7 @@ struct SignalSender
 // partial update mode for attributes
 enum How
 {
+   None = -1,
    Full = 0,
    Replace,   ///< replace and/or append (depending on given index)
    Remove,
@@ -1719,17 +1719,30 @@ enum How
 template<typename VectorT>
 struct VectorAttributeUpdate
 {
-   typedef Tuple<VectorT, uint32_t, uint32_t> type;
-   
-   VectorAttributeUpdate(VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
+   typedef Tuple<VectorT, uint32_t, uint32_t, uint32_t> type;
+
+   inline   
+   VectorAttributeUpdate()
+    : how_(None)
+    , where_(0)
+    , len_(0)
+   {
+      // NOOP
+   }
+
+   VectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
     : how_(how)
     , where_(from)
+    , len_(len)
    {
       if (how != Full)
       {
-         for(int i=from; i!=from+len; ++i)
+         if (how != Remove)
          {
-            data_.push_back(vec[i]);
+            for(int i=from; i!=from+len; ++i)
+            {
+               data_.push_back(vec[i]);
+            }
          }
       }
       else
@@ -1739,6 +1752,7 @@ struct VectorAttributeUpdate
    VectorT data_;
    uint32_t how_;
    uint32_t where_;
+   uint32_t len_;
 };
 
 
@@ -1784,6 +1798,8 @@ struct Always
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
+   typedef typename CallTraits<DataT>::param_type arg_type;
+
    inline
    ClientAttribute(uint32_t id, std::vector<Parented*>& parent)
     : signal_(id, parent)
@@ -1826,20 +1842,68 @@ struct ClientAttribute
    }
    
 private:
-   
-   void valueChanged(typename ClientSignal<DataT, Void, Void>::arg1_type arg)
+
+   /// vector argument with partial update support   
+   typedef ClientSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
+
+   void setAndCall(const VectorAttributeUpdate<DataT>& varg)
    {
-      data_ = arg;
-      
+      switch (varg.how_)
+      {
+      case Full:
+         data_ = varg.data_;
+         break;
+
+      case Remove:
+         data_.erase(data_.begin()+varg.where_, data_.begin() + varg.where_ + varg.len_);
+         break;
+
+      case Insert:
+         data_.insert(data_.begin()+varg.where_, varg.data_.begin(), varg.data_.end());
+         break;
+
+      case Replace:
+         assert(varg.data_.size() == varg.len_);
+
+         for(int i=0; i<varg.len_; ++i)
+         {
+            if (i+varg.where_ < data_.size())
+            {
+               data_[i+varg.where_] = varg.data_[i];
+            }
+            else            
+               data_.push_back(varg.data_[i]);            
+         }
+         break;
+
+      default:
+         // NOOP
+         break;
+      }
+
       if (f_)
          f_(data_);
    }
-   
-   // FIXME have other DataT here for vector based attribute
-   ClientSignal<DataT, Void, Void> signal_;
+
+   /// normal argument
+   inline
+   void setAndCall(arg_type arg)
+   {
+      data_ = arg;
+
+      if (f_)
+         f_(data_);
+   }
+
+   void valueChanged(typename signal_type::arg1_type arg)
+   {      
+      setAndCall(arg);
+   }
+      
+   signal_type signal_;
    DataT data_;
    
-   std::tr1::function<void(typename ClientSignal<DataT, Void, Void>::arg1_type)> f_;
+   std::tr1::function<void(arg_type)> f_;
 };
 
 
@@ -1956,6 +2020,17 @@ struct ServerSignal : ServerSignalBase
     
       Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));
       sendSignal(s << arg1 << arg2 << arg3);
+   }
+
+protected:
+   inline
+   void emit(arg1_type arg1, uint32_t registrationid)
+   {
+      Serializer s(sizeof(T1));
+      s << arg1;
+
+      SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
+
    }
 };
 
@@ -2194,16 +2269,14 @@ struct ServerAttribute
       }
       
       return *this;
-   }
+   }   
    
    void onAttach(uint32_t registrationid)
    {
-      Serializer s(sizeof(DataT));
-      s << t_;
-      SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
+      emit(t_, registrationid);
    }
    
-protected:
+protected:   
    using BaseAttribute<DataT>::t_;
 };
 

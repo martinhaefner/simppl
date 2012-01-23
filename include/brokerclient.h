@@ -82,7 +82,7 @@ private:
       }
       
       inline
-      void operator()(const typename waitersmap_type::value_type& p) const
+      void operator()(const waitersmap_type::value_type& p) const
       {
          stub_.waitForService(p.first);
          stub_.waiters_.insert(waitersmap_type::value_type(p.first, p.second));
