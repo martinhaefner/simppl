@@ -91,7 +91,7 @@ struct Client : Stub<Interface>
    {
       myInt.attach() >> std::tr1::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification
-      myVector.attach();
+      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1);
       
       doSomething(42);
    }
@@ -108,6 +108,20 @@ struct Client : Stub<Interface>
    {
       std::cout << "Attribute myStruct is initialized from server side [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;
       std::cout << "attribute myInt changed: new value=" << i << ", or new value=" << myInt.value() << " respectively." << std::endl;
+   }
+
+   void vectorChanged(const std::vector<int>& iv)
+   {
+      std::cout << "Yes, vector changed: ";
+
+      if (iv.empty())
+      {
+         std::cout << "[empty]";
+      }
+      else
+         std::cout << iv.front();
+
+      std::cout << std::endl;
    }
 };
 
