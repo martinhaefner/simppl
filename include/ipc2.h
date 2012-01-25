@@ -2113,15 +2113,15 @@ unconst(__gnu_cxx::__normal_iterator<IteratorT, ContainerT>& iter)
 
 
 // forward decl
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorAttributeMixin;
 
 
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorValue
 {
    inline
-   VectorValue(VectorAttributeMixin<std::vector<T> >& mixin, typename std::vector<T>::iterator iter)
+   VectorValue(VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin, typename std::vector<T>::iterator iter)
     : mixin_(mixin)
     , iter_(iter)
    {
@@ -2130,13 +2130,12 @@ struct VectorValue
    
    T& operator=(const T& t);
    
-   VectorAttributeMixin<std::vector<T> >& mixin_;
+   VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin_;
    typename std::vector<T>::iterator iter_;
 };
    
 
-// FIXME should either implement OnChange/Always here or say that vectors are Always only
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorAttributeMixin : BaseAttribute<T>
 {
 public:
@@ -2170,15 +2169,21 @@ public:
    inline
    void erase(const_iterator where)
    {
-      t_.erase(iterator(const_cast<pointer>(where.base())));
-      emit(ServerVectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
+      if (EmitPolicyT::eval(where, t_.end()))
+      {
+         t_.erase(iterator(const_cast<pointer>(where.base())));
+         emit(ServerVectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
+      }
    }
    
    inline
    void erase(const_iterator from, const_iterator to)
    {
-      t_.erase(unconst(from), unconst(to));
-      emit(ServerVectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
+      if (EmitPolicyT::eval(from, t_.end()))
+      {
+         t_.erase(unconst(from), unconst(to));
+         emit(ServerVectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
+      }
    }
    
    inline
@@ -2226,35 +2231,50 @@ public:
    }
    
    inline
-   VectorValue<value_type> operator[](size_t idx)
+   VectorValue<value_type, EmitPolicyT> operator[](size_t idx)
    {
-      return VectorValue<value_type>(*this, t_.begin()+idx);
+      return VectorValue<value_type, EmitPolicyT>(*this, t_.begin()+idx);
    }
    
    template<typename IteratorT>
    inline
    void replace(const_iterator where, IteratorT from, IteratorT to)
    {
+      bool doEmit = false;
+      
       size_t len = std::distance(from, to);
       for(iterator iter = unconst(where); iter != t_.end() && from != to; ++iter, ++from)
       {
-         replace(unconst(where), *from);
+         if (EmitPolicyT::eval(*where, *from))
+         {
+            doEmit = true;
+            t_.replace(unconst(where), *from);
+         }
       }
 
-      while(from != to)
+      if (from != to)
       {
-         t_.push_back(*from);
-         ++from;
+         doEmit = true;
+
+         while(from != to)
+         {
+            t_.push_back(*from);
+            ++from;
+         }
       }
       
-      emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
+      if (EmitPolicyT::eval(doEmit, false))
+         emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
    }
    
    inline
    void replace(const_iterator where, const value_type& v)
    {
-      *unconst(where) = v;
-      emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
+      if (EmitPolicyT::eval(*where, v))
+      {
+         *unconst(where) = v;
+         emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
+      }
    }
    
 protected:
@@ -2279,9 +2299,9 @@ protected:
 };
 
 
-template<typename T>
+template<typename T, typename EmitPolicyT>
 inline
-T& VectorValue<T>::operator=(const T& t)
+T& VectorValue<T, EmitPolicyT>::operator=(const T& t)
 {
    mixin_.replace(iter_, t);
    return *iter_;
@@ -2290,9 +2310,9 @@ T& VectorValue<T>::operator=(const T& t)
 
 template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute 
-   : if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type
+   : if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type
 {
-   typedef typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type baseclass;
+   typedef typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type baseclass;
    
    inline
    ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
