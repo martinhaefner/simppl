@@ -1834,6 +1834,17 @@ struct Always
 };
 
 
+struct Committed
+{
+   template<typename T>
+   static inline 
+   bool eval(const T&, const T&)
+   {
+      return false;
+   }
+};
+
+
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
@@ -2245,11 +2256,10 @@ public:
       size_t len = std::distance(from, to);
       for(iterator iter = unconst(where); iter != t_.end() && from != to; ++iter, ++from)
       {
+         t_.replace(unconst(where), *from);
+         
          if (EmitPolicyT::eval(*where, *from))
-         {
             doEmit = true;
-            t_.replace(unconst(where), *from);
-         }
       }
 
       if (from != to)
@@ -2270,11 +2280,10 @@ public:
    inline
    void replace(const_iterator where, const value_type& v)
    {
+      *unconst(where) = v;
+         
       if (EmitPolicyT::eval(*where, v))
-      {
-         *unconst(where) = v;
          emit(ServerVectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
-      }
    }
    
 protected:
@@ -2308,11 +2317,42 @@ T& VectorValue<T, EmitPolicyT>::operator=(const T& t)
 }
 
 
+/// a NOOP
+template<typename EmitPolicyT, typename BaseT>
+struct CommitMixin : BaseT
+{
+   inline
+   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : BaseT(id, _signals)
+   {
+      // NOOP
+   }
+};
+
+
+/// add a commit function to actively transfer the attribute data
+template<typename BaseT>
+struct CommitMixin<Committed, BaseT> : BaseT
+{
+   inline
+   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : BaseT(id, _signals)
+   {
+      // NOOP
+   }
+   
+   void commit()
+   {
+      this->emit(this->t_);
+   }
+};
+
+
 template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute 
-   : if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type
+   : CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
 {
-   typedef typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type baseclass;
+   typedef CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
    ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
@@ -2324,22 +2364,18 @@ struct ServerAttribute
    inline
    ServerAttribute& operator=(const DataT& data)
    {
-      if (EmitPolicyT::eval(t_, data))
-      {
-         t_ = data;
-         emit(t_);
-      }
+      this->t_ = data;
+      
+      if (EmitPolicyT::eval(this->t_, data))
+         emit(this->t_);
       
       return *this;
    }   
    
    void onAttach(uint32_t registrationid)
    {
-      emit(t_, registrationid);
+      emit(this->t_, registrationid);
    }
-   
-protected:   
-   using BaseAttribute<DataT>::t_;
 };
 
 
