@@ -14,6 +14,7 @@ Interface level
  * attributes with appropriate notifications (value changes, always, user-requested)  
  * event driven interface
  * blocking (RPC) call interface
+ * session handling
  
 
 Transport level
