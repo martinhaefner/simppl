@@ -1,3 +1,5 @@
+Test Zeile.
+
 This library was developed as an education project for learning how to 
 implement more advanced C++ patterns as used e.g. by the boost (and in the meanwhile tr1) 
 libary. That's why you can find interfaces directly compatible with boost classes.
