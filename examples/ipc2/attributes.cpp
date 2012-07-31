@@ -39,6 +39,7 @@ INTERFACE(Interface)
    Attribute<int> myInt;
    Attribute<MyStruct> myStruct;
    Attribute<std::vector<int> > myVector;
+   Attribute<int, Committed> comInt;
    
    inline
    Interface()
@@ -47,6 +48,7 @@ INTERFACE(Interface)
     , INIT_ATTRIBUTE(myInt)
     , INIT_ATTRIBUTE(myStruct)
     , INIT_ATTRIBUTE(myVector)
+    , INIT_ATTRIBUTE(comInt)
    {
       doSomething >> resultOfDoSomething;
    }
@@ -59,6 +61,8 @@ struct Server : Skeleton<Interface>
     : Skeleton<Interface>(role)
    {      
       myStruct = MyStruct(0, "No answer yet.");
+      comInt = 41;
+      
       doSomething >> std::tr1::bind(&Server::handleDoSomething, this, _1);
    }
    
@@ -66,10 +70,15 @@ struct Server : Skeleton<Interface>
    {
       std::cout << "handleDoSomething with i=" << i << std::endl;
       
+      comInt = 42;
+      comInt = 43;
+      comInt = 44;
+      comInt.commit();
+      comInt = 45;
+      
       // these assignments raise signals if there is anybody connected to them
       myInt = i;
       myVector.push_back(i);
-      
       myStruct = MyStruct(i, "The answer to all questions.");
       
       respondWith(resultOfDoSomething(i));
@@ -91,8 +100,9 @@ struct Client : Stub<Interface>
    {
       myInt.attach() >> std::tr1::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification
-      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1);
+      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1, _2, _3, _4);
       
+      comInt.attach() >> std::tr1::bind(&Client::commAttributeChanged, this, _1);
       doSomething(42);
    }
    
@@ -109,10 +119,15 @@ struct Client : Stub<Interface>
       std::cout << "Attribute myStruct is initialized from server side [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;
       std::cout << "attribute myInt changed: new value=" << i << ", or new value=" << myInt.value() << " respectively." << std::endl;
    }
-
-   void vectorChanged(const std::vector<int>& iv)
+   
+   void commAttributeChanged(int i)
    {
-      std::cout << "Yes, vector changed: ";
+      std::cout << "Attribute was committed: value=" << i << std::endl;
+   }
+
+   void vectorChanged(const std::vector<int>& iv, How how, uint32_t where, uint32_t len)
+   {
+      std::cout << "Yes, vector changed(" << how << "," << where << "," << len << "): ";
 
       if (iv.empty())
       {
