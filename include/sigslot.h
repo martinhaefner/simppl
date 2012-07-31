@@ -190,15 +190,15 @@ public:
     }
 
     template<typename T1, typename T2>
-    inline void internaldispatch(T1 t1, T2 t2, NoType)
+    inline void internaldispatch(const Tuple<T1, T2, NoType>& t)
     {
-        (slot_->*func_)(t1, t2);
+        (slot_->*func_)(t.template get<0>(), t.template get<1>());
     }
 
     template<typename T1, typename T2, typename T3>
-    inline void internaldispatch(T1 t1, T2 t2, T3 t3)
+    inline void internaldispatch(const Tuple<T1, T2, T3>& t)
     {
-        (slot_->*func_)(t1, t2, t3);
+        (slot_->*func_)(t.template get<0>(), t.template get<1>(), t.template get<2>());
     }
 
     bool equals(const AbstractConnection& conn) const
