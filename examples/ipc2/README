@@ -26,7 +26,7 @@ Transport level
 
 Possible future features
 
- * UDP/datagram transport for signals and shoot-and-forget requests
+ * UDP/datagram transport (perhaps broadcast/multicast) for signals and shoot-and-forget requests
  * multithread support 
    * send requests from other threads
    * receive events in thread-pool

@@ -4,9 +4,9 @@ ThreadingModel as a Policy
 ==========================
 
  * SingleThreaded (as-is)
- * MultiThreaded 
-   * server side (thread-pool)
-   * client side
+ * MultiThreaded (thread-pool) 
+   * server side (skeletons)
+   * client side (stubs)
 
    server side: requests are handled within a thread pool, the sockets are handled by the main thread, but
    all request handlers are called within the pool. Therefore, the requests are queued and the threads will
@@ -22,7 +22,7 @@ ThreadingModel as a Policy
    thread x --------------> back-queue <----------- poll loop
               (response)                  
 
-   The Stubs (-> Policy) thereby may be 
+   The Stubs and Skeletons (-> Policy) thereby may be 
  
     * reentrant 
       -> we have nothing to be concerned about (just catch the event from the queue)
@@ -42,6 +42,20 @@ thing on top of the async IO framework.
 Then, we can add further endpoints to the dispatcher to allow to handle also tcp based requests.
 
 
+Tranport
+========
+
+Implement non-blocking write operations. In case of blocks queue the data and let the dispatcher
+send the rest of it. The second variant can be used when clients call requests from other thread
+contexts. One has to see if there is any state on clients side - if not, I can indeed trivially 
+use clients in multithreaded environments. 
+
+Servers are much more complex since they have some state during the answering process (currentRequest, 
+currentSession, ...). In case of servers running within multiple threads we would need to store this
+stuff in thread-local variables and have some locking on the dispatcher in order to access queues
+and global data.
+
+
 Transport error detection
 =========================
 
@@ -53,3 +67,20 @@ Session support
 
  * clients may send explicit detach calls to the server
  * maybe have handlers to be implemented to see if clients attach to a server 
+
+
+Next Steps
+==========
+
+ Transport
+
+ * introduce socket class with internal queue
+ * if queue empty -> send directly nonblocking
+ * if queue is full -> enqueue and arm fd slot for POLLOUT
+ * if nonblocking send fails -> enqueue (the rest)
+
+ ThreadingModel
+ 
+ * mutex for dispatcher, must be used by all socket classes
+   when sending data
+ * receiving data only in one thread
