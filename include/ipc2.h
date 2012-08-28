@@ -28,12 +28,14 @@
 #include "if.h"
 #include "typetraits.h"
 #include "tuple.h"
+#include "tie.h"
 #include "calltraits.h"
 #include "variant.h"   // for retrieving header sizes
 #include "noninstantiable.h"
 
 #define INVALID_SEQUENCE_NR 0xFFFFFFFF
 #define INVALID_SERVER_ID 0u
+#define INVALID_SESSION_ID 0u
 
 #ifdef NDEBUG
 #   define safe_cast static_cast
@@ -1108,20 +1110,23 @@ struct InterfaceResolveResponseFrame : FrameHeader
    inline
    InterfaceResolveResponseFrame()
     : FrameHeader()
-    , id_(0)
+    , id_(INVALID_SERVER_ID)
+    , sessionid_(INVALID_SESSION_ID)
    {
       // NOOP
    }
    
    inline
-   InterfaceResolveResponseFrame(uint32_t id)
+   InterfaceResolveResponseFrame(uint32_t id, uint32_t sessionid)
     : FrameHeader(FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE)
     , id_(id)
+    , sessionid_(sessionid)
    {
       // NOOP
    }
    
-   uint32_t id_;     // invalid id is 0.
+   uint32_t id_;         // invalid id is INVALID_SERVER_ID
+   uint32_t sessionid_;
 };
 
 
@@ -1131,22 +1136,28 @@ struct RequestFrame : FrameHeader
    RequestFrame()
     : FrameHeader()
     , serverid_(INVALID_SERVER_ID)
+    , sessionid_(INVALID_SESSION_ID)
     , func_(0)
+    , padding_(0)
    {
       // NOOP
    }
    
    inline
-   RequestFrame(uint32_t serverid, uint32_t func)
+   RequestFrame(uint32_t serverid, uint32_t func, uint32_t sessionid)
     : FrameHeader(FRAME_TYPE_REQUEST)
     , serverid_(serverid)
+    , sessionid_(sessionid)
     , func_(func)
+    , padding_(0)
    {
       // NOOP
    }
    
    uint32_t serverid_;
+   uint32_t sessionid_;
    uint32_t func_;
+   uint32_t padding_;
 };
 
 
@@ -1156,7 +1167,7 @@ struct ResponseFrame : FrameHeader
    ResponseFrame()
     : FrameHeader()
     , result_(0)
-    , reserved_(0)
+    , padding_(0)
    {
       // NOOP
    }
@@ -1165,13 +1176,13 @@ struct ResponseFrame : FrameHeader
    ResponseFrame(int32_t result)
     : FrameHeader(FRAME_TYPE_RESPONSE)
     , result_(result)
-    , reserved_(0)
+    , padding_(0)
    {
       // NOOP
    }
    
    int32_t result_;     // 0 = ok result, any other value: exceptional result, exception text may be added as payload
-   int32_t reserved_;
+   int32_t padding_;
 };
 
 
@@ -1220,7 +1231,7 @@ struct UnregisterSignalFrame : FrameHeader
    }
    
    uint32_t registrationid_;
-   uint32_t reserved_;
+   uint32_t padding_;
 };
 
 
@@ -1230,7 +1241,7 @@ struct SignalEmitFrame : FrameHeader
    SignalEmitFrame()
     : FrameHeader()
     , id_(0)
-    , reserved_(0)
+    , padding_(0)
    {
       // NOOP
    }
@@ -1239,13 +1250,13 @@ struct SignalEmitFrame : FrameHeader
    SignalEmitFrame(uint32_t id)
     : FrameHeader(FRAME_TYPE_SIGNAL)
     , id_(id)
-    , reserved_(0)
+    , padding_(0)
    {
       // NOOP
    }
    
    uint32_t id_;
-   uint32_t reserved_;
+   uint32_t padding_;
 };
 
 
@@ -1474,9 +1485,10 @@ public:
    StubBase(const char* iface, const char* role, const char* boundname)
     : iface_(iface) 
     , role_(role)
-    , id_(0)
+    , id_(INVALID_SERVER_ID)
     , disp_(0)
     , fd_(-1)
+    , current_sessionid_(INVALID_SESSION_ID)
    {
       assert(iface);
       assert(role);
@@ -1496,15 +1508,17 @@ public:
       return role_;
    }
    
+   inline
    Dispatcher& disp()
    {
       assert(disp_);
       return *disp_;
    }
    
+   inline
    bool isConnected() const
    {
-      return id_ != 0 && fd_ != -1;
+      return id_ != INVALID_SERVER_ID && fd_ != -1;
    }
    
 protected:
@@ -1529,6 +1543,7 @@ protected:
    
    Dispatcher* disp_;
    int fd_;                 ///< connected socket
+   uint32_t current_sessionid_;
 };
 
 
@@ -1704,6 +1719,9 @@ struct SignalSender
 };
 
 
+// -------------------------------------------------------------------------------
+
+
 // partial update mode for attributes
 enum How
 {
@@ -1715,45 +1733,81 @@ enum How
 };
 
 
-// FIXME optimization - create read/write functions in serializer for this type to drop the need of a vector copy here
 template<typename VectorT>
-struct VectorAttributeUpdate
+struct ClientVectorAttributeUpdate
 {
-   typedef Tuple<VectorT, uint32_t, uint32_t, uint32_t> type;
-
    inline   
-   VectorAttributeUpdate()
+   ClientVectorAttributeUpdate()
     : how_(None)
     , where_(0)
     , len_(0)
    {
       // NOOP
    }
-
-   VectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
-    : how_(how)
-    , where_(from)
-    , len_(len)
-   {
-      if (how != Full)
-      {
-         if (how != Remove)
-         {
-            for(int i=from; i!=from+len; ++i)
-            {
-               data_.push_back(vec[i]);
-            }
-         }
-      }
-      else
-         data_ = vec;
-   }
    
    VectorT data_;
-   uint32_t how_;
+   How how_;
    uint32_t where_;
    uint32_t len_;
 };
+
+
+template<typename VectorT>
+Deserializer& operator>>(Deserializer& istream, ClientVectorAttributeUpdate<VectorT>& updt)
+{
+   istream >> (uint32_t&)updt.how_;
+   istream >> updt.where_;
+   istream >> updt.len_;
+   
+   if (updt.how_ != Remove)
+   {
+      updt.data_.resize(updt.len_);
+      for(int i=0; i<updt.len_; ++i)
+      {
+         istream >> updt.data_[i];
+      }
+   }
+   
+   return istream;
+}
+
+
+template<typename VectorT>
+struct ServerVectorAttributeUpdate
+{
+   ServerVectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
+    : data_(vec)
+    , how_(how)
+    , where_(from)
+    , len_(how == Full ? vec.size() : len)
+   {
+      // NOOP
+   }
+   
+   const VectorT& data_;
+   How how_;
+   uint32_t where_;
+   uint32_t len_;
+};
+
+
+template<typename VectorT>
+Serializer& operator<<(Serializer& ostream, const ServerVectorAttributeUpdate<VectorT>& updt)
+{
+   ostream << (uint32_t)updt.how_;
+   ostream << updt.where_;
+   ostream << updt.len_;
+   
+   if (updt.how_ != Remove)
+   {
+      for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
+      {
+         ostream << updt.data_[i];
+      }
+   }
+   
+   return ostream;
+}
 
 
 // --------------------------------------------------------------------------------------
@@ -1795,11 +1849,26 @@ struct Always
 };
 
 
+struct Committed
+{
+   template<typename T>
+   static inline 
+   bool eval(const T&, const T&)
+   {
+      return false;
+   }
+};
+
+
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
    typedef typename CallTraits<DataT>::param_type arg_type;
-
+   
+   typedef typename if_<is_vector<DataT>::value, 
+      std::tr1::function<void(arg_type, How, uint32_t, uint32_t)>, 
+      std::tr1::function<void(arg_type)> >::type function_type;
+   
    inline
    ClientAttribute(uint32_t id, std::vector<Parented*>& parent)
     : signal_(id, parent)
@@ -1844,9 +1913,9 @@ struct ClientAttribute
 private:
 
    /// vector argument with partial update support   
-   typedef ClientSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
+   typedef ClientSignal<typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
 
-   void setAndCall(const VectorAttributeUpdate<DataT>& varg)
+   void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
    {
       switch (varg.how_)
       {
@@ -1882,7 +1951,7 @@ private:
       }
 
       if (f_)
-         f_(data_);
+         f_(data_, varg.how_, varg.where_, varg.len_);
    }
 
    /// normal argument
@@ -1903,7 +1972,7 @@ private:
    signal_type signal_;
    DataT data_;
    
-   std::tr1::function<void(arg_type)> f_;
+   function_type f_;
 };
 
 
@@ -2030,18 +2099,17 @@ protected:
       s << arg1;
 
       SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
-
    }
 };
 
 
 template<typename DataT>
 struct BaseAttribute 
- : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
+ : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
 {
    inline
    BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<is_vector<DataT>::value, VectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
+    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
    {
       // NOOP
    }
@@ -2071,15 +2139,15 @@ unconst(__gnu_cxx::__normal_iterator<IteratorT, ContainerT>& iter)
 
 
 // forward decl
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorAttributeMixin;
 
 
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorValue
 {
    inline
-   VectorValue(VectorAttributeMixin<std::vector<T> >& mixin, typename std::vector<T>::iterator iter)
+   VectorValue(VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin, typename std::vector<T>::iterator iter)
     : mixin_(mixin)
     , iter_(iter)
    {
@@ -2088,20 +2156,19 @@ struct VectorValue
    
    T& operator=(const T& t);
    
-   VectorAttributeMixin<std::vector<T> >& mixin_;
+   VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin_;
    typename std::vector<T>::iterator iter_;
 };
    
 
-// FIXME should either implement OnChange/Always here or say that vectors are Always only
-template<typename T>
+template<typename T, typename EmitPolicyT>
 struct VectorAttributeMixin : BaseAttribute<T>
 {
 public:
    
    inline
    VectorAttributeMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : baseclass(id, _signals)
+    : BaseAttribute<T>(id, _signals)
    {
       // NOOP
    }
@@ -2121,22 +2188,28 @@ public:
    inline
    void insert(const_iterator where, const value_type& value)
    {
-      t_.insert(unconst(where), value);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), 1));
+      this->t_.insert(unconst(where), value);
+      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), 1));
    }
    
    inline
    void erase(const_iterator where)
    {
-      t_.erase(iterator(const_cast<pointer>(where.base())));
-      emit(VectorAttributeUpdate<T>(t_, Remove, where-t_.begin(), 1));
+      if (EmitPolicyT::eval(where, this->t_.end()))
+      {
+         this->t_.erase(iterator(const_cast<pointer>(where.base())));
+         emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, where-this->t_.begin(), 1));
+      }
    }
    
    inline
    void erase(const_iterator from, const_iterator to)
    {
-      t_.erase(unconst(from), unconst(to));
-      emit(VectorAttributeUpdate<T>(t_, Remove, from-begin(), to-from));
+      if (EmitPolicyT::eval(from, this->t_.end()))
+      {
+         this->t_.erase(unconst(from), unconst(to));
+         emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, from-begin(), to-from));
+      }
    }
    
    inline
@@ -2148,109 +2221,150 @@ public:
    inline
    bool empty() const
    {
-      return t_.empty();
+      return this->t_.empty();
    }
    
    inline
    void push_back(const value_type& val)
    {
-      t_.push_back(val);
-      emit(VectorAttributeUpdate<T>(t_, Replace, t_.size()-1, 1));
+      this->t_.push_back(val);
+      emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, this->t_.size()-1, 1));
    }
    
    inline
    void pop_back()
    {
-      t_.pop_back();
-      emit(VectorAttributeUpdate<T>(t_, Remove, t_.size(), 1));
+      this->t_.pop_back();
+      emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, this->t_.size(), 1));
    }
    
    inline
    size_t size() const
    {
-      return t_.size();
+      return this->t_.size();
    }
    
    inline
    const_iterator begin() const
    {
-      return t_.begin();
+      return this->t_.begin();
    }
    
    inline
    const_iterator end() const
    {
-      return t_.end();
+      return this->t_.end();
    }
    
    inline
-   VectorValue<value_type> operator[](size_t idx)
+   VectorValue<value_type, EmitPolicyT> operator[](size_t idx)
    {
-      return VectorValue<value_type>(*this, t_.begin()+idx);
+      return VectorValue<value_type, EmitPolicyT>(*this, this->t_.begin()+idx);
    }
    
    template<typename IteratorT>
    inline
    void replace(const_iterator where, IteratorT from, IteratorT to)
    {
+      bool doEmit = false;
+      
       size_t len = std::distance(from, to);
-      for(iterator iter = unconst(where); iter != t_.end() && from != to; ++iter, ++from)
+      for(iterator iter = unconst(where); iter != this->t_.end() && from != to; ++iter, ++from)
       {
-         replace(unconst(where), *from);
+         this->t_.replace(unconst(where), *from);
+         
+         if (EmitPolicyT::eval(*where, *from))
+            doEmit = true;
       }
 
-      while(from != to)
+      if (from != to)
       {
-         t_.push_back(*from);
-         ++from;
+         doEmit = true;
+
+         while(from != to)
+         {
+            this->t_.push_back(*from);
+            ++from;
+         }
       }
       
-      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), len));
+      if (EmitPolicyT::eval(doEmit, false))
+         emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), len));
    }
    
    inline
    void replace(const_iterator where, const value_type& v)
    {
       *unconst(where) = v;
-      emit(VectorAttributeUpdate<T>(t_, Replace, where-t_.begin(), 1));
+         
+      if (EmitPolicyT::eval(*where, v))
+         emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), 1));
    }
    
 protected:
    
-   typedef BaseAttribute<T> baseclass;
-   using baseclass::t_;
-   
    inline
    void insert(const_iterator where, size_t count, const value_type& value, tTrueType)
    {
-      t_.insert(unconst(where), count, value);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), count));
+      this->t_.insert(unconst(where), count, value);
+      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), count));
    }
    
    template<typename IteratorT>
    inline
    void insert(const_iterator where, IteratorT from, IteratorT to, tFalseType)
    {
-      t_.insert(unconst(where), from, to);
-      emit(VectorAttributeUpdate<T>(t_, Insert, where - t_.begin(), std::distance(from, to)));
+      this->t_.insert(unconst(where), from, to);
+      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), std::distance(from, to)));
    }
 };
 
 
-template<typename T>
+template<typename T, typename EmitPolicyT>
 inline
-T& VectorValue<T>::operator=(const T& t)
+T& VectorValue<T, EmitPolicyT>::operator=(const T& t)
 {
    mixin_.replace(iter_, t);
    return *iter_;
 }
 
 
+/// a NOOP
+template<typename EmitPolicyT, typename BaseT>
+struct CommitMixin : BaseT
+{
+   inline
+   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : BaseT(id, _signals)
+   {
+      // NOOP
+   }
+};
+
+
+/// add a commit function to actively transfer the attribute data
+template<typename BaseT>
+struct CommitMixin<Committed, BaseT> : BaseT
+{
+   inline
+   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+    : BaseT(id, _signals)
+   {
+      // NOOP
+   }
+   
+   void commit()
+   {
+      this->emit(this->t_);
+   }
+};
+
+
 template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute 
-   : if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type
+   : CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
 {
-   typedef typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT>, BaseAttribute<DataT> >::type baseclass;
+   typedef CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
    ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
@@ -2262,22 +2376,18 @@ struct ServerAttribute
    inline
    ServerAttribute& operator=(const DataT& data)
    {
-      if (EmitPolicyT::eval(t_, data))
-      {
-         t_ = data;
-         emit(t_);
-      }
+      this->t_ = data;
+      
+      if (EmitPolicyT::eval(this->t_, data))
+         emit(this->t_);
       
       return *this;
    }   
    
    void onAttach(uint32_t registrationid)
    {
-      emit(t_, registrationid);
+      emit(this->t_, registrationid);
    }
-   
-protected:   
-   using BaseAttribute<DataT>::t_;
 };
 
 
@@ -2521,7 +2631,8 @@ struct ServerHolderBase
       // NOOP
    }
    
-   virtual void eval(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t len) = 0;
+   /// handle request
+   virtual void eval(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t len) = 0;
    
    virtual ServerSignalBase* addSignalRecipient(uint32_t id, int fd, uint32_t registrationid, uint32_t clientsid) = 0;
 };
@@ -2546,9 +2657,9 @@ struct ServerHolder : ServerHolderBase
    }
    
    /*virtual*/
-   void eval(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t len)
+   void eval(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t len)
    {
-      handler_->handleRequest(funcid, sequence_nr, fd, payload, len);
+      handler_->handleRequest(funcid, sequence_nr, sessionid, fd, payload, len);
    }
    
    /*virtual*/
@@ -2569,6 +2680,70 @@ struct ServerHolder : ServerHolderBase
    SkeletonT* handler_;
 };
    
+
+/// session data holder
+struct SessionData
+{
+   inline
+   SessionData()
+    : fd_(-1)
+    , data_(0)
+    , destructor_(0)
+   {
+      // NOOP
+   }
+   
+   /// move semantics
+   SessionData(const SessionData& rhs)
+    : fd_(rhs.fd_)
+    , data_(rhs.data_)
+    , destructor_(rhs.destructor_)
+   {
+      SessionData* that = const_cast<SessionData*>(&rhs);
+      that->fd_ = -1;
+      that->data_ = 0;
+      that->destructor_ = 0;
+   }
+   
+   inline
+   SessionData(int fd, void* data, void(*destructor)(void*))
+    : fd_(fd)
+    , data_(data)
+    , destructor_(destructor)
+   {
+      // NOOP
+   }
+   
+   /// move semantics
+   SessionData& operator=(const SessionData& rhs)
+   {
+      if (this != &rhs)
+      {
+         fd_ = rhs.fd_;
+         data_ = rhs.data_;
+         destructor_ = rhs.destructor_;
+         
+         SessionData* that = const_cast<SessionData*>(&rhs);
+         that->fd_ = -1;
+         that->data_ = 0;
+         that->destructor_ = 0;
+      }
+      
+      return *this;
+   }
+   
+   inline
+   ~SessionData()
+   {
+      if (data_ && destructor_)
+         (*destructor_)(data_);
+   }
+   
+   int fd_;                     ///< associated file handle the session belongs to
+   void* data_;                 ///< the session data pointer
+   void(*destructor_)(void*);   ///< destructor function to use for destruction
+};
+
 
 static std::auto_ptr<char> NullAutoPtr(0);
 
@@ -2600,6 +2775,7 @@ struct Dispatcher
    typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
    typedef std::map<uint32_t/*=serverside_id*/, ServerSignalBase*> serversignalers_type;
    
+   typedef std::map<uint32_t/*=sessionid*/, SessionData> sessionmap_type;
    
    static
    void makeInetAddress(struct sockaddr_in& addr, const char* endpoint)
@@ -2612,7 +2788,7 @@ struct Dispatcher
       while(*++port != ':');
       *port = '\0';
       ++port;
-      std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
+      //std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
       addr.sin_family = AF_INET;
       addr.sin_port = htons(::atoi(port));
       addr.sin_addr.s_addr = ::inet_addr(tmp + 4);
@@ -2971,7 +3147,7 @@ private:
                               servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
                               if (iter != servers_by_id_.end())
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 iter->second->eval(rf->func_, rf->sequence_nr_, rf->sessionid_, fds_[i].fd, buf.get(), rf->payloadsize_);
                               }
                               else
                                  std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
@@ -3107,7 +3283,7 @@ private:
                            {
                               InterfaceResolveFrame* irf = (InterfaceResolveFrame*)hdr;
                               
-                              InterfaceResolveResponseFrame rf(0);
+                              InterfaceResolveResponseFrame rf(0, generateId());
                               rf.sequence_nr_ = irf->sequence_nr_;
                                  
                               servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
@@ -3138,6 +3314,7 @@ private:
                               {
                                  StubBase* stub = iter->second;
                                  stub->id_ = irrf->id_;
+                                 stub->current_sessionid_ = irrf->sessionid_;
                                  dangling_interface_resolves_.erase(iter);
                                  
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
@@ -3207,6 +3384,18 @@ public:
          iter->second->removeAllWithFd(fds_[idx].fd);
       }
       
+      for (sessionmap_type::iterator iter = sessions_.begin(); iter != sessions_.end();)
+      {
+         if (iter->second.fd_ == fds_[idx].fd)
+         {
+            (*iter->second.destructor_)(iter->second.data_);
+            sessions_.erase(iter);
+            iter = sessions_.begin();
+         }
+         else
+            ++iter;
+      }
+      
       socketDisconnected(fds_[idx].fd);
                         
       fds_[idx].fd = 0;
@@ -3224,6 +3413,23 @@ public:
    {
       return running_;
    }
+   
+   inline
+   void* getSessionData(uint32_t sessionid)
+   {
+      sessionmap_type::iterator iter = sessions_.find(sessionid);
+      if (iter != sessions_.end())
+         return iter->second.data_;
+      
+      return 0;
+   }
+   
+   inline
+   void registerSession(uint32_t fd, uint32_t sessionid, void* data, void(*destructor)(void*))
+   {
+      sessions_[sessionid] = SessionData(fd, data, destructor);
+   }
+   
    
 private:
    
@@ -3288,7 +3494,8 @@ private:
       // 2. initialize interface resolution
       if (stub.fd_ > 0)
       {
-         // FIXME could use local cache here
+         // don't cache anything here, a sessionid will be 
+         // created no the server for any resolve request
          InterfaceResolveFrame f(42);
          char buf[128];
          
@@ -3344,6 +3551,8 @@ private:
    
    BrokerClient* broker_;
    std::vector<std::string> endpoints_;
+   
+   sessionmap_type sessions_;
 };
 
 
@@ -3351,7 +3560,7 @@ uint32_t StubBase::sendRequest(Parented& requestor, ClientResponseBase* handler,
 {
    assert(disp_);
  
-   RequestFrame f(id_, id);
+   RequestFrame f(id_, id, current_sessionid_);
    f.payloadsize_ = s.size();
    f.sequence_nr_ = disp_->generateSequenceNr();
    
@@ -3452,7 +3661,8 @@ struct ServerRequestDescriptor
    ServerRequestDescriptor()
     : requestor_(0)
     , fd_(-1)
-    , sequence_nr_(0)
+    , sequence_nr_(INVALID_SEQUENCE_NR)
+    , sessionid_(INVALID_SESSION_ID)
    {
       // NOOP
    }
@@ -3462,6 +3672,7 @@ struct ServerRequestDescriptor
     : requestor_(rhs.requestor_)
     , fd_(rhs.fd_)
     , sequence_nr_(rhs.sequence_nr_)
+    , sessionid_(rhs.sessionid_)
    {
       const_cast<ServerRequestDescriptor&>(rhs).clear();
    }
@@ -3473,6 +3684,7 @@ struct ServerRequestDescriptor
          requestor_ = rhs.requestor_;
          fd_ = rhs.fd_;
          sequence_nr_ = rhs.sequence_nr_;
+         sessionid_ = rhs.sessionid_;
          
          const_cast<ServerRequestDescriptor&>(rhs).clear();
       }
@@ -3480,19 +3692,19 @@ struct ServerRequestDescriptor
       return *this;
    }
    
-   ServerRequestDescriptor& set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr)
+   ServerRequestDescriptor& set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr, uint32_t sessionid)
    {
       requestor_ = requestor;
       fd_ = fd;
       sequence_nr_ = sequence_nr;
-      
+      sessionid_ = sessionid;
       return *this;
    }
    
    inline
    void clear()
    {
-      set(0, -1, 0);
+      set(0, -1, INVALID_SEQUENCE_NR, INVALID_SESSION_ID);
    }
    
    inline
@@ -3504,6 +3716,7 @@ struct ServerRequestDescriptor
    ServerRequestBase* requestor_;
    int fd_;
    uint32_t sequence_nr_;
+   uint32_t sessionid_;
 };
 
 
@@ -3523,6 +3736,11 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttr
     , disp_(0)
    {
       assert(role_);
+   }
+   
+   virtual ~Skeleton()
+   {
+      // NOOP
    }
    
    Dispatcher& disp()
@@ -3604,10 +3822,22 @@ struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttr
       return current_request_;
    }
    
+   inline
+   void* currentSessionData()
+   {
+      return disp().getSessionData(currentRequest().sessionid_);
+   }
+   
+   inline
+   void registerSession(void* data, void(*destructor)(void*))
+   {
+      disp().registerSession(currentRequest().fd_, currentRequest().sessionid_, data, destructor);
+   }
+   
    
 private:
    
-   void handleRequest(uint32_t funcid, uint32_t sequence_nr, int fd, const void* payload, size_t length)
+   void handleRequest(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t length)
    {
       //std::cout << "Skeleton::handleRequest '" << funcid << "'" << std::endl;
       std::map<uint32_t, ServerRequestBase*>::iterator iter = ((interface_type*)this)->container_.find(funcid);
@@ -3616,7 +3846,7 @@ private:
       {
          try
          {
-            current_request_.set(iter->second, fd, sequence_nr);
+            current_request_.set(iter->second, fd, sequence_nr, sessionid);
             iter->second->eval(payload, length);
             
             // current_request_ is only valid if no response handler was called
@@ -3651,6 +3881,13 @@ private:
          std::cerr << "Unknown request '" << funcid << "' with payload size=" << length << std::endl;
    }
    
+   /// return a session pointer and destruction function if adequate
+   virtual Tuple<void*,void(*)(void*)> clientAttached()
+   {
+      abort();
+      std::cout << "XX" << std::endl;
+      return Tuple<void*,void(*)(void*)>(0, 0);   // the default does not create any session data
+   }
    
    const char* role_;
    Dispatcher* disp_;
