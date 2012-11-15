@@ -1,10 +1,5 @@
-//
-// integrated broker interface handling
-//
+#include "simppl/ipc2.h"
 
-#include "include/ipc2.h"
-#include "brokerclient.h"
-#include "sbroker.h"
 #include "calculator.h"
 
 
@@ -13,9 +8,9 @@ struct CalculatorImpl : Skeleton<Calculator>
    CalculatorImpl(const char* role)
     : Skeleton<Calculator>(role)
    {
-      clear >> std::tr1::bind(&CalculatorImpl::handleClear, this);
-      add >> std::tr1::bind(&CalculatorImpl::handleAdd, this, _1);
-      sub >> std::tr1::bind(&CalculatorImpl::handleSub, this, _1);
+      clear >> std::bind(&CalculatorImpl::handleClear, this);
+      add >> std::bind(&CalculatorImpl::handleAdd, this, _1);
+      sub >> std::bind(&CalculatorImpl::handleSub, this, _1);
    }
    
    void handleClear()

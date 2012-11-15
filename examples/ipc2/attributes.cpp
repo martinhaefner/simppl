@@ -1,9 +1,9 @@
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 
 struct MyStruct
 {
-   typedef Tuple<int, std::string> type;
+   typedef make_serializer<int, std::string>::type serializer_type;
    
    inline
    MyStruct()
@@ -63,7 +63,7 @@ struct Server : Skeleton<Interface>
       myStruct = MyStruct(0, "No answer yet.");
       comInt = 41;
       
-      doSomething >> std::tr1::bind(&Server::handleDoSomething, this, _1);
+      doSomething >> std::bind(&Server::handleDoSomething, this, _1);
    }
    
    void handleDoSomething(int i)
@@ -91,22 +91,24 @@ struct Client : Stub<Interface>
    Client(const char* role)
     : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
+      connected >> std::bind(&Client::handleConnected, this);
+      
       std::cout << "Initial attribute myStruct is [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;
       
-      resultOfDoSomething >> std::tr1::bind(&Client::handleResultDoSomething, this, _1);
+      resultOfDoSomething >> std::bind(&Client::handleResultDoSomething, this, _1, _2);
    }
    
-   void connected()
+   void handleConnected()
    {
-      myInt.attach() >> std::tr1::bind(&Client::attributeChanged, this, _1);
+      myInt.attach() >> std::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification
-      myVector.attach() >> std::tr1::bind(&Client::vectorChanged, this, _1, _2, _3, _4);
+      myVector.attach() >> std::bind(&Client::vectorChanged, this, _1, _2, _3, _4);
       
-      comInt.attach() >> std::tr1::bind(&Client::commAttributeChanged, this, _1);
+      comInt.attach() >> std::bind(&Client::commAttributeChanged, this, _1);
       doSomething(42);
    }
    
-   void handleResultDoSomething(int response)
+   void handleResultDoSomething(const CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       std::cout << "Attribute myStruct is now [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;

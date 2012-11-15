@@ -18,12 +18,12 @@ struct CalculatorClient : Stub<Calculator>
    CalculatorClient(const char* location)
     : Stub<Calculator>(rolename, location)
    {
-      // NOOP
+      connected >> std::bind(&CalculatorClient::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
-      value.attach() >> std::tr1::bind(&CalculatorClient::valueChanged, this, _1);
+      value.attach() >> std::bind(&CalculatorClient::valueChanged, this, _1);
    }
    
    void valueChanged(double d)
@@ -50,7 +50,7 @@ void* threadRunner(void* arg)
    Dispatcher disp;
 
    BrokerClient broker(disp);
-   broker.waitForService(fullQualifiedName("Calculator", rolename), std::tr1::bind(ClientsFactory, &disp, _1, _2));
+   broker.waitForService(fullQualifiedName("Calculator", rolename), std::bind(ClientsFactory, &disp, _1, _2));
    
    disp.run();
    return 0;

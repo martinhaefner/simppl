@@ -1,4 +1,5 @@
-#include "sbroker.h"
+#include "simppl/ipc2.h"
+#include "simppl/sbroker.h"
 
 
 struct ServiceHandle
@@ -69,10 +70,10 @@ struct BrokerImpl : Skeleton<Broker>
    BrokerImpl()
     : Skeleton<Broker>("broker")
    {
-      waitForService >> std::tr1::bind(&BrokerImpl::handleWaitForService, this, _1);
-      registerService >> std::tr1::bind(&BrokerImpl::handleRegisterService, this, _1, _2);
-      listServices >> std::tr1::bind(&BrokerImpl::handleListServices, this);
-      listWaiters >> std::tr1::bind(&BrokerImpl::handleListWaiters, this);
+      waitForService >> std::bind(&BrokerImpl::handleWaitForService, this, _1);
+      registerService >> std::bind(&BrokerImpl::handleRegisterService, this, _1, _2);
+      listServices >> std::bind(&BrokerImpl::handleListServices, this);
+      listWaiters >> std::bind(&BrokerImpl::handleListWaiters, this);
    }
    
    void handleListServices()

@@ -1,4 +1,4 @@
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 
 INTERFACE(Interface)
@@ -6,12 +6,18 @@ INTERFACE(Interface)
    Request<int> doSomething;
    Response<int> resultOfDoSomething;
    
+   Request<int> doSomethingElse;
+   Response<> resultOfDoSomethingElse;
+   
    inline
    Interface()
     : INIT_REQUEST(doSomething)
+    , INIT_REQUEST(doSomethingElse)
     , INIT_RESPONSE(resultOfDoSomething)
+    , INIT_RESPONSE(resultOfDoSomethingElse)
    {
-      doSomething >> resultOfDoSomething;
+      doSomething >> resultOfDoSomething /*|| throwing()*/;
+      doSomethingElse >> resultOfDoSomethingElse;
    }
 };
 
@@ -21,7 +27,7 @@ struct Server : Skeleton<Interface>
    Server(const char* role)
     : Skeleton<Interface>(role)
    {      
-      doSomething >> std::tr1::bind(&Server::handleDoSomething, this, _1);
+      doSomething >> std::bind(&Server::handleDoSomething, this, _1);
    }
    
    void handleDoSomething(int i)
@@ -44,27 +50,33 @@ struct Client : Stub<Interface>
    Client(const char* role)
     : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
-      resultOfDoSomething >> std::tr1::bind(&Client::handleResultDoSomething, this, _1);
+      connected >> std::bind(&Client::handleConnected, this);
+      
+      // must distinuish between normal response and error handler
+      // another possible solution would be to wrap the binder in an OnError(...) Function
+      // which then could be used for type switching in the >> operator via specialization 
+      
+      resultOfDoSomething >> std::bind(&Client::handleResultDoSomething, this, _1, _2);
    }
    
-   void connected()
+   void handleConnected()
    {
       doSomething(42);
    }
    
-   void handleRuntimeError(const Parented& p, const RuntimeError& err)
+   void handleResultDoSomething(const CallState& state, int response)
    {
-      std::cout << "Error transmitted from server: request " 
-         << (&p == &doSomething ? "doSomething":"unknown") 
-         << " failed: " << err.error() << ", message: " << err.what() << std::endl;
+      if (state)
+      {
+         std::cout << "Response is " << response << std::endl;
+         disp().stop();
+      }
+      else
+      {
+         std::cout << "Error transmitted from server: request failed, message: " << state.what() << std::endl;
       
-      doSomething(7);
-   }
-   
-   void handleResultDoSomething(int response)
-   {
-      std::cout << "Response is " << response << std::endl;
-      disp().stop();
+         doSomething(7);
+      }
    }
 };
 

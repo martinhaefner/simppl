@@ -18,12 +18,12 @@ struct CalculatorClient : Stub<Calculator>
    CalculatorClient()
     : Stub<Calculator>(rolename, "auto:")
    {
-      // NOOP
+      connected >> std::bind(&CalculatorClient::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
-      value.attach() >> std::tr1::bind(&CalculatorClient::valueChanged, this, _1);
+      value.attach() >> std::bind(&CalculatorClient::valueChanged, this, _1);
       calc = this;
    }
    

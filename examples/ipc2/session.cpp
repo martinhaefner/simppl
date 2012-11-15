@@ -1,4 +1,4 @@
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 
 struct SessionSpec
@@ -36,8 +36,8 @@ struct Server : Skeleton<BankAccount>
    Server(const char* role)
     : Skeleton<BankAccount>(role)
    {  
-      login >> std::tr1::bind(&Server::handleLogin, this, _1, _2);
-      getDeposit >> std::tr1::bind(&Server::handleGetDeposit, this);
+      login >> std::bind(&Server::handleLogin, this, _1, _2);
+      getDeposit >> std::bind(&Server::handleGetDeposit, this);
    }
    
    
@@ -87,18 +87,24 @@ struct Client : Stub<BankAccount>
     : Stub<BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
     , user_(user)
    {
-      resultOfGetDeposit >> std::tr1::bind(&Client::handleGetDeposit, this, _1);
+      connected >> std::bind(&Client::handleConnected, this);
+      resultOfGetDeposit >> std::bind(&Client::handleGetDeposit, this, _1, _2);
    }
    
-   void connected()
+   void handleConnected()
    {
       login(user_, "passwd");
       getDeposit();
    }
    
-   void handleGetDeposit(int value)
+   void handleGetDeposit(const CallState& state, int value)
    {
-      std::cout << "Deposit is " << value << std::endl;
+      if (state)
+      {
+         std::cout << "Deposit is " << value << std::endl;
+      }
+      else
+         std::cout << "Error returning deposit of user '" << user_ << "': " << state.what() << std::endl;
    }
 
    std::string user_;

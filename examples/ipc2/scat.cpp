@@ -1,7 +1,8 @@
 #include <iostream>
 #include <algorithm>
 
-#include "sbroker.h"
+#include "simppl/ipc2.h"
+#include "simppl/sbroker.h"
 
 
 inline

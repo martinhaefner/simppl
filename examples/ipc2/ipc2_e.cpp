@@ -1,13 +1,12 @@
 
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 #include <pthread.h>
 
 
 struct Complex
 {
-   // FIXME implement automatic tuple generation for structs
-   typedef Tuple<double, double> type;
+   typedef make_serializer<double, double>::type serializer_type;
    
    // you always need the default constructor
    inline
@@ -82,8 +81,10 @@ struct InterfaceClient : Stub<Interface>
    InterfaceClient(const char* role)
     : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
-      resultOfAdd >> std::tr1::bind(&InterfaceClient::handleResultAdd, this, _1);
-      resultOfSub >> std::tr1::bind(&InterfaceClient::handleResultSub, this, _1);
+      resultOfAdd >> std::bind(&InterfaceClient::handleResultAdd, this, _1, _2);
+      resultOfSub >> std::bind(&InterfaceClient::handleResultSub, this, _1, _2);
+      
+      connected >> std::bind(&InterfaceClient::handleConnected, this);
    }
    
    void handleCleared()
@@ -91,21 +92,20 @@ struct InterfaceClient : Stub<Interface>
       std::cout << "CPU was cleared..." << std::endl;
    }
    
-   void connected()
+   void handleConnected()
    {
       // attach to all wanted signals here
-      sig1.attach() >> std::tr1::bind(&InterfaceClient::handleSig1, this, _1);
-      
+      sig1.attach() >> std::bind(&InterfaceClient::handleSig1, this, _1);
       add(42);
    }
    
-   void handleResultAdd(int response)
+   void handleResultAdd(const CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       sub(21);
    }
    
-   void handleResultSub(int response)
+   void handleResultSub(const CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       display("Hello World!");
@@ -123,12 +123,12 @@ struct InterfaceClient2 : Stub<Interface>
    InterfaceClient2(const char* role)
     : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
-      // NOOP
+      connected >> std::bind(&InterfaceClient2::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
-      sig1.attach() >> std::tr1::bind(&InterfaceClient2::handleSig1, this, _1);
+      sig1.attach() >> std::bind(&InterfaceClient2::handleSig1, this, _1);
    }
    
    void handleSig1(int data)
@@ -144,12 +144,12 @@ struct InterfaceClient3 : Stub<Interface>
    InterfaceClient3(const char* role)
     : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
-      // NOOP
+      connected >> std::bind(&InterfaceClient3::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
-      cleared.attach() >> std::tr1::bind(&InterfaceClient3::handleCleared, this);
+      cleared.attach() >> std::bind(&InterfaceClient3::handleCleared, this);
    }
    
    void handleCleared()
@@ -166,11 +166,11 @@ struct InterfaceServer : Skeleton<Interface>
     : Skeleton<Interface>(role)
     , result_(0)
    {      
-      add >> std::tr1::bind(&InterfaceServer::handleAdd, this, _1);
-      sub >> std::tr1::bind(&InterfaceServer::handleSub, this, _1);
-      clear >> std::tr1::bind(&InterfaceServer::handleClear, this);
-      display >> std::tr1::bind(&InterfaceServer::handleDisplay, this, _1);
-      addComplex >> std::tr1::bind(&InterfaceServer::handleAddComplex, this, _1);
+      add >> std::bind(&InterfaceServer::handleAdd, this, _1);
+      sub >> std::bind(&InterfaceServer::handleSub, this, _1);
+      clear >> std::bind(&InterfaceServer::handleClear, this);
+      display >> std::bind(&InterfaceServer::handleDisplay, this, _1);
+      addComplex >> std::bind(&InterfaceServer::handleAddComplex, this, _1);
    }
    
    void handleAdd(int i)
@@ -230,7 +230,7 @@ void* server(void* dispatcher)
 
 struct CheckMeToo
 {
-   typedef Tuple<int, std::map<std::string, std::string> > type;
+   typedef make_serializer<int, std::map<std::string, std::string> >::type serializer_type;
    
    int i;
    std::map<std::string, std::string> s;
@@ -239,7 +239,7 @@ struct CheckMeToo
 
 struct CheckMe
 {
-   typedef Tuple<int, double, CheckMeToo> type;
+   typedef make_serializer<int, double, CheckMeToo>::type serializer_type;
    
    int i;
    double d;
@@ -278,6 +278,6 @@ int main()
    server_dispatcher.stop();
    pthread_join(tid, 0);
    
-   STATIC_CHECK(isValidType<CheckMe>::value, ooops);
+   static_assert(isValidType<CheckMe>::value, "ooops");
    return 0;
 }

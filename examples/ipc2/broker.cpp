@@ -1,4 +1,4 @@
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 /*
  * build the four types of servers:
@@ -114,10 +114,10 @@ struct HelloWorldClient : Stub<HelloWorld>
    HelloWorldClient(const char* loc)
     : Stub<HelloWorld>("helloworld", loc)
    {
-      // NOOP
+      connected >> std::tr1::bind(&HelloWorldClient::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
       sayHello("Hello World!");
    }
@@ -129,10 +129,10 @@ struct BrokerClientOnServerSide : Stub<Broker>
    BrokerClientOnServerSide()
     : Stub<Broker>("broker", "unix:the_broker")
    {
-      // NOOP
+      connected >> std::tr1::bind(&BrokerClientOnServerSide::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
       std::cout << "Got connected to broker, registering..." << std::endl;
       registerService("HelloWorld::helloworld", "unix:the_server");
@@ -146,9 +146,10 @@ struct BrokerClientOnClientSide : Stub<Broker>
     : Stub<Broker>("broker", "unix:the_broker")
    {
       serviceReady >> std::tr1::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1, _2);
+      connected >> std::tr1::bind(&BrokerClientOnClientSide::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
       std::cout << "Got connected to broker, waiting..." << std::endl;
       

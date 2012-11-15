@@ -1,5 +1,8 @@
 TODOs 
 
+Allow serialization of std::tuples.
+
+
 ThreadingModel as a Policy
 ==========================
 
@@ -54,6 +57,37 @@ Servers are much more complex since they have some state during the answering pr
 currentSession, ...). In case of servers running within multiple threads we would need to store this
 stuff in thread-local variables and have some locking on the dispatcher in order to access queues
 and global data.
+
+
+Error support
+=============
+
+Make exceptions part of CallStatus object that is the first argument to response functions.
+
+
+struct CallStatus
+{
+   inline
+   CallStatus(uint32_t sequence_nr = INVALID_SEQUENCE_NR)
+    : exception_(0)
+    , sequence_nr_(sequence_nr)
+   {
+      // NOOP
+   }
+   
+   inline
+   operator const void*() const
+   {
+      return !exception;
+   } 
+   
+   IPCException* exception_;
+   uint32_t sequence_nr_;
+};
+
+Maybe blocking function calls could indeed register other handlers to the 
+exception is really thrown while the callback function must contain this argument. 
+How could an interface designer introduce other exception classes?
 
 
 Transport error detection

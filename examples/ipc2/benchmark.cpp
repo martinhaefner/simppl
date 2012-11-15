@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "include/ipc2.h"
+#include "simppl/ipc2.h"
 
 
 static
@@ -15,7 +15,7 @@ unsigned int current_time_ms()
 
 struct PODStruct
 {
-   typedef Tuple<int32_t, double, double, std::string> type;
+   typedef make_serializer<int32_t, double, double, std::string>::type serializer_type;
    
    int32_t anInt32;
    double aDouble;
@@ -74,9 +74,11 @@ struct Client : Stub<DSIBenchmark>
       mPodStruct.aDouble = 2;
       mPodStruct.anotherDouble = 3;
       mPodStruct.aString = "01234567890123456789";   
+      
+      connected >> std::tr1::bind(&Client::handleConnected, this);
    }
    
-   void connected()
+   void handleConnected()
    {
       rCallNoArg.attach();     
       
