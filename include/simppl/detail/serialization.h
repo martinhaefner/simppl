@@ -102,7 +102,7 @@ struct TupleSerializer // : noncopable
    }
    
    template<typename T>
-   void operator()(const T& t, int /*idx*/)   // seems to be already a reference so no copy is done
+   void operator()(const T& t)   // seems to be already a reference so no copy is done
    {
       s_.write(t);
    }
@@ -121,7 +121,7 @@ struct TupleDeserializer // : noncopable
    }
    
    template<typename T>
-   void operator()(T& t, int /*idx*/)
+   void operator()(T& t)
    {
       s_.read(t);
    }
@@ -154,6 +154,41 @@ struct make_serializer
    typedef typename make_typelist<T...>::type type__;
    typedef typename make_serializer_imp<type__>::type type;
 };
+
+
+// ------------------------------------------------------------------------------------
+
+
+template<size_t N>
+struct StdTupleForEach
+{
+   template<typename TupleT, typename FunctorT>
+   static inline
+   void eval(TupleT& t, FunctorT func)
+   {
+      func(std::get<N>(t));
+      StdTupleForEach<N-1>::template eval(t, func);
+   }
+};
+
+template<>
+struct StdTupleForEach<0>
+{
+   template<typename TupleT, typename FunctorT>
+   static inline
+   void eval(TupleT& t, FunctorT func)
+   {
+      func(std::get<0>(t));
+   }
+};
+
+
+template<typename TupleT, typename FunctorT>
+inline
+void std_tuple_for_each(TupleT& t, FunctorT functor)
+{
+   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value-1>::template eval(t, functor);
+}
 
 
 // ------------------------------------------------------------------------------------
@@ -277,10 +312,10 @@ struct Serializer // : noncopyable
       return *this;
    }
    
-   template<typename T1, typename T2, typename T3, typename T4>
-   Serializer& write(const Tuple<T1, T2, T3, T4>& tuple)
+   template<typename... T>
+   Serializer& write(const std::tuple<T...>& t)
    {
-      for_each(tuple, TupleSerializer<Serializer>(*this));
+      std_tuple_for_each(t, TupleSerializer<Serializer>(*this));
       return *this;
    }
    
@@ -374,9 +409,9 @@ Serializer& operator<<(Serializer& s, const StructT& st)
    return s.write(tuple);
 }
 
-template<typename T1, typename T2, typename T3, typename T4>
+template<typename... T>
 inline
-Serializer& operator<<(Serializer& s, const Tuple<T1, T2, T3, T4>& t)
+Serializer& operator<<(Serializer& s, const std::tuple<T...>& t)
 {
    return s.write(t);
 }
@@ -510,10 +545,10 @@ struct Deserializer // : noncopyable
       return *this;
    }
    
-   template<typename T1, typename T2, typename T3, typename T4>
-   Deserializer& read(Tuple<T1, T2, T3, T4>& tuple)
+   template<typename... T>
+   Deserializer& read(std::tuple<T...>& t)
    {
-      for_each(tuple, TupleDeserializer<Deserializer>(*this));
+      std_tuple_for_each(t, TupleDeserializer<Deserializer>(*this));
       return *this;
    }
    
@@ -591,9 +626,9 @@ Deserializer& operator>>(Deserializer& s, StructT& st)
    return s.read(tuple);
 }
 
-template<typename T1, typename T2, typename T3, typename T4>
+template<typename... T>
 inline
-Deserializer& operator>>(Deserializer& s, Tuple<T1, T2, T3, T4>& t)
+Deserializer& operator>>(Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
 }

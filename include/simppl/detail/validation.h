@@ -13,16 +13,21 @@ struct isValidTuple
    enum { value = false }; 
 };
 
+// forward decl
+template<typename... T>
+struct isValidTuple<std::tuple<T...> >;
 
-template<typename T1, typename T2, typename T3, typename T4>
-struct isValidTuple<Tuple<T1, T2, T3, T4> > 
+// recurse into variadic template arguments
+template<typename T1, typename... T>
+struct isValidTuple<std::tuple<T1, T...> >
 { 
-   enum { value = 
-         isValidType<T1>::value 
-      && (isValidType<T2>::value || std::is_same<T2, NilType>::value)
-      && (isValidType<T3>::value || std::is_same<T3, NilType>::value)
-      && (isValidType<T4>::value || std::is_same<T4, NilType>::value)
-   }; 
+   enum { value = isValidType<T1>::value && isValidTuple<std::tuple<T...> >::value };
+};
+
+template<typename T>
+struct isValidTuple<std::tuple<T> >
+{ 
+   enum { value = isValidType<T>::value };
 };
 
 

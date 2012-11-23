@@ -50,7 +50,7 @@ INTERFACE(Interface)
    Signal<int> sig1;
    Signal<> cleared;
    
-   Request<Tuple<int, double, std::string> > reqt;
+   Request<std::tuple<int, double, std::string> > reqt;
      
    inline
    Interface()
@@ -100,6 +100,7 @@ struct InterfaceServer : Skeleton<Interface>
       clear >> std::bind(&InterfaceServer::handleClear, this);
       display >> std::bind(&InterfaceServer::handleDisplay, this, _1);
       addComplex >> std::bind(&InterfaceServer::handleAddComplex, this, _1);
+      reqt >> std::bind(&InterfaceServer::handleReqt, this, _1);
    }
    
    void handleAdd(int i)
@@ -126,6 +127,11 @@ struct InterfaceServer : Skeleton<Interface>
       
          sig1.emit(result_);
       }
+   }
+   
+   void handleReqt(const std::tuple<int, double, std::string>& tup)
+   {
+      std::cout << "Tuple result: int=" << std::get<0>(tup) << ", double=" << std::get<1>(tup) << ", string=" << std::get<2>(tup) << std::endl;
    }
    
    void handleClear()
@@ -191,6 +197,8 @@ int main()
       d.waitForResponse(c1.sub(21), result);
       std::cout << "Result of sub is " << result << std::endl;
       
+      c1.reqt(std::make_tuple(42, 3.1415, std::string("Hallo Welt")));
+         
       try
       {
          d.waitForResponse(c1.sub(-1), result);

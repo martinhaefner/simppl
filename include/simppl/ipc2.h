@@ -73,7 +73,7 @@ struct isVoid
 
 
 #ifdef SIMPPL_HAVE_VALIDATION
-#   include "include/validation.h"
+#   include "detail/validation.h"
 #else
 
 template<typename T>
