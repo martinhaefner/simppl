@@ -32,16 +32,9 @@
 
 #include "detail/serialization.h"
 
-// enable this section to allow auto switch between error and normal response
-// functions argument dispatching
-#if 0
-#   define __BINDER_NS ipc2
-#   define HAVE_TR1 1
-#   include "simppl/bind_adapter.h"
-#endif
-
 #define INVALID_SEQUENCE_NR 0xFFFFFFFF
-#define INVALID_SERVER_ID 0u
+#define INVALID_SERVER_ID 0xFFFFFFFFu
+#define RESERVED_SERVER_ID 0u   // no distinct server, just the dispatcher has to resolve the request
 #define INVALID_SESSION_ID 0u
 
 #ifdef NDEBUG
@@ -494,17 +487,17 @@ protected:
 
 // -----------------------------------------------------------------------------
 
+#define REQUEST_RESOLVE_INTERFACE 0x1u
 
 #define FRAME_MAGIC                            0xAABBCCDDu
 #define FRAME_TYPE_REQUEST                     0x1u
 #define FRAME_TYPE_RESPONSE                    0x2u
-#define FRAME_TYPE_RESOLVE_INTERFACE           0x3u
-#define FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE  0x4u
-#define FRAME_TYPE_REGISTER_SIGNAL             0x5u
-#define FRAME_TYPE_UNREGISTER_SIGNAL           0x6u
-#define FRAME_TYPE_SIGNAL                      0x7u
-#define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x8u
-#define FRAME_TYPE_TRANSPORT_ERROR             0x9u
+#define FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE  0x3u
+#define FRAME_TYPE_REGISTER_SIGNAL             0x4u
+#define FRAME_TYPE_UNREGISTER_SIGNAL           0x5u
+#define FRAME_TYPE_SIGNAL                      0x6u
+#define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x7u
+#define FRAME_TYPE_TRANSPORT_ERROR             0x8u
 
 
 struct FrameHeader
@@ -544,26 +537,6 @@ struct FrameHeader
    
    uint32_t payloadsize_;
    uint32_t sequence_nr_;
-};
-
-
-/// send interface::role name for service identification -> return will have an int32_t value which can
-/// be used later on.
-struct InterfaceResolveFrame : FrameHeader
-{
-   inline
-   InterfaceResolveFrame()
-    : FrameHeader()
-   {
-      // NOOP
-   }
-   
-   inline
-   InterfaceResolveFrame(int)
-    : FrameHeader(FRAME_TYPE_RESOLVE_INTERFACE)
-   {
-      // NOOP
-   }
 };
 
 
@@ -775,8 +748,7 @@ struct TransportErrorFrame : FrameHeader
 
 struct HeaderSize
 {
-   typedef TYPELIST_9( \
-      InterfaceResolveFrame, \
+   typedef TYPELIST_8( \
       InterfaceResolveResponseFrame, \
       RequestFrame, \
       ResponseFrame, \
@@ -790,16 +762,15 @@ struct HeaderSize
 
    enum { max = Max<headertypes, SizeFunc>::value };
    
-   static const unsigned int size[10];
+   static const unsigned int size[9];
 };
 
 
 /*static*/ 
-const unsigned int HeaderSize::size[10] = {
+const unsigned int HeaderSize::size[9] = {
    0
  , sizeof(RequestFrame)
  , sizeof(ResponseFrame)
- , sizeof(InterfaceResolveFrame)
  , sizeof(InterfaceResolveResponseFrame) 
  , sizeof(RegisterSignalFrame)
  , sizeof(UnregisterSignalFrame)
@@ -2628,13 +2599,52 @@ private:
                            {
                               RequestFrame* rf = (RequestFrame*)hdr;
                               
-                              servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
-                              if (iter != servers_by_id_.end())
+                              if (rf->serverid_ != RESERVED_SERVER_ID)
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, rf->sessionid_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
+                                 if (iter != servers_by_id_.end())
+                                 {
+                                    iter->second->eval(rf->func_, rf->sequence_nr_, rf->sessionid_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 }
+                                 else
+                                    std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
                               }
                               else
-                                 std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
+                              {
+                                 switch(rf->func_)
+                                 {
+                                 case REQUEST_RESOLVE_INTERFACE:
+                                    {
+                                       Deserializer ds(buf.get());
+                                       std::string iface_name;
+                                       ds >> iface_name;
+                                       
+                                       uint32_t the_id = INVALID_SERVER_ID;
+                                       
+                                       servermap_type::iterator iter = servers_.find(iface_name);
+                                       if (iter != servers_.end())
+                                       {
+                                          for(servermapid_type::iterator iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
+                                          {
+                                             if (iter->second == iditer->second)
+                                             {
+                                                the_id = iditer->first;
+                                                break;
+                                             }
+                                          }
+                                       }
+                                       else
+                                          std::cerr << "No such server '" << iface_name << "' found." << std::endl;
+                                       
+                                       sendInternalResponse(fds_[i].fd, RESPONSE_RESOLVE_INTERFACE, the_id, rf->sequence_nr_);
+                                    }
+                                    break;
+                                    
+                                 default:
+                                    std::cerr << "Unknown internal request." << std::endl;
+                                    break;
+                                 }
+                              }
                            }
                            break;
                            
@@ -2778,32 +2788,6 @@ private:
                            }
                            break;
                       
-                        case FRAME_TYPE_RESOLVE_INTERFACE:
-                           {
-                              InterfaceResolveFrame* irf = (InterfaceResolveFrame*)hdr;
-                              
-                              InterfaceResolveResponseFrame rf(0, generateId());
-                              rf.sequence_nr_ = irf->sequence_nr_;
-                                 
-                              servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
-                              if (iter != servers_.end())
-                              {
-                                 for(servermapid_type::iterator iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
-                                 {
-                                    if (iter->second == iditer->second)
-                                    {
-                                       rf.id_ = iditer->first;
-                                       break;
-                                    }
-                                 }
-                              }
-                              else
-                                 std::cerr << "No such server found." << std::endl;
-                              
-                              genericSend(fds_[i].fd, rf, 0);
-                           }
-                           break;
-                        
                         case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
                            {
                               InterfaceResolveResponseFrame* irrf = (InterfaceResolveResponseFrame*)hdr;
@@ -2937,6 +2921,21 @@ public:
    
 private:
    
+   template<typename T>
+   uint32_t sendInternalRequest(int fd, int func, const T& data)
+   {
+      Serializer s;
+      s << data;
+      
+      RequestFrame f(RESERVED_SERVER_ID, func, INVALID_SESSION_ID);
+      f.payloadsize_ = s.size();
+      f.sequence_nr_ = generateSequenceNr();
+   
+      genericSend(fd, f, s.data());
+      return f.sequence_nr_;
+   }
+         
+   
    bool connect(StubBase& stub, bool blockUntilResponse = false, const char* location = 0)
    {
       const char* the_location = location ? location : stub.boundname_;
@@ -3000,20 +2999,15 @@ private:
       {
          // don't cache anything here, a sessionid will be 
          // created no the server for any resolve request
-         InterfaceResolveFrame f(42);
          char buf[128];
-         
          assert(strlen(stub.iface_) + 2 + strlen(stub.role_) < sizeof(buf));
          fullQualifiedName(buf, stub.iface_, stub.role_);
-                                 
-         f.payloadsize_ = strlen(buf)+1;
-         f.sequence_nr_ = generateSequenceNr();
-   
-         dangling_interface_resolves_[f.sequence_nr_] = &stub;
-         genericSend(stub.fd_, f, buf);
+         
+         uint32_t sequenceNr = sendInternalRequest(stub.fd_, REQUEST_RESOLVE_INTERFACE, std::string(buf));   // FIXME make this without std::string char 
+         dangling_interface_resolves_[sequenceNr] = &stub;
          
          if (blockUntilResponse)
-            loopUntil(f.sequence_nr_);
+            loopUntil(sequenceNr);
       }
          
       return stub.fd_ > 0;
