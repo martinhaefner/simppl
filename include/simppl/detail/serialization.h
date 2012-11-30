@@ -2,6 +2,9 @@
 #define SIMPPL_SERIALIZATION_H
 
 
+#include "simppl/typelist.h"
+
+
 template<typename T> 
 struct isPod 
 { 

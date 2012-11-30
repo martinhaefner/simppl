@@ -52,7 +52,7 @@ INTERFACE(Interface)
 
    Attribute<int> myInt;
    
-   Request<Tuple<int, double, std::string> > reqt;
+   Request<std::tuple<int, double, std::string> > reqt;
      
    inline
    Interface()

@@ -27,7 +27,6 @@
 
 #include "if.h"
 #include "calltraits.h"
-#include "variant.h"   // for retrieving header sizes
 #include "noninstantiable.h"
 
 #include "detail/serialization.h"
@@ -770,45 +769,20 @@ struct TransportErrorFrame : FrameHeader
    void* err_;       ///< internal pointer to TransportError
 };
 
-// ------------------------------------------------------------------------------------------
 
-
-struct HeaderSize
-{
-   typedef TYPELIST_9( \
-      InterfaceResolveFrame, \
-      InterfaceResolveResponseFrame, \
-      RequestFrame, \
-      ResponseFrame, \
-      RegisterSignalFrame, \
-      UnregisterSignalFrame, \
-      SignalEmitFrame, \
-      SignalResponseFrame, \
-      TransportErrorFrame \
-   ) 
-   headertypes;
-
-   enum { max = Max<headertypes, SizeFunc>::value };
-   
-   static const unsigned int size[10];
+static
+size_t headersize[] {
+   0,
+   sizeof(RequestFrame), 
+   sizeof(ResponseFrame),    
+   sizeof(InterfaceResolveFrame),
+   sizeof(InterfaceResolveResponseFrame),
+   sizeof(RegisterSignalFrame),
+   sizeof(UnregisterSignalFrame),
+   sizeof(SignalEmitFrame),
+   sizeof(SignalResponseFrame),
+   sizeof(TransportErrorFrame)
 };
-
-
-/*static*/ 
-const unsigned int HeaderSize::size[10] = {
-   0
- , sizeof(RequestFrame)
- , sizeof(ResponseFrame)
- , sizeof(InterfaceResolveFrame)
- , sizeof(InterfaceResolveResponseFrame) 
- , sizeof(RegisterSignalFrame)
- , sizeof(UnregisterSignalFrame)
- , sizeof(SignalEmitFrame)
- , sizeof(SignalResponseFrame)
- , sizeof(TransportErrorFrame)
-};
-
-static_assert((sizeof(HeaderSize::size) / sizeof(HeaderSize::size[0])) == Size<HeaderSize::headertypes>::value + 1, "error_frame_types_must_occur_here");
 
 
 // -------------------------------------------------------------------------------------------
@@ -2597,12 +2571,28 @@ private:
                      len = 0;
                      std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
                      
-                     char hdr[HeaderSize::max] __attribute__((aligned(4)));
+                     union Hdr 
+                     {
+                        Hdr()
+                        {
+                           // NOOP
+                        }
+                        
+                        RequestFrame rqf;
+                        ResponseFrame rf;
+                        InterfaceResolveFrame irf;
+                        InterfaceResolveResponseFrame irrf;
+                        RegisterSignalFrame rsf;
+                        UnregisterSignalFrame usf;
+                        SignalEmitFrame sef;
+                        SignalResponseFrame srf;
+                        TransportErrorFrame tef;
+                     } hdr; 
 
                      struct msghdr msg;
                      memset(&msg, 0, sizeof(msg));
                      
-                     struct iovec v[2] = { { hdr, HeaderSize::size[f.type_] }, { 0, 0 } };
+                     struct iovec v[2] = { { &hdr, headersize[f.type_] }, { 0, 0 } };
                      msg.msg_iov = v;
                      
                      if (f.payloadsize_ > 0)
@@ -2625,53 +2615,46 @@ private:
                         switch(f.type_)
                         {
                         case FRAME_TYPE_REQUEST:
-                           {
-                              RequestFrame* rf = (RequestFrame*)hdr;
-                              
-                              servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
+                           { 
+                              servermapid_type::iterator iter = servers_by_id_.find(hdr.rqf.serverid_);
                               if (iter != servers_by_id_.end())
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, rf->sessionid_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 iter->second->eval(hdr.rqf.func_, hdr.rqf.sequence_nr_, hdr.rqf.sessionid_, fds_[i].fd, buf.get(), hdr.rqf.payloadsize_);
                               }
                               else
-                                 std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
+                                 std::cerr << "No service with id=" << hdr.rqf.serverid_ << " found." << std::endl;
                            }
                            break;
                            
                         case FRAME_TYPE_TRANSPORT_ERROR:
+                           if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != hdr.tef.sequence_nr_)
                            {
-                              TransportErrorFrame* ef = (TransportErrorFrame*)hdr;
-                              
-                              if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != ef->sequence_nr_)
-                              {
-                                 CallState cs((TransportError*)(ef->err_));
-                                 ((ClientResponseBase*)ef->handler_)->eval(cs, 0, 0);
-                              }
-                              else
-                              {
-                                 std::unique_ptr<TransportError> var((TransportError*)(ef->err_));
-                                 throw *var;
-                              }
+                              CallState cs((TransportError*)(hdr.tef.err_));
+                              ((ClientResponseBase*)hdr.tef.handler_)->eval(cs, 0, 0);
                            }
+                           else
+                           {
+                              std::unique_ptr<TransportError> var((TransportError*)(hdr.tef.err_));
+                              throw *var;
+                           }
+                        
                            break;
                            
                         case FRAME_TYPE_RESPONSE:
-                           {
-                              ResponseFrame* rf = (ResponseFrame*)hdr;
-                              
+                           {  
                               outstanding_requests_type::iterator iter;
-                              if ((iter = outstandings_.find(rf->sequence_nr_)) != outstandings_.end())
+                              if ((iter = outstandings_.find(hdr.rf.sequence_nr_)) != outstandings_.end())
                               {
-                                 if (sequence_nr == INVALID_SEQUENCE_NR || rf->sequence_nr_ != sequence_nr)
+                                 if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
                                  {
-                                    if (rf->result_ == 0)   // normal response
+                                    if (hdr.rf.result_ == 0)   // normal response
                                     {
-                                       CallState cs(rf->sequence_nr_);
-                                       std::get<1>(iter->second)->eval(cs, buf.get(), rf->payloadsize_);
+                                       CallState cs(hdr.rf.sequence_nr_);
+                                       std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
                                     }
                                     else   // error response
                                     {
-                                       CallState cs(new RuntimeError(rf->result_, (const char*)buf.get(), rf->sequence_nr_));
+                                       CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
                                        std::get<1>(iter->second)->eval(cs, 0, 0);
                                     }
                                  }
@@ -2680,21 +2663,21 @@ private:
                                     assert(argLen);
                                     running_ = false;
                                     
-                                    if (rf->result_ == 0)
+                                    if (hdr.rf.result_ == 0)
                                     {
                                        if (buf.get() == 0)
                                        {
                                           // must copy payload in this case
-                                          *argData = new char[rf->payloadsize_];
-                                          ::memcpy(*argData, buf.get(), rf->payloadsize_);
+                                          *argData = new char[hdr.rf.payloadsize_];
+                                          ::memcpy(*argData, buf.get(), hdr.rf.payloadsize_);
                                        }
                                        else
                                           *argData = buf.release();
                                        
-                                       *argLen = rf->payloadsize_;
+                                       *argLen = hdr.rf.payloadsize_;
                                     }
                                     else
-                                       throw RuntimeError(rf->result_, (const char*)buf.get(), rf->sequence_nr_);
+                                       throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
                                  }
                                  
                                  outstandings_.erase(iter);
@@ -2706,21 +2689,19 @@ private:
                         
                         case FRAME_TYPE_REGISTER_SIGNAL:
                            {
-                              RegisterSignalFrame* rsf = (RegisterSignalFrame*)hdr;
-                              
-                              servermapid_type::iterator iter = servers_by_id_.find(rsf->serverid_);
+                              servermapid_type::iterator iter = servers_by_id_.find(hdr.rsf.serverid_);
                               if (iter != servers_by_id_.end())
                               {
                                  uint32_t registrationid = generateId();
                                  
-                                 ServerSignalBase* sig = iter->second->addSignalRecipient(rsf->sig_, fds_[i].fd, registrationid, rsf->id_);
+                                 ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fds_[i].fd, registrationid, hdr.rsf.id_);
                                  
                                  if (sig)
                                     server_sighandlers_[registrationid] = sig;
                                  
                                  // FIXME error handling, what if sig is 0???
-                                 SignalResponseFrame rf(registrationid, rsf->id_);
-                                 rf.sequence_nr_ = rsf->sequence_nr_;
+                                 SignalResponseFrame rf(registrationid, hdr.rsf.id_);
+                                 rf.sequence_nr_ = hdr.rsf.sequence_nr_;
                                  
                                  genericSend(fds_[i].fd, rf, 0);
                                  
@@ -2728,50 +2709,44 @@ private:
                                     sig->onAttach(registrationid);
                               }
                               else
-                                 std::cerr << "No server with id=" << rsf->serverid_ << " found." << std::endl;
+                                 std::cerr << "No server with id=" << hdr.rsf.serverid_ << " found." << std::endl;
                            }
                            break;
                            
                         case FRAME_TYPE_UNREGISTER_SIGNAL:
                            {
-                              UnregisterSignalFrame* usf = (UnregisterSignalFrame*)hdr;
-                              
-                              serversignalers_type::iterator iter = server_sighandlers_.find(usf->registrationid_);
+                              serversignalers_type::iterator iter = server_sighandlers_.find(hdr.usf.registrationid_);
                               if (iter != server_sighandlers_.end())
                               {
-                                 iter->second->removeRecipient(usf->registrationid_);
+                                 iter->second->removeRecipient(hdr.usf.registrationid_);
                               }
                               else
-                                 std::cerr << "No registered signal '" << usf->registrationid_ << "' found." << std::endl;
+                                 std::cerr << "No registered signal '" << hdr.usf.registrationid_ << "' found." << std::endl;
                            }
                            break;
                         
                         case FRAME_TYPE_REGISTER_SIGNAL_RESPONSE:
                            {
-                              SignalResponseFrame* srf = (SignalResponseFrame*)hdr;
-                              
-                              outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(srf->sequence_nr_);
+                              outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
                               if (iter != outstanding_sig_registrs_.end())
                               {
-                                 sighandlers_[srf->id_] = iter->second;
+                                 sighandlers_[hdr.srf.id_] = iter->second;
                                  outstanding_sig_registrs_.erase(iter);
                               }
                               else
                                  std::cerr << "No such signal registration found." << std::endl;
                               
-                              if (sequence_nr == srf->sequence_nr_)
+                              if (sequence_nr == hdr.srf.sequence_nr_)
                                  running_ = false;
                            }
                            break;
 
                         case FRAME_TYPE_SIGNAL:
                            {
-                              SignalEmitFrame* sef = (SignalEmitFrame*)hdr;
-                              
-                              sighandlers_type::iterator iter = sighandlers_.find(sef->id_);
+                              sighandlers_type::iterator iter = sighandlers_.find(hdr.sef.id_);
                               if (iter != sighandlers_.end())
                               {
-                                 iter->second->eval(buf.get(), sef->payloadsize_);
+                                 iter->second->eval(buf.get(), hdr.sef.payloadsize_);
                               }
                               else
                                  std::cerr << "No such signal handler found." << std::endl;
@@ -2780,10 +2755,8 @@ private:
                       
                         case FRAME_TYPE_RESOLVE_INTERFACE:
                            {
-                              InterfaceResolveFrame* irf = (InterfaceResolveFrame*)hdr;
-                              
                               InterfaceResolveResponseFrame rf(0, generateId());
-                              rf.sequence_nr_ = irf->sequence_nr_;
+                              rf.sequence_nr_ = hdr.irf.sequence_nr_;
                                  
                               servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
                               if (iter != servers_.end())
@@ -2806,14 +2779,12 @@ private:
                         
                         case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
                            {
-                              InterfaceResolveResponseFrame* irrf = (InterfaceResolveResponseFrame*)hdr;
-                              
-                              outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(irrf->sequence_nr_);
+                              outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(hdr.irrf.sequence_nr_);
                               if (iter != dangling_interface_resolves_.end())
                               {
                                  StubBase* stub = iter->second;
-                                 stub->id_ = irrf->id_;
-                                 stub->current_sessionid_ = irrf->sessionid_;
+                                 stub->id_ = hdr.irrf.id_;
+                                 stub->current_sessionid_ = hdr.irrf.sessionid_;
                                  dangling_interface_resolves_.erase(iter);
                                  
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
@@ -2826,7 +2797,7 @@ private:
                                     else
                                         iter->second->connected();
                                  }
-                                 else if (sequence_nr == irrf->sequence_nr_)
+                                 else if (sequence_nr == hdr.irrf.sequence_nr_)
                                     running_ = false;
                               }
                            }
