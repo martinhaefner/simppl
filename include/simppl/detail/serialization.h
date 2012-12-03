@@ -637,4 +637,22 @@ Deserializer& operator>>(Deserializer& s, std::tuple<T...>& t)
 }
 
 
+// ------------------------------------------------------------------------
+
+
+inline
+Serializer& serialize(Serializer& s)
+{
+   return s;
+}
+
+template<typename T1, typename... T>
+inline
+Serializer& serialize(Serializer& s, T1 t1, T... t)
+{
+   s << t1;
+   return serialize(s, t...);
+}
+
+
 #endif   // SIMPPL_SERIALIZATION_H

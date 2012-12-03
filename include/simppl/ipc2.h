@@ -31,14 +31,6 @@
 
 #include "detail/serialization.h"
 
-// enable this section to allow auto switch between error and normal response
-// functions argument dispatching
-#if 0
-#   define __BINDER_NS ipc2
-#   define HAVE_TR1 1
-#   include "simppl/bind_adapter.h"
-#endif
-
 #define INVALID_SEQUENCE_NR 0xFFFFFFFF
 #define INVALID_SERVER_ID 0u
 #define INVALID_SESSION_ID 0u
@@ -326,8 +318,12 @@ const char* fullQualifiedName(char* buf, const char* ifname, const char* rolenam
 // ------------------------------------------------------------------------------------
 
 
+template<typename... T>
+struct DeserializeAndCall;
+
+
 template<typename T1, typename T2, typename T3>
-struct DeserializeAndCall : NonInstantiable
+struct DeserializeAndCall<T1, T2, T3> : NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -359,7 +355,7 @@ struct DeserializeAndCall : NonInstantiable
 
 
 template<>
-struct DeserializeAndCall<Void, Void, Void> : NonInstantiable
+struct DeserializeAndCall<> : NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -377,7 +373,7 @@ struct DeserializeAndCall<Void, Void, Void> : NonInstantiable
 };
 
 template<typename T>
-struct DeserializeAndCall<T, Void, Void> : NonInstantiable
+struct DeserializeAndCall<T> : NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -403,7 +399,7 @@ struct DeserializeAndCall<T, Void, Void> : NonInstantiable
 };
 
 template<typename T1, typename T2>
-struct DeserializeAndCall<T1, T2, Void> : NonInstantiable
+struct DeserializeAndCall<T1, T2> : NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -905,8 +901,8 @@ struct ClientSignalBase;
 
 struct StubBase
 {
-   template<typename T1, typename T2, typename T3> friend struct ClientSignal;
-   template<typename T1, typename T2, typename T3> friend struct ClientRequest;
+   template<typename... T> friend struct ClientSignal;
+   template<typename... T> friend struct ClientRequest;
    friend struct Dispatcher;
    
 protected:
@@ -1041,21 +1037,10 @@ protected:
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void()>, 
-               /*else*/std::function<void(arg1_type)> >::type,    
-            /*else*/std::function<void(arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
+   typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
    ClientSignal(uint32_t id, std::vector<Parented*>& parent)
@@ -1093,7 +1078,7 @@ struct ClientSignal : ClientSignalBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::eval(d, f_);
+         DeserializeAndCall<T...>::eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for signal " << id_ << " with payload size=" << length << std::endl;
@@ -1103,9 +1088,9 @@ struct ClientSignal : ClientSignalBase
 };
 
 
-template<typename T1, typename T2, typename T3, typename FuncT>
+template<typename... T, typename FuncT>
 inline
-void operator>>(ClientSignal<T1, T2, T3>& sig, const FuncT& func)
+void operator>>(ClientSignal<T...>& sig, const FuncT& func)
 {
    sig.handledBy(func);
 }
@@ -1360,7 +1345,7 @@ struct ClientAttribute
 private:
 
    /// vector argument with partial update support   
-   typedef ClientSignal<typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
+   typedef ClientSignal<typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type> signal_type;
 
    void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
    {
@@ -1411,7 +1396,7 @@ private:
          f_(data_);
    }
 
-   void valueChanged(typename signal_type::arg1_type arg)
+    void valueChanged(arg_type arg)
    {      
       setAndCall(arg);
    }
@@ -1489,13 +1474,9 @@ protected:
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
    inline
    ServerSignal(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
    {
@@ -1503,47 +1484,23 @@ struct ServerSignal : ServerSignalBase
    }
    
    inline
-   void emit()
+   void emit(typename CallTraits<T>::param_type... args)
    {
-      static_assert(isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      //FIXME static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      // FIXME maybe remove operator<< since they are not needed for variadic templates approach
       
-      static Serializer s(0);
-      sendSignal(s);
+      Serializer s;
+      sendSignal(serialize(s, args...));
    }
    
-   inline
-   void emit(arg1_type arg1)
-   {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1));
-      sendSignal(s << arg1);
-   }
    
-   inline
-   void emit(arg1_type arg1, arg2_type arg2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1) + sizeof(T2));
-      sendSignal(s << arg1 << arg2);
-   }
-   
-   inline
-   void emit(arg1_type arg1, arg2_type arg2, arg3_type arg3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));
-      sendSignal(s << arg1 << arg2 << arg3);
-   }
-
 protected:
+   
    inline
-   void emit(arg1_type arg1, uint32_t registrationid)
+   void emitWithId(uint32_t registrationid, T... t)
    {
-      Serializer s(sizeof(T1));
-      s << arg1;
+      Serializer s;
+      serialize(s, t...);
 
       SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
    }
@@ -1552,11 +1509,11 @@ protected:
 
 template<typename DataT>
 struct BaseAttribute 
- : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
+ : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
 {
    inline
    BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
+    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(id, _signals)
    {
       // NOOP
    }
@@ -1833,7 +1790,7 @@ struct ServerAttribute
    
    void onAttach(uint32_t registrationid)
    {
-      emit(this->t_, registrationid);
+      emitWithId(registrationid, this->t_);
    }
 };
 
@@ -1856,58 +1813,27 @@ struct ClientResponseHolder
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientRequest : Parented
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
    inline
    ClientRequest(uint32_t id, std::vector<Parented*>& parent)
     : id_(id)
     , handler_(0)
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+      //FIXME static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       parent.push_back(this);
    }
-   
-   inline
-   ClientResponseHolder operator()()
-   {
-      static_assert(isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
       
-      static Serializer s(0);
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s));
-   }
-   
    inline
-   ClientResponseHolder operator()(arg1_type t1)
+   ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      //static_assert(!isVoid<T>::value... && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
       
-      Serializer s(sizeof(typename remove_ref<T1>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1));
+      Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
    }
 
-   inline
-   ClientResponseHolder operator()(arg1_type t1, arg2_type t2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2));
-   }
-   
-   inline
-   ClientResponseHolder operator()(arg1_type t1, arg2_type t2, arg3_type t3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type) + sizeof(typename remove_ref<T3>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2 << t3));
-   }
-   
    ClientResponseBase* handler_;
    uint32_t id_;
 };
@@ -1916,26 +1842,15 @@ struct ClientRequest : Parented
 // ----------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientResponse : ClientResponseBase
-{
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void(const CallState&)>, 
-               /*else*/std::function<void(const CallState&, arg1_type)> >::type,    
-            /*else*/std::function<void(const CallState&, arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(const CallState&, arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
+{ 
+   typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
    inline
    ClientResponse()
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+ //     static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
    }
    
    template<typename FunctorT>
@@ -1951,7 +1866,7 @@ struct ClientResponse : ClientResponseBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::evalResponse(d, f_, cs);
+         DeserializeAndCall<T...>::evalResponse(d, f_, cs);
       }
       else
          std::cerr << "No appropriate handler registered for response with payload size=" << length << std::endl;
@@ -1962,9 +1877,9 @@ struct ClientResponse : ClientResponseBase
 
 
 
-template<typename T1, typename T2, typename T3, typename FunctorT>
+template<typename FunctorT, typename... T>
 inline 
-ClientResponse<T1, T2, T3>& operator>> (ClientResponse<T1, T2, T3>& r, const FunctorT& f)
+ClientResponse<T...>& operator>> (ClientResponse<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
    return r;
@@ -1974,26 +1889,15 @@ ClientResponse<T1, T2, T3>& operator>> (ClientResponse<T1, T2, T3>& r, const Fun
 // -------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ServerRequest : ServerRequestBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void()>, 
-               /*else*/std::function<void(arg1_type)> >::type,    
-            /*else*/std::function<void(arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
-   
+   typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
+     
    inline
    ServerRequest(uint32_t id, std::map<uint32_t, ServerRequestBase*>& requests)
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+     // static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       requests[id] = this;
    }
    
@@ -2010,7 +1914,7 @@ struct ServerRequest : ServerRequestBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::eval(d, f_);
+         DeserializeAndCall<T...>::eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for request with payload size=" << length << std::endl;
@@ -2020,9 +1924,9 @@ struct ServerRequest : ServerRequestBase
 };
 
 
-template<typename T1, typename T2, typename T3, typename FunctorT>
+template<typename FunctorT, typename... T>
 inline 
-void operator>> (ServerRequest<T1, T2, T3>& r, const FunctorT& f)
+void operator>> (ServerRequest<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
 }
@@ -2030,45 +1934,23 @@ void operator>> (ServerRequest<T1, T2, T3>& r, const FunctorT& f)
 
 // ---------------------------------------------------------------------------------------------
 
+// FIXME remove data type Void since it is no longer needed for variadic templates
 
-template<typename T1, typename T2, typename T3>
+
+template<typename... T>
 struct ServerResponse : ServerResponseBase
-{
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
+{   
    inline
    ServerResponse()
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+    //FIXME  static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
    }
    
    inline
-   ServerResponseHolder operator()(arg1_type t1)
-   {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1));      
-      return ServerResponseHolder(s << t1, *this);
-   }
-   
-   inline
-   ServerResponseHolder operator()(arg1_type t1, arg2_type t2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1) + sizeof(T2));      
-      return ServerResponseHolder(s << t1 << t2, *this);
-   }
-   
-   inline
-   ServerResponseHolder operator()(arg1_type t1, arg2_type t2, arg3_type t3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));      
-      return ServerResponseHolder(s << t1 << t2 << t3, *this);
+   ServerResponseHolder operator()(typename CallTraits<T>::param_type&... t)
+   { 
+      Serializer s;
+      return ServerResponseHolder(serialize(s, std::forward<T...>(t...)), *this);
    }
 };
 
@@ -2428,7 +2310,7 @@ struct Dispatcher
       
       if (rc == 0)
       {
-         ClientResponse<T1, Void, Void>* r = safe_cast<ClientResponse<T1, Void, Void>*>(resp.r_);
+         ClientResponse<T1>* r = safe_cast<ClientResponse<T1>*>(resp.r_);
          assert(r);
          
          Deserializer d(data, len);
@@ -2437,7 +2319,7 @@ struct Dispatcher
       
       return rc == 0;
    }
-   
+
    template<typename T1, typename T2>
    bool waitForResponse(const ClientResponseHolder& resp, T1& t1, T2& t2)
    {
@@ -2452,7 +2334,7 @@ struct Dispatcher
       
       if (rc == 0)
       {
-         ClientResponse<T1, T2, Void>* r = safe_cast<ClientResponse<T1, T2, Void>*>(resp.r_);
+         ClientResponse<T1, T2>* r = safe_cast<ClientResponse<T1, T2>*>(resp.r_);
          assert(r);
          
          Deserializer d(data, len);
@@ -3100,9 +2982,9 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 }
 
 
-template<template<template<typename,typename,typename> class, 
-                  template<typename,typename,typename> class,
-                  template<typename,typename,typename> class,
+template<template<template<typename...> class, 
+                  template<typename...> class,
+                  template<typename...> class,
                   template<typename,typename> class> 
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
@@ -3204,9 +3086,9 @@ struct ServerRequestDescriptor
 };
 
 
-template<template<template<typename,typename,typename> class, 
-                  template<typename,typename,typename> class,
-                  template<typename,typename,typename> class,
+template<template<template<typename...> class, 
+                  template<typename...> class,
+                  template<typename...> class,
                   template<typename,typename> class> class IfaceT>
 struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
@@ -3385,9 +3267,9 @@ struct isServer
 {
 private:
    
-   template<template<template<typename,typename,typename> class, 
-                     template<typename,typename,typename> class,
-                     template<typename,typename,typename> class,
+   template<template<template<typename...> class, 
+                     template<typename...> class,
+                     template<typename...> class,
                      template<typename,typename> class> 
    class IfaceT>
    static int testFunc(const Skeleton<IfaceT>*);
@@ -3415,18 +3297,18 @@ void operator>> (std::function<void()>& func, const CallableT& callable)
 // -------------------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+template<typename... T, typename... T2>
 inline
-void operator>> (ClientRequest<T1, T2, T3>& request, ClientResponse<T4, T5, T6>& response)
+void operator>> (ClientRequest<T...>& request, ClientResponse<T2...>& response)
 {
    assert(!request.handler_);
    request.handler_ = &response;
 }
 
 
-template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+template<typename... T, typename... T2>
 inline
-void operator>> (ServerRequest<T1, T2, T3>& request, ServerResponse<T4, T5, T6>& response)
+void operator>> (ServerRequest<T...>& request, ServerResponse<T2...>& response)
 {
    assert(!request.hasResponse());
    
@@ -3465,7 +3347,7 @@ protected:
 };
 
 
-template<template<typename,typename,typename> class RequestT>
+template<template<typename...> class RequestT>
 struct InterfaceBase;
 
 
@@ -3494,17 +3376,17 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 
 
 #define INTERFACE(iface) \
-   template<template<typename=Void,typename=Void,typename=Void> class Request, \
-            template<typename=Void, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal, \
+   template<template<typename...> class Request, \
+            template<typename...> class Response, \
+            template<typename...> class Signal, \
             template<typename,typename=OnChange> class Attribute> \
       struct iface; \
             \
    template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
    template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
-   template<template<typename=Void,typename=Void,typename=Void> class Request, \
-            template<typename=Void, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal, \
+   template<template<typename...> class Request, \
+            template<typename...> class Response, \
+            template<typename...> class Signal, \
             template<typename,typename=OnChange> class Attribute> \
       struct iface : InterfaceBase<Request>
 
