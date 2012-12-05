@@ -245,7 +245,12 @@ struct CallState
       return ex_->what();
    }
    
-   // FIXME add access to exception itself
+   inline
+   const IPCException& exception() const
+   {
+      return *ex_;
+   }
+   
    
 private:
    
