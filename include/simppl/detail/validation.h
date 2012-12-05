@@ -3,7 +3,7 @@
 
 
 // forward decl
-template<typename T>
+template<typename... T>
 struct isValidType;
 
 
@@ -15,19 +15,9 @@ struct isValidTuple
 
 // forward decl
 template<typename... T>
-struct isValidTuple<std::tuple<T...> >;
-
-// recurse into variadic template arguments
-template<typename T1, typename... T>
-struct isValidTuple<std::tuple<T1, T...> >
-{ 
-   enum { value = isValidType<T1>::value && isValidTuple<std::tuple<T...> >::value };
-};
-
-template<typename T>
-struct isValidTuple<std::tuple<T> >
-{ 
-   enum { value = isValidType<T>::value };
+struct isValidTuple<std::tuple<T...> >
+{
+   enum { value = isValidType<T...>::value };
 };
 
 
@@ -143,13 +133,29 @@ struct isString
 };
 
 
+// -----------------------------------------------------------------------------------
+
+
+template<typename T1, typename... T>
+struct isValidType<T1, T...>
+{
+   enum { value = isValidType<T1>::value && isValidType<T...>::value };
+};
+
+
+template<>
+struct isValidType<>
+{
+   enum { value = true };
+};
+
+
 template<typename T>
-struct isValidType
+struct isValidType<T>
 {
    enum { 
       value =
-         isVoid<T>::value
-      || isPod<T>::value 
+         isPod<T>::value 
       || isValidStruct<T>::value 
       || isVector<T>::value 
       || isMap<T>::value 

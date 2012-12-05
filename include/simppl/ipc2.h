@@ -53,21 +53,11 @@ struct isServer;
 struct BrokerClient;
 struct Dispatcher;
 
-// no forward decl, just a type definition
-struct Void;
-
-template<typename T>
-struct isVoid
-{
-   enum { value = std::is_same<T, Void>::value };
-};
-
-
 #ifdef SIMPPL_HAVE_VALIDATION
 #   include "detail/validation.h"
 #else
 
-template<typename T>
+template<typename... T>
 struct isValidType
 {
    enum { value = true };
@@ -1040,6 +1030,8 @@ protected:
 template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
+   static_assert(isValidType<T...>::value, "invalid type in interface");
+   
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
@@ -1243,6 +1235,19 @@ Serializer& operator<<(Serializer& ostream, const ServerVectorAttributeUpdate<Ve
 }
 
 
+template<typename VectorT>
+struct isValidType<ServerVectorAttributeUpdate<VectorT>>
+{
+   enum { value = true };
+};
+
+template<typename VectorT>
+struct isValidType<ClientVectorAttributeUpdate<VectorT>>
+{
+   enum { value = true };
+};
+
+
 // --------------------------------------------------------------------------------------
 
 
@@ -1296,6 +1301,8 @@ struct Committed
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
+   static_assert(isValidType<DataT>::value, "invalid type in interface");
+   
    typedef typename CallTraits<DataT>::param_type arg_type;
    
    typedef typename if_<is_vector<DataT>::value, 
@@ -1479,6 +1486,8 @@ protected:
 template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
+   static_assert(isValidType<T...>::value, "invalid type in interface");
+   
    inline
    ServerSignal(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
    {
@@ -1488,9 +1497,6 @@ struct ServerSignal : ServerSignalBase
    inline
    void emit(typename CallTraits<T>::param_type... args)
    {
-      //FIXME static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      // FIXME maybe remove operator<< since they are not needed for variadic templates approach
-      
       Serializer s;
       sendSignal(serialize(s, args...));
    }
@@ -1770,6 +1776,8 @@ template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute 
    : CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
 {
+   static_assert(isValidType<DataT>::value, "invalid type in interface");
+   
    typedef CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
@@ -1818,20 +1826,19 @@ struct ClientResponseHolder
 template<typename... T>
 struct ClientRequest : Parented
 {
+   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+      
    inline
    ClientRequest(uint32_t id, std::vector<Parented*>& parent)
     : id_(id)
     , handler_(0)
    {
-      //FIXME static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       parent.push_back(this);
    }
       
    inline
    ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      //static_assert(!isVoid<T>::value... && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
       Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
       return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
    }
@@ -1847,12 +1854,14 @@ struct ClientRequest : Parented
 template<typename... T>
 struct ClientResponse : ClientResponseBase
 { 
+   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   
    typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
    inline
    ClientResponse()
    {
- //     static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+      // NOOP
    }
    
    template<typename FunctorT>
@@ -1894,12 +1903,13 @@ ClientResponse<T...>& operator>> (ClientResponse<T...>& r, const FunctorT& f)
 template<typename... T>
 struct ServerRequest : ServerRequestBase
 {
+   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
      
    inline
    ServerRequest(uint32_t id, std::map<uint32_t, ServerRequestBase*>& requests)
    {
-     // static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       requests[id] = this;
    }
    
@@ -1936,16 +1946,16 @@ void operator>> (ServerRequest<T...>& r, const FunctorT& f)
 
 // ---------------------------------------------------------------------------------------------
 
-// FIXME remove data type Void since it is no longer needed for variadic templates
-
 
 template<typename... T>
 struct ServerResponse : ServerResponseBase
 {   
+   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   
    inline
    ServerResponse()
    {
-    //FIXME  static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+      // NOOP
    }
    
    inline
