@@ -27,18 +27,9 @@
 
 #include "if.h"
 #include "calltraits.h"
-#include "variant.h"   // for retrieving header sizes
 #include "noninstantiable.h"
 
 #include "detail/serialization.h"
-
-// enable this section to allow auto switch between error and normal response
-// functions argument dispatching
-#if 0
-#   define __BINDER_NS ipc2
-#   define HAVE_TR1 1
-#   include "simppl/bind_adapter.h"
-#endif
 
 #define INVALID_SEQUENCE_NR 0xFFFFFFFF
 #define INVALID_SERVER_ID 0u
@@ -114,6 +105,10 @@ private:
    
    uint32_t sequence_nr_;
 };
+
+
+// FIXME add a namespace simppl to everything in here
+// FIXME move private stuff to detail namespace
 
 
 /// blocking calls will throw, eventloop driven approach will call separate handlers
@@ -327,40 +322,87 @@ const char* fullQualifiedName(char* buf, const char* ifname, const char* rolenam
 // ------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3>
-struct DeserializeAndCall : NonInstantiable
+// FIXME use calltraits or rvalue references here
+
+template<int N, typename TupleT>
+struct FunctionCaller
+{
+   template<typename FunctorT>
+   static inline
+   void eval(FunctorT& f, const TupleT& tuple)
+   {
+      FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
+   }
+   
+   template<typename FunctorT>
+   static inline
+   void eval_cs(FunctorT& f, const CallState& cs, const TupleT& tuple)
+   {
+      FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
+   {
+      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& tuple, const T&... t)
+   {
+      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs(f, cs, tuple, t..., std::get<N>(tuple));
+   }
+};
+
+template<typename TupleT>
+struct FunctionCaller<-1, TupleT>
+{
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern(FunctorT& f, const TupleT& /*tuple*/, const T&... t)
+   {
+      f(t...);
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& /*tuple*/, const T&... t)
+   {
+      f(cs, t...);
+   }
+};
+
+
+template<typename... T>
+struct DeserializeAndCall
 {
    template<typename FunctorT>
    static inline
    void eval(Deserializer& d, FunctorT& f)
    {
-      T1 t1;
-      T2 t2;
-      T3 t3;
+      std::tuple<T...> tuple;
+      d >> tuple;
       
-      d >> t1 >> t2 >> t3;
-      f(t1, t2, t3);
+      FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
-   
    
    template<typename FunctorT>
    static inline
    void evalResponse(Deserializer& d, FunctorT& f, const CallState& cs)
    {
-      T1 t1;
-      T2 t2;
-      T3 t3;
+      std::tuple<T...> tuple;
       
       if (cs)
-         d >> t1 >> t2 >> t3;
+         d >> tuple;
       
-      f(cs, t1, t2, t3);
+      FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
    }
 };
 
 
-template<>
-struct DeserializeAndCall<Void, Void, Void> : NonInstantiable
+struct DeserializeAndCall0 : NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -377,58 +419,11 @@ struct DeserializeAndCall<Void, Void, Void> : NonInstantiable
    }
 };
 
-template<typename T>
-struct DeserializeAndCall<T, Void, Void> : NonInstantiable
-{
-   template<typename FunctorT>
-   static inline
-   void eval(Deserializer& d, FunctorT& f)
-   {
-      T t;
-      
-      d >> t;
-      f(t);
-   }
-   
-   template<typename FunctorT>
-   static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const CallState& cs)
-   {
-      T t;
-      
-      if (cs)
-         d >> t;
-      
-      f(cs, t);
-   }
-};
 
-template<typename T1, typename T2>
-struct DeserializeAndCall<T1, T2, Void> : NonInstantiable
+template<typename... T>
+struct GetCaller
 {
-   template<typename FunctorT>
-   static inline
-   void eval(Deserializer& d, FunctorT& f)
-   {
-      T1 t1;
-      T2 t2;
-      
-      d >> t1 >> t2;
-      f(t1, t2);
-   }
-   
-   template<typename FunctorT>
-   static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const CallState& cs)
-   {
-      T1 t1;
-      T2 t2;
-      
-      if (cs)
-         d >> t1 >> t2;
-      
-      f(cs, t1, t2);
-   }
+   typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
 };
 
 
@@ -770,45 +765,20 @@ struct TransportErrorFrame : FrameHeader
    void* err_;       ///< internal pointer to TransportError
 };
 
-// ------------------------------------------------------------------------------------------
 
-
-struct HeaderSize
-{
-   typedef TYPELIST_9( \
-      InterfaceResolveFrame, \
-      InterfaceResolveResponseFrame, \
-      RequestFrame, \
-      ResponseFrame, \
-      RegisterSignalFrame, \
-      UnregisterSignalFrame, \
-      SignalEmitFrame, \
-      SignalResponseFrame, \
-      TransportErrorFrame \
-   ) 
-   headertypes;
-
-   enum { max = Max<headertypes, SizeFunc>::value };
-   
-   static const unsigned int size[10];
+static
+size_t headersize[] {
+   0,
+   sizeof(RequestFrame), 
+   sizeof(ResponseFrame),    
+   sizeof(InterfaceResolveFrame),
+   sizeof(InterfaceResolveResponseFrame),
+   sizeof(RegisterSignalFrame),
+   sizeof(UnregisterSignalFrame),
+   sizeof(SignalEmitFrame),
+   sizeof(SignalResponseFrame),
+   sizeof(TransportErrorFrame)
 };
-
-
-/*static*/ 
-const unsigned int HeaderSize::size[10] = {
-   0
- , sizeof(RequestFrame)
- , sizeof(ResponseFrame)
- , sizeof(InterfaceResolveFrame)
- , sizeof(InterfaceResolveResponseFrame) 
- , sizeof(RegisterSignalFrame)
- , sizeof(UnregisterSignalFrame)
- , sizeof(SignalEmitFrame)
- , sizeof(SignalResponseFrame)
- , sizeof(TransportErrorFrame)
-};
-
-static_assert((sizeof(HeaderSize::size) / sizeof(HeaderSize::size[0])) == Size<HeaderSize::headertypes>::value + 1, "error_frame_types_must_occur_here");
 
 
 // -------------------------------------------------------------------------------------------
@@ -931,8 +901,8 @@ struct ClientSignalBase;
 
 struct StubBase
 {
-   template<typename T1, typename T2, typename T3> friend struct ClientSignal;
-   template<typename T1, typename T2, typename T3> friend struct ClientRequest;
+   template<typename... T> friend struct ClientSignal;
+   template<typename... T> friend struct ClientRequest;
    friend struct Dispatcher;
    
 protected:
@@ -1067,21 +1037,10 @@ protected:
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void()>, 
-               /*else*/std::function<void(arg1_type)> >::type,    
-            /*else*/std::function<void(arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
+   typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
    ClientSignal(uint32_t id, std::vector<Parented*>& parent)
@@ -1119,7 +1078,7 @@ struct ClientSignal : ClientSignalBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::eval(d, f_);
+         GetCaller<T...>::type::template eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for signal " << id_ << " with payload size=" << length << std::endl;
@@ -1129,9 +1088,9 @@ struct ClientSignal : ClientSignalBase
 };
 
 
-template<typename T1, typename T2, typename T3, typename FuncT>
+template<typename... T, typename FuncT>
 inline
-void operator>>(ClientSignal<T1, T2, T3>& sig, const FuncT& func)
+void operator>>(ClientSignal<T...>& sig, const FuncT& func)
 {
    sig.handledBy(func);
 }
@@ -1208,7 +1167,7 @@ enum How
 
 template<typename VectorT>
 struct ClientVectorAttributeUpdate
-{
+{   
    inline   
    ClientVectorAttributeUpdate()
     : how_(None)
@@ -1235,6 +1194,7 @@ Deserializer& operator>>(Deserializer& istream, ClientVectorAttributeUpdate<Vect
    if (updt.how_ != Remove)
    {
       updt.data_.resize(updt.len_);
+      
       for(int i=0; i<updt.len_; ++i)
       {
          istream >> updt.data_[i];
@@ -1386,8 +1346,9 @@ struct ClientAttribute
 private:
 
    /// vector argument with partial update support   
-   typedef ClientSignal<typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> signal_type;
-
+   typedef typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type signal_arg_type;
+   typedef ClientSignal<signal_arg_type> signal_type;
+   
    void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
    {
       switch (varg.how_)
@@ -1427,7 +1388,7 @@ private:
          f_(data_, varg.how_, varg.where_, varg.len_);
    }
 
-   /// normal argument
+   /// normal argument - will not work with vectors and partial update support
    inline
    void setAndCall(arg_type arg)
    {
@@ -1437,7 +1398,7 @@ private:
          f_(data_);
    }
 
-   void valueChanged(typename signal_type::arg1_type arg)
+   void valueChanged(typename CallTraits<signal_arg_type>::param_type arg)
    {      
       setAndCall(arg);
    }
@@ -1515,13 +1476,9 @@ protected:
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
    inline
    ServerSignal(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
    {
@@ -1529,47 +1486,23 @@ struct ServerSignal : ServerSignalBase
    }
    
    inline
-   void emit()
+   void emit(typename CallTraits<T>::param_type... args)
    {
-      static_assert(isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      //FIXME static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      // FIXME maybe remove operator<< since they are not needed for variadic templates approach
       
-      static Serializer s(0);
-      sendSignal(s);
+      Serializer s;
+      sendSignal(serialize(s, args...));
    }
    
-   inline
-   void emit(arg1_type arg1)
-   {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1));
-      sendSignal(s << arg1);
-   }
    
-   inline
-   void emit(arg1_type arg1, arg2_type arg2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1) + sizeof(T2));
-      sendSignal(s << arg1 << arg2);
-   }
-   
-   inline
-   void emit(arg1_type arg1, arg2_type arg2, arg3_type arg3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-    
-      Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));
-      sendSignal(s << arg1 << arg2 << arg3);
-   }
-
 protected:
+   
    inline
-   void emit(arg1_type arg1, uint32_t registrationid)
+   void emitWithId(uint32_t registrationid, T... t)
    {
-      Serializer s(sizeof(T1));
-      s << arg1;
+      Serializer s;
+      serialize(s, t...);
 
       SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
    }
@@ -1578,11 +1511,11 @@ protected:
 
 template<typename DataT>
 struct BaseAttribute 
- : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void> 
+ : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
 {
    inline
    BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type, Void, Void>(id, _signals)
+    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(id, _signals)
    {
       // NOOP
    }
@@ -1859,7 +1792,7 @@ struct ServerAttribute
    
    void onAttach(uint32_t registrationid)
    {
-      emit(this->t_, registrationid);
+      emitWithId(registrationid, this->t_);
    }
 };
 
@@ -1882,58 +1815,27 @@ struct ClientResponseHolder
 };
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientRequest : Parented
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
    inline
    ClientRequest(uint32_t id, std::vector<Parented*>& parent)
     : id_(id)
     , handler_(0)
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+      //FIXME static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       parent.push_back(this);
    }
-   
-   inline
-   ClientResponseHolder operator()()
-   {
-      static_assert(isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
       
-      static Serializer s(0);
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s));
-   }
-   
    inline
-   ClientResponseHolder operator()(arg1_type t1)
+   ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
+      //static_assert(!isVoid<T>::value... && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
       
-      Serializer s(sizeof(typename remove_ref<T1>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1));
+      Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
+      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
    }
 
-   inline
-   ClientResponseHolder operator()(arg1_type t1, arg2_type t2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2));
-   }
-   
-   inline
-   ClientResponseHolder operator()(arg1_type t1, arg2_type t2, arg3_type t3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(typename remove_ref<T1>::type) + sizeof(typename remove_ref<T2>::type) + sizeof(typename remove_ref<T3>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, s << t1 << t2 << t3));
-   }
-   
    ClientResponseBase* handler_;
    uint32_t id_;
 };
@@ -1942,26 +1844,15 @@ struct ClientRequest : Parented
 // ----------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ClientResponse : ClientResponseBase
-{
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void(const CallState&)>, 
-               /*else*/std::function<void(const CallState&, arg1_type)> >::type,    
-            /*else*/std::function<void(const CallState&, arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(const CallState&, arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
+{ 
+   typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
    inline
    ClientResponse()
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+ //     static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
    }
    
    template<typename FunctorT>
@@ -1977,7 +1868,7 @@ struct ClientResponse : ClientResponseBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::evalResponse(d, f_, cs);
+         GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }
       else
          std::cerr << "No appropriate handler registered for response with payload size=" << length << std::endl;
@@ -1988,9 +1879,9 @@ struct ClientResponse : ClientResponseBase
 
 
 
-template<typename T1, typename T2, typename T3, typename FunctorT>
+template<typename FunctorT, typename... T>
 inline 
-ClientResponse<T1, T2, T3>& operator>> (ClientResponse<T1, T2, T3>& r, const FunctorT& f)
+ClientResponse<T...>& operator>> (ClientResponse<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
    return r;
@@ -2000,26 +1891,15 @@ ClientResponse<T1, T2, T3>& operator>> (ClientResponse<T1, T2, T3>& r, const Fun
 // -------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3>
+template<typename... T>
 struct ServerRequest : ServerRequestBase
 {
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
-   typedef 
-      typename if_<isVoid<T3>::value, 
-         typename if_<isVoid<T2>::value, 
-            typename if_<isVoid<T1>::value, std::function<void()>, 
-               /*else*/std::function<void(arg1_type)> >::type,    
-            /*else*/std::function<void(arg1_type, arg2_type)> >::type, 
-         /*else*/std::function<void(arg1_type, arg2_type, arg3_type)> >::type 
-      function_type;
-   
+   typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
+     
    inline
    ServerRequest(uint32_t id, std::map<uint32_t, ServerRequestBase*>& requests)
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+     // static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
       requests[id] = this;
    }
    
@@ -2036,7 +1916,7 @@ struct ServerRequest : ServerRequestBase
       if (f_)
       {
          Deserializer d(payload, length);
-         DeserializeAndCall<T1, T2, T3>::eval(d, f_);
+         GetCaller<T...>::type::template eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for request with payload size=" << length << std::endl;
@@ -2046,9 +1926,9 @@ struct ServerRequest : ServerRequestBase
 };
 
 
-template<typename T1, typename T2, typename T3, typename FunctorT>
+template<typename FunctorT, typename... T>
 inline 
-void operator>> (ServerRequest<T1, T2, T3>& r, const FunctorT& f)
+void operator>> (ServerRequest<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
 }
@@ -2056,45 +1936,23 @@ void operator>> (ServerRequest<T1, T2, T3>& r, const FunctorT& f)
 
 // ---------------------------------------------------------------------------------------------
 
+// FIXME remove data type Void since it is no longer needed for variadic templates
 
-template<typename T1, typename T2, typename T3>
+
+template<typename... T>
 struct ServerResponse : ServerResponseBase
-{
-   typedef typename CallTraits<T1>::param_type arg1_type;
-   typedef typename CallTraits<T2>::param_type arg2_type;
-   typedef typename CallTraits<T3>::param_type arg3_type;
-   
+{   
    inline
    ServerResponse()
    {
-      static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
+    //FIXME  static_assert(isValidType<T1>::value && isValidType<T2>::value && isValidType<T3>::value, "invalid_type_in_interface");
    }
    
    inline
-   ServerResponseHolder operator()(arg1_type t1)
-   {
-      static_assert(!isVoid<T1>::value && isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1));      
-      return ServerResponseHolder(s << t1, *this);
-   }
-   
-   inline
-   ServerResponseHolder operator()(arg1_type t1, arg2_type t2)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1) + sizeof(T2));      
-      return ServerResponseHolder(s << t1 << t2, *this);
-   }
-   
-   inline
-   ServerResponseHolder operator()(arg1_type t1, arg2_type t2, arg3_type t3)
-   {
-      static_assert(!isVoid<T1>::value && !isVoid<T2>::value && !isVoid<T3>::value, "invalid_function_call_due_to_arguments_mismatch");
-      
-      Serializer s(sizeof(T1) + sizeof(T2) + sizeof(T3));      
-      return ServerResponseHolder(s << t1 << t2 << t3, *this);
+   ServerResponseHolder operator()(typename CallTraits<T>::param_type&... t)
+   { 
+      Serializer s;
+      return ServerResponseHolder(serialize(s, std::forward<T...>(t...)), *this);
    }
 };
 
@@ -2218,6 +2076,22 @@ struct SessionData
    void* data_;                 ///< the session data pointer
    void(*destructor_)(void*);   ///< destructor function to use for destruction
 };
+
+
+template<int N, typename TupleT>
+inline
+void assign(const TupleT& tuple)
+{
+   // NOOP - end condition
+}
+
+template<int N, typename TupleT, typename T1, typename... T>
+inline
+void assign(const TupleT& tuple, T1& t1, T&... t)
+{
+   t1 = std::move(std::get<N>(tuple));
+   assign<N+1>(tuple, t...);
+}
 
 
 static std::unique_ptr<char> NullUniquePtr;
@@ -2440,8 +2314,8 @@ struct Dispatcher
    
    void addClient(StubBase& clnt);
    
-   template<typename T1>
-   bool waitForResponse(const ClientResponseHolder& resp, T1& t1)
+   /// no arguments version
+   bool waitForResponse(const ClientResponseHolder& resp)
    {
       assert(resp.r_);
       assert(!running_);
@@ -2454,18 +2328,16 @@ struct Dispatcher
       
       if (rc == 0)
       {
-         ClientResponse<T1, Void, Void>* r = safe_cast<ClientResponse<T1, Void, Void>*>(resp.r_);
+         ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
          assert(r);
-         
-         Deserializer d(data, len);
-         d >> t1;
       }
       
       return rc == 0;
    }
    
-   template<typename T1, typename T2>
-   bool waitForResponse(const ClientResponseHolder& resp, T1& t1, T2& t2)
+   /// at least one argument version
+   template<typename T1, typename... T>
+   bool waitForResponse(const ClientResponseHolder& resp, T1& t1, T&... t)
    {
       assert(resp.r_);
       assert(!running_);
@@ -2478,35 +2350,14 @@ struct Dispatcher
       
       if (rc == 0)
       {
-         ClientResponse<T1, T2, Void>* r = safe_cast<ClientResponse<T1, T2, Void>*>(resp.r_);
+         ClientResponse<T1, T...>* r = safe_cast<ClientResponse<T1, T...>*>(resp.r_);
          assert(r);
          
          Deserializer d(data, len);
-         d >> t1 >> t2;
-      }
-      
-      return rc == 0;
-   }
-   
-   template<typename T1, typename T2, typename T3>
-   bool waitForResponse(const ClientResponseHolder& resp, T1& t1, T2& t2, T3& t3)
-   {
-      assert(resp.r_);
-      assert(!running_);
-      
-      char* data = nullptr;
-      size_t len = 0;
-      
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
-      std::unique_ptr<char> raii(data);
-      
-      if (rc == 0)
-      {
-         ClientResponse<T1, T2, T3>* r = safe_cast<ClientResponse<T1, T2, T3>*>(resp.r_);
-         assert(r);
+         std::tuple<T1, T...> tup;
+         d >> tup;
          
-         Deserializer d(data, len);
-         d >> t1 >> t2 >> t3;
+         assign<0>(tup, t1, t...);
       }
       
       return rc == 0;
@@ -2597,12 +2448,28 @@ private:
                      len = 0;
                      std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
                      
-                     char hdr[HeaderSize::max] __attribute__((aligned(4)));
+                     union Hdr 
+                     {
+                        Hdr()
+                        {
+                           // NOOP
+                        }
+                        
+                        RequestFrame rqf;
+                        ResponseFrame rf;
+                        InterfaceResolveFrame irf;
+                        InterfaceResolveResponseFrame irrf;
+                        RegisterSignalFrame rsf;
+                        UnregisterSignalFrame usf;
+                        SignalEmitFrame sef;
+                        SignalResponseFrame srf;
+                        TransportErrorFrame tef;
+                     } hdr; 
 
                      struct msghdr msg;
                      memset(&msg, 0, sizeof(msg));
                      
-                     struct iovec v[2] = { { hdr, HeaderSize::size[f.type_] }, { 0, 0 } };
+                     struct iovec v[2] = { { &hdr, headersize[f.type_] }, { 0, 0 } };
                      msg.msg_iov = v;
                      
                      if (f.payloadsize_ > 0)
@@ -2625,53 +2492,46 @@ private:
                         switch(f.type_)
                         {
                         case FRAME_TYPE_REQUEST:
-                           {
-                              RequestFrame* rf = (RequestFrame*)hdr;
-                              
-                              servermapid_type::iterator iter = servers_by_id_.find(rf->serverid_);
+                           { 
+                              servermapid_type::iterator iter = servers_by_id_.find(hdr.rqf.serverid_);
                               if (iter != servers_by_id_.end())
                               {
-                                 iter->second->eval(rf->func_, rf->sequence_nr_, rf->sessionid_, fds_[i].fd, buf.get(), rf->payloadsize_);
+                                 iter->second->eval(hdr.rqf.func_, hdr.rqf.sequence_nr_, hdr.rqf.sessionid_, fds_[i].fd, buf.get(), hdr.rqf.payloadsize_);
                               }
                               else
-                                 std::cerr << "No service with id=" << rf->serverid_ << " found." << std::endl;
+                                 std::cerr << "No service with id=" << hdr.rqf.serverid_ << " found." << std::endl;
                            }
                            break;
                            
                         case FRAME_TYPE_TRANSPORT_ERROR:
+                           if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != hdr.tef.sequence_nr_)
                            {
-                              TransportErrorFrame* ef = (TransportErrorFrame*)hdr;
-                              
-                              if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != ef->sequence_nr_)
-                              {
-                                 CallState cs((TransportError*)(ef->err_));
-                                 ((ClientResponseBase*)ef->handler_)->eval(cs, 0, 0);
-                              }
-                              else
-                              {
-                                 std::unique_ptr<TransportError> var((TransportError*)(ef->err_));
-                                 throw *var;
-                              }
+                              CallState cs((TransportError*)(hdr.tef.err_));
+                              ((ClientResponseBase*)hdr.tef.handler_)->eval(cs, 0, 0);
                            }
+                           else
+                           {
+                              std::unique_ptr<TransportError> var((TransportError*)(hdr.tef.err_));
+                              throw *var;
+                           }
+                        
                            break;
                            
                         case FRAME_TYPE_RESPONSE:
-                           {
-                              ResponseFrame* rf = (ResponseFrame*)hdr;
-                              
+                           {  
                               outstanding_requests_type::iterator iter;
-                              if ((iter = outstandings_.find(rf->sequence_nr_)) != outstandings_.end())
+                              if ((iter = outstandings_.find(hdr.rf.sequence_nr_)) != outstandings_.end())
                               {
-                                 if (sequence_nr == INVALID_SEQUENCE_NR || rf->sequence_nr_ != sequence_nr)
+                                 if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
                                  {
-                                    if (rf->result_ == 0)   // normal response
+                                    if (hdr.rf.result_ == 0)   // normal response
                                     {
-                                       CallState cs(rf->sequence_nr_);
-                                       std::get<1>(iter->second)->eval(cs, buf.get(), rf->payloadsize_);
+                                       CallState cs(hdr.rf.sequence_nr_);
+                                       std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
                                     }
                                     else   // error response
                                     {
-                                       CallState cs(new RuntimeError(rf->result_, (const char*)buf.get(), rf->sequence_nr_));
+                                       CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
                                        std::get<1>(iter->second)->eval(cs, 0, 0);
                                     }
                                  }
@@ -2680,21 +2540,21 @@ private:
                                     assert(argLen);
                                     running_ = false;
                                     
-                                    if (rf->result_ == 0)
+                                    if (hdr.rf.result_ == 0)
                                     {
                                        if (buf.get() == 0)
                                        {
                                           // must copy payload in this case
-                                          *argData = new char[rf->payloadsize_];
-                                          ::memcpy(*argData, buf.get(), rf->payloadsize_);
+                                          *argData = new char[hdr.rf.payloadsize_];
+                                          ::memcpy(*argData, buf.get(), hdr.rf.payloadsize_);
                                        }
                                        else
                                           *argData = buf.release();
                                        
-                                       *argLen = rf->payloadsize_;
+                                       *argLen = hdr.rf.payloadsize_;
                                     }
                                     else
-                                       throw RuntimeError(rf->result_, (const char*)buf.get(), rf->sequence_nr_);
+                                       throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
                                  }
                                  
                                  outstandings_.erase(iter);
@@ -2706,21 +2566,19 @@ private:
                         
                         case FRAME_TYPE_REGISTER_SIGNAL:
                            {
-                              RegisterSignalFrame* rsf = (RegisterSignalFrame*)hdr;
-                              
-                              servermapid_type::iterator iter = servers_by_id_.find(rsf->serverid_);
+                              servermapid_type::iterator iter = servers_by_id_.find(hdr.rsf.serverid_);
                               if (iter != servers_by_id_.end())
                               {
                                  uint32_t registrationid = generateId();
                                  
-                                 ServerSignalBase* sig = iter->second->addSignalRecipient(rsf->sig_, fds_[i].fd, registrationid, rsf->id_);
+                                 ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fds_[i].fd, registrationid, hdr.rsf.id_);
                                  
                                  if (sig)
                                     server_sighandlers_[registrationid] = sig;
                                  
                                  // FIXME error handling, what if sig is 0???
-                                 SignalResponseFrame rf(registrationid, rsf->id_);
-                                 rf.sequence_nr_ = rsf->sequence_nr_;
+                                 SignalResponseFrame rf(registrationid, hdr.rsf.id_);
+                                 rf.sequence_nr_ = hdr.rsf.sequence_nr_;
                                  
                                  genericSend(fds_[i].fd, rf, 0);
                                  
@@ -2728,50 +2586,44 @@ private:
                                     sig->onAttach(registrationid);
                               }
                               else
-                                 std::cerr << "No server with id=" << rsf->serverid_ << " found." << std::endl;
+                                 std::cerr << "No server with id=" << hdr.rsf.serverid_ << " found." << std::endl;
                            }
                            break;
                            
                         case FRAME_TYPE_UNREGISTER_SIGNAL:
                            {
-                              UnregisterSignalFrame* usf = (UnregisterSignalFrame*)hdr;
-                              
-                              serversignalers_type::iterator iter = server_sighandlers_.find(usf->registrationid_);
+                              serversignalers_type::iterator iter = server_sighandlers_.find(hdr.usf.registrationid_);
                               if (iter != server_sighandlers_.end())
                               {
-                                 iter->second->removeRecipient(usf->registrationid_);
+                                 iter->second->removeRecipient(hdr.usf.registrationid_);
                               }
                               else
-                                 std::cerr << "No registered signal '" << usf->registrationid_ << "' found." << std::endl;
+                                 std::cerr << "No registered signal '" << hdr.usf.registrationid_ << "' found." << std::endl;
                            }
                            break;
                         
                         case FRAME_TYPE_REGISTER_SIGNAL_RESPONSE:
                            {
-                              SignalResponseFrame* srf = (SignalResponseFrame*)hdr;
-                              
-                              outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(srf->sequence_nr_);
+                              outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
                               if (iter != outstanding_sig_registrs_.end())
                               {
-                                 sighandlers_[srf->id_] = iter->second;
+                                 sighandlers_[hdr.srf.id_] = iter->second;
                                  outstanding_sig_registrs_.erase(iter);
                               }
                               else
                                  std::cerr << "No such signal registration found." << std::endl;
                               
-                              if (sequence_nr == srf->sequence_nr_)
+                              if (sequence_nr == hdr.srf.sequence_nr_)
                                  running_ = false;
                            }
                            break;
 
                         case FRAME_TYPE_SIGNAL:
                            {
-                              SignalEmitFrame* sef = (SignalEmitFrame*)hdr;
-                              
-                              sighandlers_type::iterator iter = sighandlers_.find(sef->id_);
+                              sighandlers_type::iterator iter = sighandlers_.find(hdr.sef.id_);
                               if (iter != sighandlers_.end())
                               {
-                                 iter->second->eval(buf.get(), sef->payloadsize_);
+                                 iter->second->eval(buf.get(), hdr.sef.payloadsize_);
                               }
                               else
                                  std::cerr << "No such signal handler found." << std::endl;
@@ -2780,10 +2632,8 @@ private:
                       
                         case FRAME_TYPE_RESOLVE_INTERFACE:
                            {
-                              InterfaceResolveFrame* irf = (InterfaceResolveFrame*)hdr;
-                              
                               InterfaceResolveResponseFrame rf(0, generateId());
-                              rf.sequence_nr_ = irf->sequence_nr_;
+                              rf.sequence_nr_ = hdr.irf.sequence_nr_;
                                  
                               servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
                               if (iter != servers_.end())
@@ -2806,14 +2656,12 @@ private:
                         
                         case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
                            {
-                              InterfaceResolveResponseFrame* irrf = (InterfaceResolveResponseFrame*)hdr;
-                              
-                              outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(irrf->sequence_nr_);
+                              outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(hdr.irrf.sequence_nr_);
                               if (iter != dangling_interface_resolves_.end())
                               {
                                  StubBase* stub = iter->second;
-                                 stub->id_ = irrf->id_;
-                                 stub->current_sessionid_ = irrf->sessionid_;
+                                 stub->id_ = hdr.irrf.id_;
+                                 stub->current_sessionid_ = hdr.irrf.sessionid_;
                                  dangling_interface_resolves_.erase(iter);
                                  
                                  if (sequence_nr == INVALID_SEQUENCE_NR)
@@ -2826,7 +2674,7 @@ private:
                                     else
                                         iter->second->connected();
                                  }
-                                 else if (sequence_nr == irrf->sequence_nr_)
+                                 else if (sequence_nr == hdr.irrf.sequence_nr_)
                                     running_ = false;
                               }
                            }
@@ -3129,9 +2977,9 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 }
 
 
-template<template<template<typename,typename,typename> class, 
-                  template<typename,typename,typename> class,
-                  template<typename,typename,typename> class,
+template<template<template<typename...> class, 
+                  template<typename...> class,
+                  template<typename...> class,
                   template<typename,typename> class> 
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
@@ -3233,9 +3081,9 @@ struct ServerRequestDescriptor
 };
 
 
-template<template<template<typename,typename,typename> class, 
-                  template<typename,typename,typename> class,
-                  template<typename,typename,typename> class,
+template<template<template<typename...> class, 
+                  template<typename...> class,
+                  template<typename...> class,
                   template<typename,typename> class> class IfaceT>
 struct Skeleton : IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
@@ -3414,9 +3262,9 @@ struct isServer
 {
 private:
    
-   template<template<template<typename,typename,typename> class, 
-                     template<typename,typename,typename> class,
-                     template<typename,typename,typename> class,
+   template<template<template<typename...> class, 
+                     template<typename...> class,
+                     template<typename...> class,
                      template<typename,typename> class> 
    class IfaceT>
    static int testFunc(const Skeleton<IfaceT>*);
@@ -3444,18 +3292,18 @@ void operator>> (std::function<void()>& func, const CallableT& callable)
 // -------------------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+template<typename... T, typename... T2>
 inline
-void operator>> (ClientRequest<T1, T2, T3>& request, ClientResponse<T4, T5, T6>& response)
+void operator>> (ClientRequest<T...>& request, ClientResponse<T2...>& response)
 {
    assert(!request.handler_);
    request.handler_ = &response;
 }
 
 
-template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+template<typename... T, typename... T2>
 inline
-void operator>> (ServerRequest<T1, T2, T3>& request, ServerResponse<T4, T5, T6>& response)
+void operator>> (ServerRequest<T...>& request, ServerResponse<T2...>& response)
 {
    assert(!request.hasResponse());
    
@@ -3494,7 +3342,7 @@ protected:
 };
 
 
-template<template<typename,typename,typename> class RequestT>
+template<template<typename...> class RequestT>
 struct InterfaceBase;
 
 
@@ -3523,17 +3371,17 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 
 
 #define INTERFACE(iface) \
-   template<template<typename=Void,typename=Void,typename=Void> class Request, \
-            template<typename=Void, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal, \
+   template<template<typename...> class Request, \
+            template<typename...> class Response, \
+            template<typename...> class Signal, \
             template<typename,typename=OnChange> class Attribute> \
       struct iface; \
             \
    template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
    template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
-   template<template<typename=Void,typename=Void,typename=Void> class Request, \
-            template<typename=Void, typename=Void, typename=Void> class Response, \
-            template<typename=Void,typename=Void,typename=Void> class Signal, \
+   template<template<typename...> class Request, \
+            template<typename...> class Response, \
+            template<typename...> class Signal, \
             template<typename,typename=OnChange> class Attribute> \
       struct iface : InterfaceBase<Request>
 

@@ -2,6 +2,9 @@
 #define SIMPPL_SERIALIZATION_H
 
 
+#include "simppl/typelist.h"
+
+
 template<typename T> 
 struct isPod 
 { 
@@ -104,7 +107,7 @@ struct TupleSerializer // : noncopable
    template<typename T>
    void operator()(const T& t)   // seems to be already a reference so no copy is done
    {
-      s_.write(t);
+      s_ << t;
    }
    
    SerializerT& s_;
@@ -123,7 +126,7 @@ struct TupleDeserializer // : noncopable
    template<typename T>
    void operator()(T& t)
    {
-      s_.read(t);
+      s_ >> t;
    }
    
    DeserializerT& s_;
@@ -631,6 +634,24 @@ inline
 Deserializer& operator>>(Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
+}
+
+
+// ------------------------------------------------------------------------
+
+
+inline
+Serializer& serialize(Serializer& s)
+{
+   return s;
+}
+
+template<typename T1, typename... T>
+inline
+Serializer& serialize(Serializer& s, T1 t1, T... t)
+{
+   s << t1;
+   return serialize(s, t...);
 }
 
 
