@@ -3,8 +3,7 @@
 
 
 #include "simppl/sbroker.h"
-
-#include <map>
+#include "simppl/stub.h"
 
 
 struct BrokerClient 

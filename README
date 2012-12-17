@@ -1,5 +1,5 @@
 This library was developed as an education project for learning how to 
-implement more advanced C++ patterns as used e.g. by the boost (and in the meanwhile tr1) 
+implement more advanced C++ patterns as used e.g. by the boost (and in the meanwhile tr1 and C++11) 
 libary. That's why you can find interfaces directly compatible with boost classes.
 
 
@@ -22,27 +22,21 @@ The more sophisticated library parts built on-top of these intrinsics are:
  * generative service-oriented IPC library introducing a C++ embedded DSL for defining service 
    interfaces
 
-So you can use all these generative frameworks without installing boost on your computer 
-(which may be a problem for some people working in companies that do explicitly not allow
-the use of boost libraries).
-
-
-Where is the source?
-
-Most of the code is header-only. Some functions should be implemented in C++ source files
-but for simplicity reasons when developing prototypes I have never split the code.
+So you can use all these generative frameworks with C++11 supporting compilers.
 
 
 Compilers:
 
-Well, I only developed on GCC >4.4. Due to the extreme usage of templating techniques
-I will not guarantee that any of the code will work with other compilers (especially VS compiler).
+Well, I only developed on GCC >4.6. Due to the extreme usage of templating techniques and C++11 
+language fragments I will not guarantee that any of the code will work with other compilers 
+(especially VS compiler).
 
 
 Status:
 
 Most of the source is rapid prototyping. It may work or it may not. Feel free to make a 
-real good project from any of the parts.
+real good project from any of the parts. I plan to make simppl a fully operable IPC library
+and remove all the education stuff someday.
 
 
 CopyLeft:

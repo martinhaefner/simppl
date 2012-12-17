@@ -1,7 +1,8 @@
 #include <iostream>
 #include <algorithm>
 
-#include "simppl/ipc2.h"
+#include "simppl/dispatcher.h"
+#include "simppl/stub.h"
 #include "simppl/sbroker.h"
 
 

@@ -2,9 +2,14 @@
 // example of integrated broker interface handling
 //
 
+#include "simppl/dispatcher.h"
+
 #include "calculator.h"
 
 #include <pthread.h>
+
+
+using namespace std::placeholders;
 
 
 static const char* rolename = "calculator";

@@ -1,0 +1,22 @@
+#ifndef SIMPPL_DETAIL_CONSTANTS_H
+#define SIMPPL_DETAIL_CONSTANTS_H
+
+
+#define INVALID_SEQUENCE_NR 0xFFFFFFFF
+#define INVALID_SERVER_ID 0u
+#define INVALID_SESSION_ID 0u
+
+
+#define FRAME_MAGIC                            0xAABBCCDDu
+#define FRAME_TYPE_REQUEST                     0x1u
+#define FRAME_TYPE_RESPONSE                    0x2u
+#define FRAME_TYPE_RESOLVE_INTERFACE           0x3u
+#define FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE  0x4u
+#define FRAME_TYPE_REGISTER_SIGNAL             0x5u
+#define FRAME_TYPE_UNREGISTER_SIGNAL           0x6u
+#define FRAME_TYPE_SIGNAL                      0x7u
+#define FRAME_TYPE_REGISTER_SIGNAL_RESPONSE    0x8u
+#define FRAME_TYPE_TRANSPORT_ERROR             0x9u
+
+
+#endif   // SIMPPL_DETAIL_CONSTANTS_H

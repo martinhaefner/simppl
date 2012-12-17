@@ -1,7 +1,11 @@
-
-#include "simppl/ipc2.h"
+#include "simppl/interface.h"
+#include "simppl/skeleton.h"
+#include "simppl/stub.h"
+#include "simppl/dispatcher.h"
 
 #include <pthread.h>
+
+using std::placeholders::_1;
 
 
 struct Complex

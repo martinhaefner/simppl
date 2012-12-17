@@ -1,6 +1,8 @@
-#ifndef SIMPPL_VALIDATION_H
-#define SIMPPL_VALIDATION_H
+#ifndef SIMPPL_DETAIL_VALIDATION_H
+#define SIMPPL_DETAIL_VALIDATION_H
 
+
+#ifdef SIMPPL_HAVE_VALIDATION
 
 // forward decl
 template<typename... T>
@@ -165,5 +167,15 @@ struct isValidType<T>
    };
 };
 
+#else   // SIMPPL_HAVE_VALIDATION
 
-#endif   // SIMPPL_VALIDATION_H
+template<typename... T>
+struct isValidType
+{
+   enum { value = true };
+};
+
+#endif   // SIMPPL_HAVE_VALIDATION
+
+
+#endif   // SIMPPL_DETAIL_VALIDATION_H

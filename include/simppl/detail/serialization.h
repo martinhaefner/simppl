@@ -1,8 +1,21 @@
-#ifndef SIMPPL_SERIALIZATION_H
-#define SIMPPL_SERIALIZATION_H
+#ifndef SIMPPL_DETAIL_SERIALIZATION_H
+#define SIMPPL_DETAIL_SERIALIZATION_H
 
 
+#include "simppl/noninstantiable.h"
 #include "simppl/typelist.h"
+
+#include <map>
+#include <vector>
+#include <tuple>
+#include <cstring>
+#include <cassert>
+#include <algorithm>
+#include <tuple>
+
+
+// forward decl
+struct CallState;
 
 
 template<typename T> 
@@ -199,15 +212,9 @@ void std_tuple_for_each(TupleT& t, FunctorT functor)
 
 struct Serializer // : noncopyable
 {   
-   inline
-   Serializer(size_t initial = 64)
-    : capacity_(initial)
-    , buf_(capacity_ > 0 ? (char*)malloc(capacity_) : 0)
-    , current_(buf_)
-   {
-      // NOOP
-   }
-
+   explicit
+   Serializer(size_t initial = 64);
+    
    inline
    ~Serializer()
    {
@@ -220,26 +227,9 @@ struct Serializer // : noncopyable
       return ::free(ptr);
    }
  
-   /// any subsequent calls to the object are invalid
-   inline
-   void* release()
-   {
-      void* rc = buf_;
-      buf_ = 0;
-      return rc;
-   }
+   void* release();
    
-   inline
-   size_t size() const
-   {
-      if (capacity_ > 0)
-      {
-         assert(buf_);
-         return current_ - buf_;
-      }
-      else
-         return 0;
-   }
+   size_t size() const;
    
    inline
    const void* data() const
@@ -273,18 +263,7 @@ struct Serializer // : noncopyable
       return write(*(const typename T::serializer_type*)&t);
    }
    
-   Serializer& write(const std::string& str)
-   {
-      int32_t len = str.size();
-      enlarge(len + sizeof(len));
-      
-      memcpy(current_, &len, sizeof(len));
-      current_ += sizeof(len);
-      memcpy(current_, str.c_str(), len);
-      current_ += len;
-      
-      return *this;
-   }
+   Serializer& write(const std::string& str);
    
    template<typename T>
    inline
@@ -338,20 +317,7 @@ private:
       write(p.first).write(p.second);
    }
    
-   void enlarge(size_t needed)
-   {
-      size_t current = size();
-      size_t estimated_capacity = current + needed;
-      
-      if (capacity_ < estimated_capacity)
-      {
-         while (capacity_ < estimated_capacity)
-            capacity_ <<=1 ;
-         
-         buf_ = (char*)realloc(buf_, capacity_);
-         current_ = buf_ + current;
-      }
-   }
+   void enlarge(size_t needed);
    
    size_t capacity_;
    
@@ -431,14 +397,7 @@ struct Deserializer // : noncopyable
       delete[] ptr;
    }
    
-   inline
-   Deserializer(const void* buf, size_t capacity)
-    : capacity_(capacity)
-    , buf_((const char*)buf)
-    , current_(buf_)
-   {
-      // NOOP
-   }
+   Deserializer(const void* buf, size_t capacity);
    
    inline
    size_t size() const
@@ -468,43 +427,9 @@ struct Deserializer // : noncopyable
       return read(*(typename T::serializer_type*)&t);
    }
    
-   Deserializer& read(char*& str)
-   {
-      assert(str == 0);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
-      
-      uint32_t len;
-      read(len);
-      
-      if (len > 0)
-      {
-         str = allocate(len);
-         memcpy(str, current_, len);
-         current_ += len;
-      }
-      else
-      {
-         str = allocate(1);
-         *str = '\0';
-      }
-      
-      return *this;
-   }
+   Deserializer& read(char*& str);
    
-   Deserializer& read(std::string& str)
-   {
-      uint32_t len;
-      read(len);
-      
-      if (len > 0)
-      {
-         str.assign(current_, len);
-         current_ += len;
-      }
-      else
-         str.clear();
-   
-      return *this;
-   }
+   Deserializer& read(std::string& str);
    
    template<typename T>
    Deserializer& read(std::vector<T>& v)
@@ -655,4 +580,112 @@ Serializer& serialize(Serializer& s, T1 t1, T... t)
 }
 
 
-#endif   // SIMPPL_SERIALIZATION_H
+// -----------------------------------------------------------------------
+
+
+// FIXME use calltraits or rvalue references here
+
+template<int N, typename TupleT>
+struct FunctionCaller
+{
+   template<typename FunctorT>
+   static inline
+   void eval(FunctorT& f, const TupleT& tuple)
+   {
+      FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
+   }
+   
+   template<typename FunctorT>
+   static inline
+   void eval_cs(FunctorT& f, const CallState& cs, const TupleT& tuple)
+   {
+      FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
+   {
+      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& tuple, const T&... t)
+   {
+      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs(f, cs, tuple, t..., std::get<N>(tuple));
+   }
+};
+
+template<typename TupleT>
+struct FunctionCaller<-1, TupleT>
+{
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern(FunctorT& f, const TupleT& /*tuple*/, const T&... t)
+   {
+      f(t...);
+   }
+   
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& /*tuple*/, const T&... t)
+   {
+      f(cs, t...);
+   }
+};
+
+
+template<typename... T>
+struct DeserializeAndCall : NonInstantiable
+{
+   template<typename FunctorT>
+   static inline
+   void eval(Deserializer& d, FunctorT& f)
+   {
+      std::tuple<T...> tuple;
+      d >> tuple;
+      
+      FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
+   }
+   
+   template<typename FunctorT>
+   static inline
+   void evalResponse(Deserializer& d, FunctorT& f, const CallState& cs)
+   {
+      std::tuple<T...> tuple;
+      
+      if (cs)
+         d >> tuple;
+      
+      FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
+   }
+};
+
+
+struct DeserializeAndCall0 : NonInstantiable
+{
+   template<typename FunctorT>
+   static inline
+   void eval(Deserializer& /*d*/, FunctorT& f)
+   {
+      f();
+   }
+   
+   template<typename FunctorT>
+   static inline
+   void evalResponse(Deserializer& /*d*/, FunctorT& f, const CallState& cs)
+   {
+      f(cs);
+   }
+};
+
+
+template<typename... T>
+struct GetCaller : NonInstantiable
+{
+   typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
+};
+
+
+#endif   // SIMPPL_DETAIL_SERIALIZATION_H

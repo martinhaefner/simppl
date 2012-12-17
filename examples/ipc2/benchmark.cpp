@@ -1,6 +1,10 @@
-#include <iostream>
+#include "simppl/stub.h"
+#include "simppl/skeleton.h"
+#include "simppl/dispatcher.h"
+#include "simppl/interface.h"
 
-#include "simppl/ipc2.h"
+
+using namespace std::placeholders;
 
 
 static
@@ -66,16 +70,16 @@ struct Client : Stub<DSIBenchmark>
     , mFactor(10u)
     , mStartTime(0u)
    {
-      rCallNoArg >> std::tr1::bind(&Client::handleCallNoArg, this);
-      rCallStruct >> std::tr1::bind(&Client::handleCallStruct, this, _1);
-      rCallStructVector >> std::tr1::bind(&Client::handleCallStructVector, this, _1);
+      rCallNoArg >> std::bind(&Client::handleCallNoArg, this);
+      rCallStruct >> std::bind(&Client::handleCallStruct, this, _1);
+      rCallStructVector >> std::bind(&Client::handleCallStructVector, this, _1);
    
       mPodStruct.anInt32 = 1;
       mPodStruct.aDouble = 2;
       mPodStruct.anotherDouble = 3;
       mPodStruct.aString = "01234567890123456789";   
       
-      connected >> std::tr1::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this);
    }
    
    void handleConnected()
@@ -181,10 +185,10 @@ struct Server : Skeleton<DSIBenchmark>
    Server()
     : Skeleton<DSIBenchmark>("bench")
    {
-      shutdown >> std::tr1::bind(&Server::handleShutdown, this);
-      callNoArg >> std::tr1::bind(&Server::handleNoArg, this);
-      callStruct >> std::tr1::bind(&Server::handleStruct, this, _1);
-      callStructVector >> std::tr1::bind(&Server::handleStructVector, this, _1);
+      shutdown >> std::bind(&Server::handleShutdown, this);
+      callNoArg >> std::bind(&Server::handleNoArg, this);
+      callStruct >> std::bind(&Server::handleStruct, this, _1);
+      callStructVector >> std::bind(&Server::handleStructVector, this, _1);
    }
    
    void handleShutdown()

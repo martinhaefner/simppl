@@ -2,7 +2,9 @@
 #define SIMPPL_CALCULATOR_H
 
 
-#include "simppl/ipc2.h"
+#include "simppl/stub.h"
+#include "simppl/skeleton.h"
+#include "simppl/interface.h"
 
 
 /// servicebroker

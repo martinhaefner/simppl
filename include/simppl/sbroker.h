@@ -2,7 +2,7 @@
 #define SIMPPL_SBROKER_H
 
 
-#include "simppl/ipc2.h"
+#include "simppl/interface.h"
 
 
 struct ServiceInfo

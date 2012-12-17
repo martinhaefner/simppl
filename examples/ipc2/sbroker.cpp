@@ -1,5 +1,9 @@
-#include "simppl/ipc2.h"
+#include "simppl/dispatcher.h"
 #include "simppl/sbroker.h"
+#include "simppl/skeleton.h"
+
+
+using namespace std::placeholders;
 
 
 struct ServiceHandle

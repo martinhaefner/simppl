@@ -1,6 +1,9 @@
-#include "simppl/ipc2.h"
+#include "simppl/dispatcher.h"
 
 #include "calculator.h"
+
+
+using namespace std::placeholders;
 
 
 struct CalculatorImpl : Skeleton<Calculator>

@@ -2,9 +2,15 @@
 // example of self-made broker interface handling
 //
 
+#include "simppl/dispatcher.h"
+#include "simppl/brokerclient.h"
+
 #include "calculator.h"
 
 #include <pthread.h>
+
+
+using namespace std::placeholders;
 
 
 struct CalculatorClient;
@@ -35,7 +41,7 @@ struct CalculatorClient : Stub<Calculator>
 
 void ClientsFactory(Dispatcher* disp, const std::string& fullName, const std::string& location)
 {
-   if (fullName == fullQualifiedName("Calculator", rolename))
+   if (fullName == disp->fullQualifiedName("Calculator", rolename))
    {
       CalculatorClient* new_calc = new CalculatorClient(location.c_str());
       disp->addClient(*new_calc);
@@ -50,7 +56,7 @@ void* threadRunner(void* arg)
    Dispatcher disp;
 
    BrokerClient broker(disp);
-   broker.waitForService(fullQualifiedName("Calculator", rolename), std::bind(ClientsFactory, &disp, _1, _2));
+   broker.waitForService(disp.fullQualifiedName("Calculator", rolename), std::bind(ClientsFactory, &disp, _1, _2));
    
    disp.run();
    return 0;

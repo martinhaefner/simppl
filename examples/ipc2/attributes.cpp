@@ -1,4 +1,10 @@
-#include "simppl/ipc2.h"
+#include "simppl/stub.h"
+#include "simppl/skeleton.h"
+#include "simppl/dispatcher.h"
+#include "simppl/interface.h"
+
+
+using namespace std::placeholders;
 
 
 struct MyStruct
