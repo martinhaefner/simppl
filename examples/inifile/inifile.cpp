@@ -1,16 +1,18 @@
 #include <iostream>
+
+// test extensions
 #define EX 1
-#include "include/inifile.h"
+
+#include "simppl/inifile.h"
+
 #ifdef EX
-#include "include/inifile_extensionpoint.h"
+#   include "simppl/inifile_extensionpoint.h"
 #endif
 
-#define __BINDER_NS ini
+#include "simppl/bind_adapter.h"
 
-//#define HAVE_BOOST 1
-//#define HAVE_TR1 1
 
-#include "include/bind_adapter.h"
+using namespace std::placeholders;
 
 
 void funca(const char* text, int i)
@@ -72,10 +74,10 @@ int main()
          ini::ReportUnknownKey>
       ::parse(
          ini::File(filename, "/etc/test.ini")[
-               ini::Key<>("one") >> __BINDER_NS::bind(&funca, "one", _1)
-            || ini::Key<ini::Mandatory>("two") >> __BINDER_NS::bind(&funca, "two", _1)
-            || ini::Key<>("three") >> __BINDER_NS::bind(&funca, "three", _1)
-            || ini::Key<ini::Mandatory>("four") >> __BINDER_NS::bind(&funca, "four", _1)
+               ini::Key<>("one") >> simppl::bind(&funca, "one", _1)
+            || ini::Key<ini::Mandatory>("two") >> simppl::bind(&funca, "two", _1)
+            || ini::Key<>("three") >> simppl::bind(&funca, "three", _1)
+            || ini::Key<ini::Mandatory>("four") >> simppl::bind(&funca, "four", _1)
          ]
          <= ini::Section("gaga")[
                ini::Key<>("hallo") >> v     
@@ -83,7 +85,7 @@ int main()
             || ini::Key<>("gell") >> b1
             || ini::Key<>("gell1") >> i2 
             || ini::Key<>("gell4") >> c
-            || ini::Key<>("gell2") >> __BINDER_NS::bind(strncpy, buf, _1, sizeof(buf))
+            || ini::Key<>("gell2") >> simppl::bind(strncpy, buf, _1, sizeof(buf))
             || ini::Key<>("gell5") >> buf
             || ini::Key<>("gell3") >> str1
          ]

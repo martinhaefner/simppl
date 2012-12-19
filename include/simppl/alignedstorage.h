@@ -1,5 +1,5 @@
-#ifndef ALIGNEDSTORAGE_H
-#define ALIGNEDSTORAGE_H
+#ifndef SIMPPL_ALIGNEDSTORAGE_H
+#define SIMPPL_ALIGNEDSTORAGE_H
 
 
 namespace detail
@@ -65,4 +65,4 @@ private:
 };
 
 
-#endif   // ALIGNEDSTORAGE_H
+#endif   // SIMPPL_ALIGNEDSTORAGE_H

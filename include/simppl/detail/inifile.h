@@ -1,10 +1,10 @@
-#ifndef DETAIL_INIFILE_H
-#define DETAIL_INIFILE_H
+#ifndef SIMPPL_DETAIL_INIFILE_H
+#define SIMPPL_DETAIL_INIFILE_H
 
 #include <limits>
+#include <type_traits>
 
-#include "../tribool.h"
-#include "../typetraits.h"
+#include "simppl/tribool.h"
 
 
 namespace ini
@@ -23,7 +23,6 @@ struct NoopHeaderParser;
    
 namespace detail
 {
-
    
 struct IniFileSectionReturn
 {
@@ -169,7 +168,7 @@ template<typename T>
 struct Converter
 {
    static inline
-   typename remove_ref<T>::type 
+   typename std::remove_reference<T>::type 
    eval(const char* ptr, bool&)
    {
       return ptr;
@@ -843,7 +842,7 @@ struct SectionatedIniFile
    inline
    Section& defaultSection()
    {
-      typedef typename if_<is_same<IncludedSectionT, File>::value, detail::IniFileSectionReturn, detail::SubCompositeSectionReturn>::type caller_type;
+      typedef typename if_<std::is_same<IncludedSectionT, File>::value, detail::IniFileSectionReturn, detail::SubCompositeSectionReturn>::type caller_type;
       return caller_type::eval(*this);
    }
    
@@ -1114,4 +1113,4 @@ struct HeaderlineEvaluator<NoopHeaderParser>
 }   // namespace ini
 
 
-#endif   // DETAIL_INIFILE_H
+#endif   // SIMPPL_DETAIL_INIFILE_H

@@ -1,7 +1,6 @@
-#ifndef INTRUSIVE_LIST_H
-#define INTRUSIVE_LIST_H
+#ifndef SIMPPL_INTRUSIVE_LIST_H
+#define SIMPPL_INTRUSIVE_LIST_H
 
-//#include "lambda.h"
 
 #include <algorithm>
 #include <cassert>
@@ -144,7 +143,7 @@ namespace intrusive
         size_t internal_size(IteratorT begin, IteratorT end) const
         {
             size_t ret = 0;
-            //std::for_each(begin, end, ++lambda::val(ret));            
+            std::for_each(begin, end, [&ret](IteratorT){ ++ret; });            
             return ret;
         }
     };
@@ -483,4 +482,4 @@ namespace intrusive
 }  // namespace intrusive
 
 
-#endif   // INTRUSIVE_LIST_H
+#endif   // SIMPPL_INTRUSIVE_LIST_H

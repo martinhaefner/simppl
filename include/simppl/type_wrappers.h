@@ -1,5 +1,5 @@
-#ifndef SIMPPL_WRAPPERS_H
-#define SIMPPL_WRAPPERS_H
+#ifndef SIMPPL_TYPE_WRAPPERS_H
+#define SIMPPL_TYPE_WRAPPERS_H
 
 
 /**
@@ -34,4 +34,4 @@ typedef bool_<true> tTrueType;
 typedef bool_<false> tFalseType;
 
 
-#endif  // SIMPPL_WRAPPERS_H
+#endif  // SIMPPL_TYPE_WRAPPERS_H

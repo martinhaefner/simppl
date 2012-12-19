@@ -1,5 +1,5 @@
-#ifndef IF_H
-#define IF_H
+#ifndef SIMPPL_IF_H
+#define SIMPPL_IF_H
 
 
 template<bool condition, typename ThenT, typename ElseT> 
@@ -16,5 +16,5 @@ struct if_<false, ThenT, ElseT>
 
 
 
-#endif  // IF_H
+#endif  // SIMPPL_IF_H
 

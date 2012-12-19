@@ -1,8 +1,12 @@
-#include "include/cmdline_extensionpoint.h"
-#include "include/bind.h"
+#include "simppl/cmdline_extensionpoint.h"
 
 #include <iostream>
 #include <stdio.h>
+
+#include "simppl/bind_adapter.h"
+
+using std::placeholders::_1;
+
 
 //#define USE_GETOPT_PARSER
 
@@ -46,7 +50,7 @@ void g1(const std::string& value)
 
 cmdline::ExtensionPoint globalExtensionPoint = 
       cmdline::Option<cmdline::NoChar>()["jiji1"].doc("Tolle Show, hier!") >> g1
-   <= cmdline::Switch<cmdline::NoChar>()["kurios"] >> bind(&Nix::sayHello, n, 42)
+   <= cmdline::Switch<cmdline::NoChar>()["kurios"] >> simppl::bind(&Nix::sayHello, n, 42)
    <= cmdline::Option<cmdline::NoChar>()["jiji2"].doc("Tolle Show, hier123!") >> g
    ;
 
@@ -127,7 +131,7 @@ int main(int argc, char** argv)
    std::string strng;
    std::vector<std::string> vec;
      
-   Function<void(*)(int)> func(h);
+   std::function<void(int)> func(h);
    
 #ifdef USE_GETOPT_PARSER
    
@@ -206,7 +210,7 @@ int main(int argc, char** argv)
              );
 #endif
   // #if 0
-   bool rc = cmdline::Parser<cmdline::IgnoreUnknown, cmdline::LongOptionSupport, cmdline::NoopUsagePrinter/*MyUsage*/>
+   bool rc = cmdline::Parser<cmdline::IgnoreUnknown, cmdline::LongOptionSupport, /*cmdline::NoopUsagePrinter*/MyUsage>
       ::parse(argc, argv,
               //cmdline::Switch<'v'>().doc("super") >> cmdline::inc(k) ||
               //cmdline::MultiOption<>()["bp"].doc("toll") >> h
@@ -218,7 +222,7 @@ int main(int argc, char** argv)
               <= cmdline::Option<'v'>()_ERASE(["hehe"].doc("Super Ding fuer ptr")) >> &ptr             // const char ptrs
               <= cmdline::Option<'w'>()_ERASE(["hihi"].doc("Super Ding fuer char arrays")) >> what     // char arrays
               <= cmdline::Option<'u'>()_ERASE(["huhu"].doc("Super Ding fuer std::string")) >> strng    // std::strings
-              <= cmdline::ExtraOption<cmdline::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> bind(&A::store1, &a, _1) 
+              <= cmdline::ExtraOption<cmdline::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> simppl::bind(&A::store1, &a, _1) 
               //ExtraOption<Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> bind(&std::vector<std::string>::push_back, &vec, _1) 
               <= cmdline::MultiExtraOption<cmdline::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> vec 
               //cmdline::ExtraOption<Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> what 

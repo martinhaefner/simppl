@@ -1,5 +1,5 @@
-#ifndef CMDLINE_H
-#define CMDLINE_H
+#ifndef SIMPPL_CMDLINE_H
+#define SIMPPL_CMDLINE_H
 
 
 #include <limits>
@@ -48,8 +48,6 @@
 
 #include "tribool.h"
 #include "typelist.h"
-#include "static_check.h"
-#include "bind.h"
 #include "noninstantiable.h"
 
 
@@ -183,7 +181,7 @@ struct CheckFurtherExtraOptionAfterMultiExtraOption
 template<typename T>
 struct IsExtraOption
 {
-   enum { value = is_same<NoChar, T>::value || is_same<MandatoryNoChar, T>::value || is_same<MultiNoChar, T>::value };
+   enum { value = std::is_same<NoChar, T>::value || std::is_same<MandatoryNoChar, T>::value || std::is_same<MultiNoChar, T>::value };
 };
 
 
@@ -353,7 +351,7 @@ struct NoLongOptionSupport : NonInstantiable
    {
       // never accept long-only arguments in NoLongOptionSupport policy chosen
       typedef typename Reverse<typename cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
-      STATIC_CHECK((Find<char_< cmdline::NoChar>, arguments_type>::value < 0), no_nochar_options_allowed_with_no_long_option_support_policy);
+      static_assert(Find<char_< cmdline::NoChar>, arguments_type>::value < 0, "no_nochar_options_allowed_with_no_long_option_support_policy");
       
       return indeterminate;
    }
@@ -380,9 +378,9 @@ struct Parser : protected UnknownPolicyT, protected UsagePrinterT
       typedef typename Reverse<typename cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
 
       // checks on extra options
-      STATIC_CHECK(cmdline::detail::CheckMandatoryAfterOptionalExtraOption<arguments_type>::value, mandatory_after_optional_extraoption_is_nonsense);
-      STATIC_CHECK(cmdline::detail::CheckMultipleOptionalExtraOptions<arguments_type>::value, multiple_optional_extraoptions_are_nonsense);
-      STATIC_CHECK(cmdline::detail::CheckFurtherExtraOptionAfterMultiExtraOption<arguments_type>::value, no_extra_option_after_multi_extra_option_allowed);
+      static_assert(cmdline::detail::CheckMandatoryAfterOptionalExtraOption<arguments_type>::value, "mandatory_after_optional_extraoption_is_nonsense");
+      static_assert(cmdline::detail::CheckMultipleOptionalExtraOptions<arguments_type>::value, "multiple_optional_extraoptions_are_nonsense");
+      static_assert(cmdline::detail::CheckFurtherExtraOptionAfterMultiExtraOption<arguments_type>::value, "no_extra_option_after_multi_extra_option_allowed");
       
       ParserT& _parser = const_cast<ParserT&>(parser);
       return doParse(argc, argv, _parser);
@@ -421,7 +419,7 @@ private:
       cmdline::detail::longOptionSupport = LongOptionSupportPolicyT<UsagePrinterT>::longSupport;
       
       // don't accept -h
-      STATIC_CHECK((Find<char_<'h'>, arguments_type>::value < 0), h_is_reserved_for_help);
+      static_assert(Find<char_<'h'>, arguments_type>::value < 0, "h_is_reserved_for_help");
           
       cmdline::detail::ParserState state(argc, argv);
 
@@ -966,12 +964,12 @@ struct Switch : MandatoryT, DocumentationT, MultiSupportT
    template<typename> friend struct detail::HandlerCompositeBase;
    template<char, typename, typename, typename, bool> friend struct detail::LongSwitch;
 
-   STATIC_CHECK((haveArgument == true || is_same<MandatoryT, Optional>::value), mandatory_switches_are_senseless);
-   STATIC_CHECK((Argument >= 48 && Argument <=57) 
+   static_assert(haveArgument == true || std::is_same<MandatoryT, Optional>::value, "mandatory_switches_are_senseless");
+   static_assert((Argument >= 48 && Argument <=57) 
              || (Argument >=65 && Argument <=90) 
              || (Argument >=97 && Argument <=122) 
              || Argument == cmdline::NoChar, 
-              switch_argument_only_valid_in_0123456789abcdefgijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ);
+              "switch_argument_only_valid_in_0123456789abcdefgijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
    
    typedef char_<Argument> char_type;
    typedef typename if_<Argument== cmdline::NoChar, cmdline::detail::InEquality, cmdline::detail::EqualityComparator<Argument> >::type equality_check_type;   
@@ -1115,9 +1113,9 @@ struct ExtraOption : MandatoryT, MultiSupportT, DocumentationT
    template<typename> friend struct detail::HandlerCompositeBase;
    template<char, typename, typename, typename, bool> friend struct detail::LongSwitch;
 
-   typedef typename if_<is_same<MultiSupportT, cmdline::detail::MultiSupport>::value, 
+   typedef typename if_<std::is_same<MultiSupportT, cmdline::detail::MultiSupport>::value, 
       cmdline::detail::MultiNoChar, 
-      typename if_<is_same<MandatoryT, Mandatory>::value, cmdline::detail::MandatoryNoChar, cmdline::detail::NoChar>::type>::type char_type;
+      typename if_<std::is_same<MandatoryT, Mandatory>::value, cmdline::detail::MandatoryNoChar, cmdline::detail::NoChar>::type>::type char_type;
    
    inline
    ExtraOption()
@@ -1299,7 +1297,7 @@ template<typename T>
 struct Converter
 {
    static inline
-   typename remove_ref<T>::type eval(const char* ptr, bool&)
+   typename std::remove_reference<T>::type eval(const char* ptr, bool&)
    {
       return ptr;
    }
@@ -1542,7 +1540,7 @@ struct Incrementor<false>
 template<typename AnchorT>
 struct HandlerCompositeBase
 {
-   STATIC_CHECK((!is_same<typename AnchorT::char_type, char_< cmdline::NoChar> >::value || AnchorT::LongSupport), only_long_options_may_support_no_char);
+   static_assert(!std::is_same<typename AnchorT::char_type, char_< cmdline::NoChar> >::value || AnchorT::LongSupport, "only_long_options_may_support_no_char");
    
 private:
    
@@ -1731,14 +1729,14 @@ struct ArgumentComposite;
 template<typename T1, typename T2>
 struct CompositeTypeDiscriminator
 {
-   STATIC_CHECK((is_same<typename T1::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T1::arguments_type>::value || is_same<typename T1::arguments_type, char_<cmdline::NoChar> >::value || is_same<typename T1::arguments_type, typename T2::arguments_type>::value == 0), no_same_arguments_allowed);
+   static_assert(std::is_same<typename T1::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T1::arguments_type>::value || std::is_same<typename T1::arguments_type, char_<cmdline::NoChar> >::value || std::is_same<typename T1::arguments_type, typename T2::arguments_type>::value == 0, "no_same_arguments_allowed");
    typedef TypeList<typename T1::arguments_type, TypeList<typename T2::arguments_type, NilType> > arguments_type;
 };
 
 template<typename T1, typename T2, typename T3>
 struct CompositeTypeDiscriminator<ArgumentComposite<T1, T2>, T3>
 {
-   STATIC_CHECK((is_same<typename T3::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T3::arguments_type>::value || is_same<typename T3::arguments_type, char_<cmdline::NoChar> >::value || Find<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type>::value == -1), no_same_arguments_allowed);
+   static_assert(std::is_same<typename T3::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T3::arguments_type>::value || std::is_same<typename T3::arguments_type, char_<cmdline::NoChar> >::value || Find<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type>::value == -1, "no_same_arguments_allowed");
    typedef TypeList<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type> arguments_type;
 };
 
@@ -1967,7 +1965,7 @@ operator<= (T1 h1, cmdline::detail::HandlerComposite<T2, T3> h2)
 
 
 // TODO make sure the handler is not called for any normal variables if no specialized variant is implemented
-//      that is, we need some static_check here.
+//      that is, we need some static_assert here.
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, bool haveArgument, typename ActionT>
 inline
 cmdline::detail::HandlerComposite<cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>
@@ -2167,4 +2165,4 @@ operator>> (cmdline::ExtraOption<MandatoryT, cmdline::detail::MultiSupport, Docu
 #endif
 
 
-#endif   // CMDLINE_H
+#endif   // SIMPPL_CMDLINE_H

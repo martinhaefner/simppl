@@ -1,10 +1,9 @@
-#ifndef CMDLINE_EXTENSIONPOINT_H
-#define CMDLINE_EXTENSIONPOINT_H
+#ifndef SIMPPL_CMDLINE_EXTENSIONPOINT_H
+#define SIMPPL_CMDLINE_EXTENSIONPOINT_H
 
 
-#include "cmdline.h"
-#include "ref.h"
-#include "intrusive_list.h"
+#include "simppl/cmdline.h"
+#include "simppl/intrusive_list.h"
 
 
 namespace cmdline
@@ -46,7 +45,7 @@ struct ExtensionPointHolderImpl : ExtensionPointHolder
     : parser_(parser)
    {
       typedef typename Reverse<typename detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;      
-      STATIC_CHECK((detail::FindExtra<arguments_type>::value < 0), no_extra_options_allowed_in_parser_extension);
+      static_assert(detail::FindExtra<arguments_type>::value < 0, "no_extra_options_allowed_in_parser_extension");
    }
   
    tribool eval(char theChar, detail::ParserState& state)
@@ -180,12 +179,12 @@ public:
    
    void doDoc(detail::stream_type& os) const
    {
-      std::for_each(holder_.begin(), holder_.end(), bind(&detail::ExtensionPointHolder::doDoc, _1, ref(os)));
+      std::for_each(holder_.begin(), holder_.end(), std::bind(&detail::ExtensionPointHolder::doDoc, std::placeholders::_1, std::ref(os)));
    }
    
    void genCmdline(detail::stream_type& os) const
    {
-      std::for_each(holder_.begin(), holder_.end(), bind(&detail::ExtensionPointHolder::genCmdline, _1, ref(os)));
+      std::for_each(holder_.begin(), holder_.end(), std::bind(&detail::ExtensionPointHolder::genCmdline, std::placeholders::_1, std::ref(os)));
    }
    
    bool ok() const 
@@ -240,4 +239,4 @@ operator<= (cmdline::ExtensionPoint h1, cmdline::ExtensionPoint h2)
 };
 
 
-#endif   // CMDLINE_EXTENSIONPOINT_H
+#endif   // SIMPPL_CMDLINE_EXTENSIONPOINT_H

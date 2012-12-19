@@ -1,5 +1,5 @@
-#ifndef INIFILE_H
-#define INIFILE_H
+#ifndef SIMPPL_INIFILE_H
+#define SIMPPL_INIFILE_H
 
 #include <cassert>
 #include <ctype.h>
@@ -9,11 +9,7 @@
 #define INIFILE_HAVE_STL_STREAMS 1
 #define INIFILE_HAVE_STD_VECTOR 1
 
-#ifdef INIFILE_HAVE_RVALUE_REFS
-#   define INIFILE_RVALUE_REF &&
-#else
-#   define INIFILE_RVALUE_REF 
-#endif
+#define INIFILE_RVALUE_REF &&
 
 #ifdef INIFILE_HAVE_STL_STREAMS
 #   include <iostream>
@@ -26,10 +22,9 @@
 #   include <vector>
 #endif
 
-#include "if.h"
-#include "tribool.h"
-#include "static_check.h"
-#include "noninstantiable.h"
+#include "simppl/if.h"
+#include "simppl/tribool.h"
+#include "simppl/noninstantiable.h"
 
 #define INIFILE_FRIEND_PARSER template<typename,typename,typename,typename,bool> friend struct Parser;
 
@@ -203,7 +198,7 @@ struct Result
          "missing mandatory key",
          "unknown error"
       };
-      STATIC_CHECK(Error_MAX == sizeof(msg)/sizeof(msg[0]), enum_and_string_array_do_not_match);
+      static_assert(Error_MAX == sizeof(msg)/sizeof(msg[0]), "enum_and_string_array_do_not_match");
       
       return msg[errno_];
    }
@@ -770,4 +765,4 @@ operator<=(const ini::File& f, const RightT& right)
 }
 
 
-#endif   // INIFILE_H
+#endif   // SIMPPL_INIFILE_H

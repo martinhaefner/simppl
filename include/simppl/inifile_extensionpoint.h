@@ -1,5 +1,5 @@
-#ifndef INIFILE_EXTENSIONPOINT_H
-#define INIFILE_EXTENSIONPOINT_H
+#ifndef SIMPPL_INIFILE_EXTENSIONPOINT_H
+#define SIMPPL_INIFILE_EXTENSIONPOINT_H
 
 #include "intrusive_list.h"
 
@@ -170,4 +170,4 @@ struct SectionatedIniFile<ExtensionPoint, IncludedSectionT>
 }   // end namespace ini
 
 
-#endif   // INIFILE_EXTENSIONPOINT_H
+#endif   // SIMPPL_INIFILE_EXTENSIONPOINT_H

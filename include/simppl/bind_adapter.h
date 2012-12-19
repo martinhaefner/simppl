@@ -1,46 +1,17 @@
-#ifndef BIND_ADAPTER_H
-#define BIND_ADAPTER_H
+#ifndef SIMPPL_BIND_ADAPTER_H
+#define SIMPPL_BIND_ADAPTER_H
 
-#if !defined(HAVE_BOOST) && !defined(HAVE_TR1)
-#   include "bind.h"
 
-// just import our own binders in this case
-namespace __BINDER_NS
-{
-   using ::bind;
-}
+#include <functional>
 
-#else
-#   include "function.h"
+#include "simppl/function_traits.h"
+#include "simppl/if.h"
 
-#   ifdef HAVE_BOOST
-#      include <boost/bind.hpp>
-#      include <boost/mpl/if.hpp>
+#define BIND_ std::bind
+#define IS_PLACEHOLDER_ std::is_placeholder
 
-#      define IF_ boost::mpl::if_c
-#      define BIND_ boost::bind
-#      define IS_PLACEHOLDER_ boost::is_placeholder
-#   endif   // HAVE_BOOST
 
-#   ifdef HAVE_TR1
-#      ifndef HAVE_BOOST
-#         include <tr1/functional>
-#         include "if.h"
-
-#         define IF_ if_
-#         define BIND_ std::tr1::bind
-#         define IS_PLACEHOLDER_ std::tr1::is_placeholder
-
-using namespace std::tr1::placeholders;
-   
-#      endif
-#   endif   // HAVE_TR1
-
-#   ifndef __BINDER_NS
-#      error "Define the macro __BINDER_NS prior to inclusion of this header file"
-#   endif
-
-namespace __BINDER_NS
+namespace simppl
 {
 
 namespace detail
@@ -55,7 +26,8 @@ struct f1_wrapper
    typedef Arg1T arg1_type;
    
    
-   explicit f1_wrapper(const FunctorT& f)
+   explicit inline
+   f1_wrapper(const FunctorT& f)
     : f_(f)
    {
       // NOOP
@@ -67,6 +39,12 @@ struct f1_wrapper
       return f_(arg);
    }
    
+   inline
+   ReturnT operator()()
+   {
+      return f_();
+   }
+   
    FunctorT f_;
 };
 
@@ -75,7 +53,7 @@ struct f1_wrapper
 template<typename FunctionT, typename Arg1T, typename Arg2T>
 struct get_argument_type_2
 {
-   typedef typename IF_<IS_PLACEHOLDER_<Arg1T>::value,
+   typedef typename if_<IS_PLACEHOLDER_<Arg1T>::value,
       typename TypeAt<0, typename FunctionTraits<FunctionT>::param_type>::type,
       typename TypeAt<1, typename FunctionTraits<FunctionT>::param_type>::type>::type type;
 };
@@ -85,9 +63,9 @@ template<typename FunctionT, typename Arg1T, typename Arg2T, typename Arg3T>
 struct get_argument_type_3
 {
    typedef
-      typename IF_<IS_PLACEHOLDER_<Arg1T>::value,
+      typename if_<IS_PLACEHOLDER_<Arg1T>::value,
          typename TypeAt<0, typename FunctionTraits<FunctionT>::param_type>::type,
-         typename IF_<IS_PLACEHOLDER_<Arg2T>::value,
+         typename if_<IS_PLACEHOLDER_<Arg2T>::value,
             typename TypeAt<1, typename FunctionTraits<FunctionT>::param_type>::type,
             typename TypeAt<2, typename FunctionTraits<FunctionT>::param_type>::type>::type>::type
       type;
@@ -144,10 +122,7 @@ auto bind(FunctionT f, Arg1T arg1, Arg2T arg2, Arg3T arg3)
    return detail::f1_wrapper<return_type, argument_type, functor_type>(BIND_(f, arg1, arg2, arg3));
 }
 
-// TODO more binder functions could follow here...
+}   // namespace simppl
 
-}   // __BINDER_NS
 
-#endif   // boost or tr1 code
-
-#endif   // BIND_ADAPTER_H
+#endif   // SIMPPL_BIND_ADAPTER_H

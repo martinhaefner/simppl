@@ -1,5 +1,6 @@
-#ifndef __TRIBOOL_H
-#define __TRIBOOL_H
+#ifndef SIMPPL_TRIBOOL_H
+#define SIMPPL_TRIBOOL_H
+
 
 struct tribool;
 typedef bool (*tIndeterminateFunc)(tribool);
@@ -99,4 +100,4 @@ bool INDETERMINATE_STATE(tribool b)
 }
 
 
-#endif   // __TRIBOOL_H
+#endif   // SIMPPL_TRIBOOL_H
