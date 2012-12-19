@@ -1,13 +1,13 @@
-#ifndef NONINSTANTIABLE_H
-#define NONINSTANTIABLE_H
+#ifndef SIMPPL_NONINSTANTIABLE_H
+#define SIMPPL_NONINSTANTIABLE_H
 
 
 struct NonInstantiable
 {
 protected:
-   NonInstantiable();
-   ~NonInstantiable();
+   NonInstantiable() = delete;
+   ~NonInstantiable() = delete;
 };
 
 
-#endif   // NONINSTANTIABLE_H
+#endif   // SIMPPL_NONINSTANTIABLE_H
