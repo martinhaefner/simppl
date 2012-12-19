@@ -1,10 +1,11 @@
-#ifndef TYPELIST_H
-#define TYPELIST_H
+#ifndef SIMPPL_TYPELIST_H
+#define SIMPPL_TYPELIST_H
 
 
-#include "wrappers.h"
-#include "typetraits.h"
-#include "if.h"
+#include <type_traits>
+
+#include "simppl/type_wrappers.h"
+#include "simppl/if.h"
 
 
 struct NilType {};
@@ -165,14 +166,14 @@ struct Find;
 template<typename SearchT, typename HeadT, typename TailT, int N>
 struct Find<SearchT, TypeList<HeadT, TailT>, N>
 {
-    typedef typename if_<(int)is_same<SearchT, HeadT>::value, int_<N>, Find<SearchT, TailT, N+1> >::type type_;
+    typedef typename if_<(int)std::is_same<SearchT, HeadT>::value, int_<N>, Find<SearchT, TailT, N+1> >::type type_;
     static const int value = type_::value;
 };
 
 template<typename SearchT, typename HeadT, int N>
 struct Find<SearchT, TypeList<HeadT, NilType>, N>
 {
-    typedef typename if_<(int)is_same<SearchT, HeadT>::value, int_<N>, int_<-1> >::type type_;    
+    typedef typename if_<(int)std::is_same<SearchT, HeadT>::value, int_<N>, int_<-1> >::type type_;    
     static const int value = type_::value;
 };
 
@@ -265,7 +266,7 @@ struct Count;
 template<typename SearchT, typename HeadT, typename TailT>
 struct Count<SearchT, TypeList<HeadT, TailT> >
 {
-   enum { value = is_same<SearchT, HeadT>::value + Count<SearchT, TailT>::value };
+   enum { value = std::is_same<SearchT, HeadT>::value + Count<SearchT, TailT>::value };
 };
 
 template<typename SearchT>
@@ -292,5 +293,5 @@ struct make_typelist<T>
 };
 
 
-#endif // TYPELIST_H
+#endif // SIMPPL_TYPELIST_H
 
