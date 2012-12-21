@@ -6,6 +6,9 @@
 #include <map>
 
 
+namespace detail
+{
+
 struct SignalRecipient
 {
    inline
@@ -51,6 +54,8 @@ struct SignalSender
    const void* data_;
    size_t len_;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_SIGNALRECIPIENT_H

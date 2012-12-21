@@ -26,10 +26,10 @@ struct SkeletonBase
    ServerRequestDescriptor deferResponse();
    
    /// only valid to call within request handler
-   void respondWith(ServerResponseHolder response);
+   void respondWith(detail::ServerResponseHolder response);
    
    /// send deferred response as retrieved by calling deferResponse()
-   void respondOn(ServerRequestDescriptor& req, ServerResponseHolder response);
+   void respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response);
    
    /// send error response - only valid to call within request handler
    void respondWith(const RuntimeError& err);

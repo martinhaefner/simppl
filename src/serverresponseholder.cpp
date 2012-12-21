@@ -3,6 +3,9 @@
 #include "simppl/detail/serialization.h"
 
 
+namespace detail
+{
+   
 ServerResponseHolder::ServerResponseHolder(Serializer& s, ServerResponseBase& responder)
  : size_(s.size())
  , payload_(s.release())
@@ -43,3 +46,6 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
    
    return *this;
 }
+
+}   // namespace detail
+   

@@ -8,12 +8,12 @@
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
 #include "simppl/attribute.h"
+#include "simppl/serialization.h"
+#include "simppl/stubbase.h"
 
 #include "simppl/detail/validation.h"
 #include "simppl/detail/parented.h"
-#include "simppl/detail/serialization.h"
 #include "simppl/detail/clientresponseholder.h"
-#include "simppl/stubbase.h"
 
 
 // forward decl
@@ -37,7 +37,7 @@ protected:
 // ---------------------------------------------------------------------------------
 
 
-struct ClientSignalBase : Parented
+struct ClientSignalBase : detail::Parented
 {
    virtual void eval(const void* data, size_t len) = 0;
    
@@ -69,12 +69,12 @@ protected:
 template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
-   static_assert(isValidType<T...>::value, "invalid type in interface");
+   static_assert(detail::isValidType<T...>::value, "invalid type in interface");
    
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
-   ClientSignal(uint32_t id, std::vector<Parented*>& parent)
+   ClientSignal(uint32_t id, std::vector<detail::Parented*>& parent)
     : ClientSignalBase(id)
    {
       parent.push_back(this);
@@ -108,8 +108,8 @@ struct ClientSignal : ClientSignalBase
    {
       if (f_)
       {
-         Deserializer d(payload, length);
-         GetCaller<T...>::type::template eval(d, f_);
+         detail::Deserializer d(payload, length);
+         detail::GetCaller<T...>::type::template eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for signal " << id_ << " with payload size=" << length << std::endl;
@@ -150,7 +150,7 @@ struct ClientVectorAttributeUpdate
 
 
 template<typename VectorT>
-Deserializer& operator>>(Deserializer& istream, ClientVectorAttributeUpdate<VectorT>& updt)
+detail::Deserializer& operator>>(detail::Deserializer& istream, ClientVectorAttributeUpdate<VectorT>& updt)
 {
    istream >> (uint32_t&)updt.how_;
    istream >> updt.where_;
@@ -170,11 +170,16 @@ Deserializer& operator>>(Deserializer& istream, ClientVectorAttributeUpdate<Vect
 }
 
 
+namespace detail
+{
+   
 template<typename VectorT>
 struct isValidType<ClientVectorAttributeUpdate<VectorT>>
 {
    enum { value = true };
 };
+
+}   // namespace detail
 
 
 // -----------------------------------------------------------------------------------
@@ -183,16 +188,16 @@ struct isValidType<ClientVectorAttributeUpdate<VectorT>>
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
-   static_assert(isValidType<DataT>::value, "invalid type in interface");
+   static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
    
    typedef typename CallTraits<DataT>::param_type arg_type;
    
-   typedef typename if_<is_vector<DataT>::value, 
+   typedef typename if_<detail::is_vector<DataT>::value, 
       std::function<void(arg_type, How, uint32_t, uint32_t)>, 
       std::function<void(arg_type)> >::type function_type;
    
    inline
-   ClientAttribute(uint32_t id, std::vector<Parented*>& parent)
+   ClientAttribute(uint32_t id, std::vector<detail::Parented*>& parent)
     : signal_(id, parent)
     , data_()
    {
@@ -235,7 +240,7 @@ struct ClientAttribute
 private:
 
    /// vector argument with partial update support   
-   typedef typename if_<is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type signal_arg_type;
+   typedef typename if_<detail::is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type signal_arg_type;
    typedef ClientSignal<signal_arg_type> signal_type;
    
    void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
@@ -310,12 +315,12 @@ void operator>>(ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
 
 
 template<typename... T>
-struct ClientRequest : Parented
+struct ClientRequest : detail::Parented
 {
-   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
       
    inline
-   ClientRequest(uint32_t id, std::vector<Parented*>& parent)
+   ClientRequest(uint32_t id, std::vector<detail::Parented*>& parent)
     : id_(id)
     , handler_(0)
    {
@@ -323,10 +328,10 @@ struct ClientRequest : Parented
    }
       
    inline
-   ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
+   detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
-      return ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
+      detail::Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
+      return detail::ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
    }
 
    ClientResponseBase* handler_;
@@ -340,7 +345,7 @@ struct ClientRequest : Parented
 template<typename... T>
 struct ClientResponse : ClientResponseBase
 { 
-   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
    
    typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
@@ -362,8 +367,8 @@ struct ClientResponse : ClientResponseBase
    {
       if (f_)
       {
-         Deserializer d(payload, length);
-         GetCaller<T...>::type::template evalResponse(d, f_, cs);
+         detail::Deserializer d(payload, length);
+         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }
       else
          std::cerr << "No appropriate handler registered for response with payload size=" << length << std::endl;

@@ -99,7 +99,7 @@ void Dispatcher::registerAtBroker(const std::string& service, const std::string&
 }
 
 
-bool Dispatcher::waitForResponse(const ClientResponseHolder& resp)
+bool Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
 {
    assert(resp.r_);
    assert(!running_);
@@ -183,7 +183,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
    {
       // don't cache anything here, a sessionid will be 
       // created no the server for any resolve request
-      InterfaceResolveFrame f(42);
+      detail::InterfaceResolveFrame f(42);
       char buf[128];
       
       assert(strlen(stub.iface_) + 2 + strlen(stub.role_) < sizeof(buf));
@@ -346,7 +346,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
             else
             {
                // ordinary stream socket
-               FrameHeader f;
+               detail::FrameHeader f;
                   
                ssize_t len = ::recv(fds_[i].fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
                
@@ -362,21 +362,21 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                         // NOOP
                      }
                      
-                     RequestFrame rqf;
-                     ResponseFrame rf;
-                     InterfaceResolveFrame irf;
-                     InterfaceResolveResponseFrame irrf;
-                     RegisterSignalFrame rsf;
-                     UnregisterSignalFrame usf;
-                     SignalEmitFrame sef;
-                     SignalResponseFrame srf;
-                     TransportErrorFrame tef;
+                     detail::RequestFrame rqf;
+                     detail::ResponseFrame rf;
+                     detail::InterfaceResolveFrame irf;
+                     detail::InterfaceResolveResponseFrame irrf;
+                     detail::RegisterSignalFrame rsf;
+                     detail::UnregisterSignalFrame usf;
+                     detail::SignalEmitFrame sef;
+                     detail::SignalResponseFrame srf;
+                     detail::TransportErrorFrame tef;
                   } hdr; 
 
                   struct msghdr msg;
                   memset(&msg, 0, sizeof(msg));
                   
-                  struct iovec v[2] = { { &hdr, headersize[f.type_] }, { 0, 0 } };
+                  struct iovec v[2] = { { &hdr, detail::headersize[f.type_] }, { 0, 0 } };
                   msg.msg_iov = v;
                   
                   if (f.payloadsize_ > 0)
@@ -478,13 +478,13 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                            {
                               uint32_t registrationid = generateId();
                               
-                              ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fds_[i].fd, registrationid, hdr.rsf.id_);
+                              detail::ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fds_[i].fd, registrationid, hdr.rsf.id_);
                               
                               if (sig)
                                  server_sighandlers_[registrationid] = sig;
                               
                               // FIXME error handling, what if sig is 0???
-                              SignalResponseFrame rf(registrationid, hdr.rsf.id_);
+                              detail::SignalResponseFrame rf(registrationid, hdr.rsf.id_);
                               rf.sequence_nr_ = hdr.rsf.sequence_nr_;
                               
                               genericSend(fds_[i].fd, rf, 0);
@@ -539,7 +539,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                    
                      case FRAME_TYPE_RESOLVE_INTERFACE:
                         {
-                           InterfaceResolveResponseFrame rf(0, generateId());
+                           detail::InterfaceResolveResponseFrame rf(0, generateId());
                            rf.sequence_nr_ = hdr.irf.sequence_nr_;
                               
                            servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));

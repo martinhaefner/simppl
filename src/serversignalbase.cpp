@@ -1,6 +1,9 @@
 #include "simppl/detail/serversignalbase.h"
 
 
+namespace detail
+{
+   
 void ServerSignalBase::sendSignal(const Serializer& s)
 {
    std::for_each(recipients_.begin(), recipients_.end(), SignalSender(s.data(), s.size()));
@@ -46,3 +49,5 @@ ServerSignalBase::~ServerSignalBase()
 {
    // NOOP
 }
+
+}   // namespace detail

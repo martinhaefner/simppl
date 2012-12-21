@@ -2,7 +2,7 @@
 #define SIMPPL_ATTRIBUTE_H
 
 
-#include <vector>
+#include "simppl/detail/is_vector.h"
 
 
 // partial update mode for attributes
@@ -17,20 +17,6 @@ enum How
 
 
 // --------------------------------------------------------------------------------------
-
-
-template<typename T>
-struct is_vector
-{
-   enum { value = false };
-};
-
-
-template<typename T>
-struct is_vector<std::vector<T> >
-{
-   enum { value = true };
-};
 
 
 struct OnChange

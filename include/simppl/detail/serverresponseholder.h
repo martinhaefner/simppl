@@ -8,6 +8,11 @@
 
 // forward decls
 struct ServerResponseBase;
+
+
+namespace detail
+{
+
 struct Serializer;
 
 
@@ -27,6 +32,8 @@ struct ServerResponseHolder
    /*mutable*/ void* payload_;
    /*mutable*/ ServerResponseBase* responder_;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_SERVERRESPONSEHOLDER_H

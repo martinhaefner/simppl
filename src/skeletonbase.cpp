@@ -1,6 +1,7 @@
 #include "simppl/skeletonbase.h"
 
 #include "simppl/dispatcher.h"
+
 #include "simppl/detail/util.h"
 #include "simppl/detail/frames.h"
 
@@ -35,26 +36,26 @@ ServerRequestDescriptor SkeletonBase::deferResponse()
 }
 
 
-void SkeletonBase::respondWith(ServerResponseHolder response)
+void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
    
-   ResponseFrame r(0);
+   detail::ResponseFrame r(0);
    r.payloadsize_ = response.size_;
    r.sequence_nr_ = current_request_.sequence_nr_;
    
-   genericSend(current_request_.fd_, r, response.payload_);
+   detail::genericSend(current_request_.fd_, r, response.payload_);
    current_request_.clear();   // only respond once!!!
 }
 
 
-void SkeletonBase::respondOn(ServerRequestDescriptor& req, ServerResponseHolder response)
+void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response)
 {
    assert(req);
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
    
-   ResponseFrame r(0);
+   detail::ResponseFrame r(0);
    r.payloadsize_ = response.size_;
    r.sequence_nr_ = req.sequence_nr_;
    
@@ -68,7 +69,7 @@ void SkeletonBase::respondWith(const RuntimeError& err)
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
    
-   ResponseFrame r(err.error());
+   detail::ResponseFrame r(err.error());
    r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
    r.sequence_nr_ = current_request_.sequence_nr_;
    
@@ -82,7 +83,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
    assert(req);
    assert(req.requestor_->hasResponse());
    
-   ResponseFrame r(err.error());
+   detail::ResponseFrame r(err.error());
    r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
    r.sequence_nr_ = req.sequence_nr_;
    

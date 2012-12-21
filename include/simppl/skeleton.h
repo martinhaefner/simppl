@@ -5,6 +5,12 @@
 #include "simppl/skeletonbase.h"
 
 
+namespace detail
+{
+   template<typename> struct ServerHolder;
+}
+
+
 template<template<template<typename...> class, 
                   template<typename...> class,
                   template<typename...> class,
@@ -12,7 +18,7 @@ template<template<template<typename...> class,
 struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
-   template<typename SkelT> friend struct ServerHolder;
+   template<typename> friend struct detail::ServerHolder;
    
    typedef IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> interface_type;
    

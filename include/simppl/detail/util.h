@@ -7,6 +7,9 @@
 #include <cstdio>
 
 
+namespace detail
+{
+   
 // FIXME move socket operation into .cpp file
 template<typename FrameT>
 bool genericSend(int fd, const FrameT& f, const void* payload)
@@ -26,6 +29,8 @@ bool genericSend(int fd, const FrameT& f, const void* payload)
    
    return true;
 }
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_UTIL_H

@@ -9,6 +9,7 @@
 
 #include "simppl/detail/serverholder.h"
 #include "simppl/detail/constants.h"
+
 #include "simppl/sessiondata.h"
 #include "simppl/clientside.h"
 
@@ -22,9 +23,13 @@
 // forward decls
 struct BrokerClient;
 struct StubBase;
-struct Parented;
 struct ClientResponseBase;
 struct ClientSignalBase;
+
+namespace detail
+{
+   struct Parented;
+};
 
 
 template<int N, typename TupleT>
@@ -54,10 +59,10 @@ struct Dispatcher
    friend struct StubBase;
    
    // resolve server name to id
-   typedef std::map<std::string/*=server::role*/, ServerHolderBase*> servermap_type;  
+   typedef std::map<std::string/*=server::role*/, detail::ServerHolderBase*> servermap_type;  
    
    // signal registration and request resolution
-   typedef std::map<uint32_t/*=serverid*/, ServerHolderBase*> servermapid_type;
+   typedef std::map<uint32_t/*=serverid*/, detail::ServerHolderBase*> servermapid_type;
    
    // all registered clients
    typedef std::multimap<std::string/*=server::role the client is connected to*/, StubBase*> clientmap_type;
@@ -66,13 +71,13 @@ struct Dispatcher
    typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
    
    // temporary maps, should always shrink again, maybe could drop entries on certain timeouts
-   typedef std::map<uint32_t/*=sequencenr*/, std::tuple<Parented*, ClientResponseBase*> > outstanding_requests_type;
+   typedef std::map<uint32_t/*=sequencenr*/, std::tuple<detail::Parented*, ClientResponseBase*> > outstanding_requests_type;
    typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
    typedef std::map<uint32_t/*=sequencenr*/, StubBase*> outstanding_interface_resolves_type;
    
    // signal handling client- and server-side
    typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
-   typedef std::map<uint32_t/*=serverside_id*/, ServerSignalBase*> serversignalers_type;
+   typedef std::map<uint32_t/*=serverside_id*/, detail::ServerSignalBase*> serversignalers_type;
    
    typedef std::map<uint32_t/*=sessionid*/, SessionData> sessionmap_type;
    
@@ -111,9 +116,9 @@ struct Dispatcher
    }
    
    inline
-   void addRequest(Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
+   void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
    {
-      outstandings_[sequence_nr] = std::tuple<Parented*, ClientResponseBase*>(&req, &resp);
+      outstandings_[sequence_nr] = std::tuple<detail::Parented*, ClientResponseBase*>(&req, &resp);
    }
    
    bool addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr);
@@ -130,11 +135,11 @@ struct Dispatcher
    void addClient(StubBase& clnt);
    
    /// no arguments version - will throw exception or error
-   bool waitForResponse(const ClientResponseHolder& resp);
+   bool waitForResponse(const detail::ClientResponseHolder& resp);
    
    /// at least one argument version - will throw exception on error
    template<typename T1, typename... T>
-   bool waitForResponse(const ClientResponseHolder& resp, T1& t1, T&... t)
+   bool waitForResponse(const detail::ClientResponseHolder& resp, T1& t1, T&... t)
    {
       assert(resp.r_);
       assert(!running_);
@@ -150,7 +155,7 @@ struct Dispatcher
          ClientResponse<T1, T...>* r = safe_cast<ClientResponse<T1, T...>*>(resp.r_);
          assert(r);
          
-         Deserializer d(data, len);
+         detail::Deserializer d(data, len);
          std::tuple<T1, T...> tup;
          d >> tup;
          
@@ -291,7 +296,7 @@ void Dispatcher::addServer(ServerT& serv)
    
    registerAtBroker(name, endpoints_.front());
    
-   ServerHolder<ServerT>* holder = new ServerHolder<ServerT>(serv);
+   detail::ServerHolder<ServerT>* holder = new detail::ServerHolder<ServerT>(serv);
    servers_[name] = holder;
    servers_by_id_[generateId()] = holder;
    

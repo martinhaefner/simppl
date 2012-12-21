@@ -75,12 +75,12 @@ protected:
 
 
 template<typename... T>
-struct ServerSignal : ServerSignalBase
+struct ServerSignal : detail::ServerSignalBase
 {
-   static_assert(isValidType<T...>::value, "invalid type in interface");
+   static_assert(detail::isValidType<T...>::value, "invalid type in interface");
    
    inline
-   ServerSignal(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+   ServerSignal(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
    {
       _signals[id] = this;
    }
@@ -88,7 +88,7 @@ struct ServerSignal : ServerSignalBase
    inline
    void emit(typename CallTraits<T>::param_type... args)
    {
-      Serializer s;
+      detail::Serializer s;
       sendSignal(serialize(s, args...));
    }
    
@@ -98,10 +98,10 @@ protected:
    inline
    void emitWithId(uint32_t registrationid, T... t)
    {
-      Serializer s;
+      detail::Serializer s;
       serialize(s, t...);
 
-      SignalSender(s.data(), s.size())(ServerSignalBase::recipients_[registrationid]);
+      detail::SignalSender(s.data(), s.size())(detail::ServerSignalBase::recipients_[registrationid]);
    }
 };
 
@@ -112,7 +112,7 @@ protected:
 template<typename... T>
 struct ServerRequest : ServerRequestBase
 {
-   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
    
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
      
@@ -134,8 +134,8 @@ struct ServerRequest : ServerRequestBase
    {
       if (f_)
       {
-         Deserializer d(payload, length);
-         GetCaller<T...>::type::template eval(d, f_);
+         detail::Deserializer d(payload, length);
+         detail::GetCaller<T...>::type::template eval(d, f_);
       }
       else
          std::cerr << "No appropriate handler registered for request with payload size=" << length << std::endl;
@@ -159,7 +159,7 @@ void operator>> (ServerRequest<T...>& r, const FunctorT& f)
 template<typename... T>
 struct ServerResponse : ServerResponseBase
 {   
-   static_assert(isValidType<T...>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
    
    inline
    ServerResponse()
@@ -168,10 +168,10 @@ struct ServerResponse : ServerResponseBase
    }
    
    inline
-   ServerResponseHolder operator()(typename CallTraits<T>::param_type&... t)
+   detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type&... t)
    { 
-      Serializer s;
-      return ServerResponseHolder(serialize(s, t...), *this);
+      detail::Serializer s;
+      return detail::ServerResponseHolder(serialize(s, t...), *this);
    }
 };
 
@@ -268,7 +268,7 @@ struct ServerVectorAttributeUpdate
 
 
 template<typename VectorT>
-Serializer& operator<<(Serializer& ostream, const ServerVectorAttributeUpdate<VectorT>& updt)
+detail::Serializer& operator<<(detail::Serializer& ostream, const ServerVectorAttributeUpdate<VectorT>& updt)
 {
    ostream << (uint32_t)updt.how_;
    ostream << updt.where_;
@@ -286,11 +286,16 @@ Serializer& operator<<(Serializer& ostream, const ServerVectorAttributeUpdate<Ve
 }
 
 
+namespace detail
+{
+   
 template<typename VectorT>
 struct isValidType<ServerVectorAttributeUpdate<VectorT>>
 {
    enum { value = true };
 };
+
+}   // namespace detail
 
 
 // --------------------------------------------------------------------------------------------
@@ -298,11 +303,11 @@ struct isValidType<ServerVectorAttributeUpdate<VectorT>>
 
 template<typename DataT>
 struct BaseAttribute 
- : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
+ : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
 {
    inline
-   BaseAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(id, _signals)
+   BaseAttribute(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
+    : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(id, _signals)
    {
       // NOOP
    }
@@ -360,7 +365,7 @@ struct VectorAttributeMixin : BaseAttribute<T>
 public:
    
    inline
-   VectorAttributeMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+   VectorAttributeMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
     : BaseAttribute<T>(id, _signals)
    {
       // NOOP
@@ -527,7 +532,7 @@ template<typename EmitPolicyT, typename BaseT>
 struct CommitMixin : BaseT
 {
    inline
-   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+   CommitMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
     : BaseT(id, _signals)
    {
       // NOOP
@@ -540,7 +545,7 @@ template<typename BaseT>
 struct CommitMixin<Committed, BaseT> : BaseT
 {
    inline
-   CommitMixin(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+   CommitMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
     : BaseT(id, _signals)
    {
       // NOOP
@@ -555,14 +560,14 @@ struct CommitMixin<Committed, BaseT> : BaseT
 
 template<typename DataT, typename EmitPolicyT>
 struct ServerAttribute 
-   : CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
+   : CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
 {
-   static_assert(isValidType<DataT>::value, "invalid type in interface");
+   static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
    
-   typedef CommitMixin<EmitPolicyT, typename if_<is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
+   typedef CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
-   ServerAttribute(uint32_t id, std::map<uint32_t, ServerSignalBase*>& _signals)
+   ServerAttribute(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
     : baseclass(id, _signals)
    {
       // NOOP

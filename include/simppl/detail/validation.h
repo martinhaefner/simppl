@@ -2,6 +2,9 @@
 #define SIMPPL_DETAIL_VALIDATION_H
 
 
+namespace detail
+{
+
 #ifdef SIMPPL_HAVE_VALIDATION
 
 // forward decl
@@ -176,6 +179,8 @@ struct isValidType
 };
 
 #endif   // SIMPPL_HAVE_VALIDATION
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_VALIDATION_H

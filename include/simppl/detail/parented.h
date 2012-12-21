@@ -4,11 +4,18 @@
 
 #include <cassert>
 
+// forward decls 
+struct StubBase;
+struct Dispatcher;
+   
+
+namespace detail
+{
 
 struct Parented
 {
-   friend struct StubBase;
-   friend struct Dispatcher;
+   friend struct ::StubBase;
+   friend struct ::Dispatcher;
    
 protected:
  
@@ -18,7 +25,7 @@ protected:
    {
       // NOOP
    }
-   
+      
    inline
    void reparent(void* parent)
    {
@@ -42,6 +49,8 @@ protected:
    
    void* parent_;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_PARENTED_H

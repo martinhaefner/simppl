@@ -18,6 +18,9 @@
 struct CallState;
 
 
+namespace detail
+{
+
 template<typename T> 
 struct isPod 
 { 
@@ -162,13 +165,6 @@ template<typename T>
 struct make_serializer_imp<TypeList<T, NilType> >
 {
    typedef SerializerTuple<T, NilType> type;
-};
-
-template<typename... T>
-struct make_serializer
-{
-   typedef typename make_typelist<T...>::type type__;
-   typedef typename make_serializer_imp<type__>::type type;
 };
 
 
@@ -325,10 +321,12 @@ private:
    char* current_;
 };
 
+}   // namespace detail
+
 
 #define MAKE_SERIALIZER(type) \
 inline \
-Serializer& operator<<(Serializer& s, type t) \
+detail::Serializer& operator<<(detail::Serializer& s, type t) \
 { \
    return s.write(t); \
 }
@@ -351,28 +349,28 @@ MAKE_SERIALIZER(double)
 
 
 inline 
-Serializer& operator<<(Serializer& s, const std::string& str) 
+detail::Serializer& operator<<(detail::Serializer& s, const std::string& str) 
 { 
    return s.write(str); 
 }
 
 template<typename T>
 inline 
-Serializer& operator<<(Serializer& s, const std::vector<T>& v) 
+detail::Serializer& operator<<(detail::Serializer& s, const std::vector<T>& v) 
 { 
    return s.write(v); 
 }
 
 template<typename KeyT, typename ValueT>
 inline 
-Serializer& operator<<(Serializer& s, const std::map<KeyT, ValueT>& m) 
+detail::Serializer& operator<<(detail::Serializer& s, const std::map<KeyT, ValueT>& m) 
 { 
    return s.write(m); 
 }
 
 template<typename StructT>
 inline
-Serializer& operator<<(Serializer& s, const StructT& st)
+detail::Serializer& operator<<(detail::Serializer& s, const StructT& st)
 {
    const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
    return s.write(tuple);
@@ -380,7 +378,7 @@ Serializer& operator<<(Serializer& s, const StructT& st)
 
 template<typename... T>
 inline
-Serializer& operator<<(Serializer& s, const std::tuple<T...>& t)
+detail::Serializer& operator<<(detail::Serializer& s, const std::tuple<T...>& t)
 {
    return s.write(t);
 }
@@ -389,6 +387,9 @@ Serializer& operator<<(Serializer& s, const std::tuple<T...>& t)
 // -----------------------------------------------------------------------------
 
 
+namespace detail
+{
+   
 struct Deserializer // : noncopyable
 {
    static inline
@@ -501,10 +502,12 @@ private:
    const char* current_;
 };
 
+}   // namespace detail
+
 
 #define MAKE_DESERIALIZER(type) \
 inline \
-Deserializer& operator>>(Deserializer& s, type& t) \
+detail::Deserializer& operator>>(detail::Deserializer& s, type& t) \
 { \
    return s.read(t); \
 }
@@ -527,28 +530,28 @@ MAKE_DESERIALIZER(double)
 
 
 inline 
-Deserializer& operator>>(Deserializer& s, std::string& str) 
+detail::Deserializer& operator>>(detail::Deserializer& s, std::string& str) 
 { 
    return s.read(str); 
 }
 
 template<typename T>
 inline 
-Deserializer& operator>>(Deserializer& s, std::vector<T>& v) 
+detail::Deserializer& operator>>(detail::Deserializer& s, std::vector<T>& v) 
 { 
    return s.read(v); 
 }
 
 template<typename KeyT, typename ValueT>
 inline 
-Deserializer& operator>>(Deserializer& s, std::map<KeyT, ValueT>& m) 
+detail::Deserializer& operator>>(detail::Deserializer& s, std::map<KeyT, ValueT>& m) 
 { 
    return s.read(m); 
 }
 
 template<typename StructT>
 inline
-Deserializer& operator>>(Deserializer& s, StructT& st)
+detail::Deserializer& operator>>(detail::Deserializer& s, StructT& st)
 {
    typename StructT::serializer_type& tuple = *(typename StructT::serializer_type*)&st;
    return s.read(tuple);
@@ -556,7 +559,7 @@ Deserializer& operator>>(Deserializer& s, StructT& st)
 
 template<typename... T>
 inline
-Deserializer& operator>>(Deserializer& s, std::tuple<T...>& t)
+detail::Deserializer& operator>>(detail::Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
 }
@@ -564,6 +567,9 @@ Deserializer& operator>>(Deserializer& s, std::tuple<T...>& t)
 
 // ------------------------------------------------------------------------
 
+
+namespace detail
+{
 
 inline
 Serializer& serialize(Serializer& s)
@@ -686,6 +692,8 @@ struct GetCaller : NonInstantiable
 {
    typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_SERIALIZATION_H

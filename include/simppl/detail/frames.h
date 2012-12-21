@@ -8,6 +8,9 @@
 #include <cstring>
 
 
+namespace detail
+{
+
 struct FrameHeader
 {
    inline
@@ -285,6 +288,8 @@ size_t headersize[] {
    sizeof(SignalResponseFrame),
    sizeof(TransportErrorFrame)
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_FRAMES_H

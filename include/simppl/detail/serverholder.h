@@ -5,6 +5,9 @@
 #include "simppl/detail/serversignalbase.h"
 
 
+namespace detail
+{
+
 struct ServerHolderBase
 {
    virtual ~ServerHolderBase()
@@ -60,6 +63,8 @@ struct ServerHolder : ServerHolderBase
    
    SkeletonT* handler_;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_SERVERHOLDER_H

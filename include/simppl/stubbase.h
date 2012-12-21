@@ -9,11 +9,15 @@
 #include "simppl/detail/parented.h"
 
 
-// forward decl
+// forward decls
 struct Dispatcher;
 struct ClientResponseBase;
 struct ClientSignalBase;
-struct Serializer;
+
+namespace detail
+{
+   struct Serializer;
+};
 
 
 struct StubBase
@@ -34,7 +38,7 @@ protected:
    }
 
    inline   
-   void reparent(Parented* child)
+   void reparent(detail::Parented* child)
    {
       child->parent_ = this;
    }
@@ -67,7 +71,7 @@ public:
    
 protected:
    
-   uint32_t sendRequest(Parented& requestor, ClientResponseBase* handler, uint32_t requestid, const Serializer& s);
+   uint32_t sendRequest(detail::Parented& requestor, ClientResponseBase* handler, uint32_t requestid, const detail::Serializer& s);
    
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);

@@ -9,6 +9,9 @@
 struct ClientResponseBase;
 
 
+namespace detail
+{
+
 struct ClientResponseHolder
 {
    inline
@@ -22,6 +25,8 @@ struct ClientResponseHolder
    ClientResponseBase* r_;
    uint32_t sequence_nr_;
 };
+
+} // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_CLIENTRESPONSEHOLDER_H

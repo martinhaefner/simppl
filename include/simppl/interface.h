@@ -52,8 +52,8 @@ struct InterfaceBase<ClientRequest> : AbsoluteInterfaceBase
    }
    
    // temporary lists
-   std::vector<Parented*> container_;
-   std::vector<Parented*>& signals_;
+   std::vector<detail::Parented*> container_;
+   std::vector<detail::Parented*>& signals_;
 };
 
 
@@ -61,7 +61,7 @@ template<>
 struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
 {
    std::map<uint32_t, ServerRequestBase*> container_;
-   std::map<uint32_t, ServerSignalBase*> signals_;
+   std::map<uint32_t, detail::ServerSignalBase*> signals_;
 };
 
 

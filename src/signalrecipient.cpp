@@ -4,7 +4,7 @@
 #include "simppl/detail/util.h"
 
 
-void SignalSender::operator()(const SignalRecipient& info)
+void detail::SignalSender::operator()(const detail::SignalRecipient& info)
 {
    SignalEmitFrame f(info.clientsid_);
    f.payloadsize_ = len_;

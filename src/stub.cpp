@@ -1,6 +1,7 @@
 #include "simppl/stub.h"
 
 #include "simppl/dispatcher.h"
+
 #include "simppl/detail/frames.h"
 #include "simppl/detail/util.h"
 
@@ -35,11 +36,11 @@ bool StubBase::dispatcherIsRunning() const
 }
 
 
-uint32_t StubBase::sendRequest(Parented& requestor, ClientResponseBase* handler, uint32_t id, const Serializer& s)
+uint32_t StubBase::sendRequest(detail::Parented& requestor, ClientResponseBase* handler, uint32_t id, const detail::Serializer& s)
 {
    assert(disp_);
  
-   RequestFrame f(id_, id, current_sessionid_);
+   detail::RequestFrame f(id_, id, current_sessionid_);
    f.payloadsize_ = s.size();
    f.sequence_nr_ = disp_->generateSequenceNr();
    
@@ -56,7 +57,7 @@ uint32_t StubBase::sendRequest(Parented& requestor, ClientResponseBase* handler,
          errno = EINVAL;
          TransportError* err = new TransportError(errno, f.sequence_nr_);
          
-         TransportErrorFrame ef(handler, err);
+         detail::TransportErrorFrame ef(handler, err);
          ef.sequence_nr_ = f.sequence_nr_;
          
          (void)::write(disp_->selfpipe_[1], &ef, sizeof(ef));
@@ -71,7 +72,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
    
-   RegisterSignalFrame f(id_, sigbase.id(), disp_->generateId());
+   detail::RegisterSignalFrame f(id_, sigbase.id(), disp_->generateId());
    f.payloadsize_ = 0;
    f.sequence_nr_ = disp_->generateSequenceNr();
    
@@ -97,7 +98,7 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
    
-   UnregisterSignalFrame f(disp_->removeSignalRegistration(sigbase));
+   detail::UnregisterSignalFrame f(disp_->removeSignalRegistration(sigbase));
    
    if (f.registrationid_ != 0)
    {

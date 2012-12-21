@@ -1,7 +1,7 @@
 #include "simppl/detail/serialization.h"
 
 
-Serializer::Serializer(size_t initial)
+detail::Serializer::Serializer(size_t initial)
  : capacity_(initial)
  , buf_(capacity_ > 0 ? (char*)malloc(capacity_) : 0)
  , current_(buf_)
@@ -10,7 +10,7 @@ Serializer::Serializer(size_t initial)
 }
 
 
-void* Serializer::release()
+void* detail::Serializer::release()
 {
    void* rc = buf_;
    buf_ = 0;
@@ -18,7 +18,7 @@ void* Serializer::release()
 }
 
 
-size_t Serializer::size() const
+size_t detail::Serializer::size() const
 {
    if (capacity_ > 0)
    {
@@ -30,7 +30,7 @@ size_t Serializer::size() const
 }
 
 
-Serializer& Serializer::write(const std::string& str)
+detail::Serializer& detail::Serializer::write(const std::string& str)
 {
    int32_t len = str.size();
    enlarge(len + sizeof(len));
@@ -44,7 +44,7 @@ Serializer& Serializer::write(const std::string& str)
 }
 
 
-void Serializer::enlarge(size_t needed)
+void detail::Serializer::enlarge(size_t needed)
 {
    size_t current = size();
    size_t estimated_capacity = current + needed;
@@ -63,7 +63,7 @@ void Serializer::enlarge(size_t needed)
 // ----------------------------------------------------------------------------
 
 
-Deserializer::Deserializer(const void* buf, size_t capacity)
+detail::Deserializer::Deserializer(const void* buf, size_t capacity)
  : capacity_(capacity)
  , buf_((const char*)buf)
  , current_(buf_)
@@ -72,7 +72,7 @@ Deserializer::Deserializer(const void* buf, size_t capacity)
 }
 
 
-Deserializer& Deserializer::read(char*& str)
+detail::Deserializer& detail::Deserializer::read(char*& str)
 {
    assert(str == 0);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
    
@@ -95,7 +95,7 @@ Deserializer& Deserializer::read(char*& str)
 }
 
 
-Deserializer& Deserializer::read(std::string& str)
+detail::Deserializer& detail::Deserializer::read(std::string& str)
 {
    uint32_t len;
    read(len);

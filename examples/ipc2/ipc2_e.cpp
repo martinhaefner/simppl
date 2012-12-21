@@ -283,6 +283,6 @@ int main()
    server_dispatcher.stop();
    pthread_join(tid, 0);
    
-   static_assert(isValidType<CheckMe>::value, "ooops");
+   static_assert(detail::isValidType<CheckMe>::value, "ooops");
    return 0;
 }

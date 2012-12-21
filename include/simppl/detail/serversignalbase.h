@@ -6,7 +6,9 @@
 #include "simppl/detail/serialization.h"
 
 
-// FIXME move to detail if adequate
+namespace detail
+{
+
 struct ServerSignalBase
 {   
    void sendSignal(const Serializer& s);
@@ -26,6 +28,8 @@ protected:
    
    std::map<uint32_t/*registrationid*/, SignalRecipient> recipients_;
 };
+
+}   // namespace detail
 
 
 #endif   // SIMPPL_DETAIL_SERVERSIGNALBASE_H
