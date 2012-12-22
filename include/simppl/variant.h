@@ -1,10 +1,10 @@
-#ifndef VARIANT_H
-#define VARIANT_H
+#ifndef SIMPPL_VARIANT_H
+#define SIMPPL_VARIANT_H
 
 
-#include "tuple.h"
-#include "static_check.h"
-#include "alignedstorage.h"
+#include "simppl/typelist.h"
+   
+#include <type_traits>
 
 
 struct AlignFunc
@@ -12,7 +12,7 @@ struct AlignFunc
     template<typename T>
     struct apply_
     {
-        enum { value = alignment_of<T>::value };
+        enum { value = std::alignment_of<T>::value };
     };
 };
 
@@ -60,8 +60,8 @@ struct Variant
    // FIXME make sure not to be able to add the same type multiple times
    
     typedef TypeList<T1, TypeList<T2, NilType> > tl1__;
-    typedef typename if_<is_same<T3, NilType>::value, tl1__, typename PushBack<tl1__, T3>::type>::type tl2__;
-    typedef typename if_<is_same<T4, NilType>::value, tl2__, typename PushBack<tl2__, T4>::type>::type tl3__;
+    typedef typename if_<std::is_same<T3, NilType>::value, tl1__, typename PushBack<tl1__, T3>::type>::type tl2__;
+    typedef typename if_<std::is_same<T4, NilType>::value, tl2__, typename PushBack<tl2__, T4>::type>::type tl3__;
 
     typedef tl3__ typelist_type;
 
@@ -82,9 +82,9 @@ struct Variant
    Variant(const T& t)             // FIXME use calltraits here
     : idx_(Find<T, typelist_type>::value)
    {
-      STATIC_CHECK((!is_same<T1, NilType>::value && !is_same<T2, NilType>::value), a_variant_must_contain_at_least_two_elements);
-      STATIC_CHECK((Find<T, typelist_type>::value >= 0), given_type_is_not_element_of_variant_maybe_use_explicit_cast);
-      ::new(data_.address()) T(t);
+      static_assert(!std::is_same<T1, NilType>::value && !std::is_same<T2, NilType>::value, "a_variant_must_contain_at_least_two_elements");
+      static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
+      ::new(&data_) T(t);
    }
 
    // FIXME implement copy constructor, inplace factories and assignment operator
@@ -93,7 +93,7 @@ struct Variant
    template<typename T>
    Variant& operator=(const T& t)            // FIXME use calltraits here
    {
-      STATIC_CHECK((Find<T, typelist_type>::value >= 0), given_type_is_not_element_of_variant_maybe_use_explicit_cast);
+      static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
       if (idx_ == Find<T, typelist_type>::value)
       {
@@ -103,7 +103,7 @@ struct Variant
       {
          try_destroy();
          idx_ = Find<T, typelist_type>::value;
-         ::new(data_.address()) T(t);
+         ::new(&data_) T(t);
       }
 
       return *this;
@@ -113,24 +113,24 @@ struct Variant
    inline
    T* const get()
    {
-       STATIC_CHECK((Find<T, typelist_type>::value >= 0), given_type_is_not_element_of_variant_maybe_use_explicit_cast);
+       static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
       if (Find<T, typelist_type>::value != idx_)
          return 0;
 
-      return (T*)(data_.address());
+      return (T*)(&data_);
    }
 
    template<typename T>
    inline
    const T* const get() const
    {
-       STATIC_CHECK((Find<T, typelist_type>::value >= 0), given_type_is_not_element_of_variant_maybe_use_explicit_cast);
+       static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
        if (Find<T, typelist_type>::value != idx_)
            return 0;
 
-       return (T*)(data_.address());
+       return (T*)(&data_);
    }
 
 // private
@@ -156,11 +156,11 @@ struct Variant
             // append if necessary
        };
        if (idx_ >= 0 && idx_ < Size<typelist_type>::value)
-           funcs[idx_](data_.address());
+           funcs[idx_](&data_);
    }  
 
    // with an ordinary union only simple data types could be stored in here
-   AlignedStorage<size, alignment> data_;
+   typename std::aligned_storage<size, alignment>::type data_;
    char idx_;
 };
 
@@ -221,4 +221,4 @@ typename VisitorT::return_type staticVisit(const VisitorT& visitor, VariantT& va
 }
 
 
-#endif  // VARIANT_H
+#endif  // SIMPPL_VARIANT_H

@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "variant.h"
+#include "simppl/variant.h"
 
 
 struct MyVisitor : StaticVisitor<>
@@ -84,9 +84,6 @@ struct StrategyVisitor : StaticVisitor<>
 
 int main()
 {         
-   nix n;
-   n.i = 42;
-   
    Variant<First, Second> the_switch;   
    the_switch = First();
    //the_switch.get<First>()->sayHello();
