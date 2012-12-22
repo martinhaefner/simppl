@@ -6,8 +6,23 @@
 #include <vector>
 #include <map>
 
-#include "simppl/clientside.h"
-#include "simppl/serverside.h"
+#include "simppl/detail/parented.h"
+#include "simppl/detail/serversignalbase.h"
+
+
+// forward decls
+template<typename...> struct ClientRequest;
+template<typename...> struct ClientResponse;
+template<typename...> struct ClientSignal;
+template<typename, typename> struct ClientAttribute;
+
+template<typename...> struct ServerRequest;
+template<typename...> struct ServerResponse;
+template<typename...> struct ServerSignal;
+template<typename, typename> struct ServerAttribute;
+
+struct ServerRequestBase;
+struct ServerRequestBaseSetter;
 
 
 struct AbsoluteInterfaceBase
@@ -101,6 +116,17 @@ void operator>> (ClientRequest<T...>& request, ClientResponse<T2...>& response)
    assert(!request.handler_);
    request.handler_ = &response;
 }
+
+
+struct ServerRequestBaseSetter
+{
+   template<typename T>
+   static inline
+   void setHasResponse(T& t)
+   {
+      t.hasResponse_ = true;
+   }
+};
 
 
 template<typename... T, typename... T2>

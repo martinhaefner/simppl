@@ -1,4 +1,5 @@
 #include "simppl/dispatcher.h"
+#include "simppl/skeleton.h"
 
 #include "calculator.h"
 

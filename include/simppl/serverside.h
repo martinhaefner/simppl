@@ -45,8 +45,8 @@ protected:
 };
 
 
-// move to namespace detail
-struct ServerRequestBaseSetter
+// FIXME move to namespace detail
+/*struct ServerRequestBaseSetter
 {
    template<typename T>
    static inline
@@ -54,7 +54,7 @@ struct ServerRequestBaseSetter
    {
       t.hasResponse_ = true;
    }
-};
+};*/
 
 
 struct ServerResponseBase
