@@ -7,6 +7,9 @@
 #include <type_traits>
 
 
+namespace simppl
+{
+
 struct AlignFunc
 {
     template<typename T>
@@ -219,6 +222,8 @@ typename VisitorT::return_type staticVisit(const VisitorT& visitor, VariantT& va
       throw;
    }
 }
+
+}   // namespace simppl
 
 
 #endif  // SIMPPL_VARIANT_H

@@ -2,6 +2,9 @@
 #define SIMPPL_TRIBOOL_H
 
 
+namespace simppl
+{
+
 struct tribool;
 typedef bool (*tIndeterminateFunc)(tribool);
 
@@ -98,6 +101,8 @@ bool INDETERMINATE_STATE(tribool b)
 {
    return b.value_ == tribool::Indeterminate;
 }
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_TRIBOOL_H

@@ -51,6 +51,9 @@
 #include "noninstantiable.h"
 
 
+namespace simppl
+{
+   
 namespace cmdline
 {
 
@@ -212,7 +215,7 @@ class IgnoreUnknown : NonInstantiable
 protected:
    
    static inline
-   bool eval(cmdline::detail::ParserState&)
+   bool eval(simppl::cmdline::detail::ParserState&)
    {
       return true;
    }
@@ -227,7 +230,7 @@ class ReportUnknown : NonInstantiable
 protected:
    
    static inline
-   bool eval(cmdline::detail::ParserState& state)
+   bool eval(simppl::cmdline::detail::ParserState& state)
    {
 #ifdef CMDLINE_HAVE_STL_STREAMS
       PARSER_STDERR_STREAM << "Unknown or multiple option '" << state.argv_[state.current_] << "' encountered." << std::endl;
@@ -263,7 +266,7 @@ protected:
       if (usage)
          (*usage)(os);
       
-      cmdline::detail::extraOptionCounter = 0;
+      simppl::cmdline::detail::extraOptionCounter = 0;
       
 #ifdef CMDLINE_HAVE_STL_STREAMS
       os << std::endl;
@@ -276,7 +279,7 @@ protected:
       fprintf(os, "\n\n");
 #endif
       
-      cmdline::detail::extraOptionCounter = 0;
+      simppl::cmdline::detail::extraOptionCounter = 0;
       parser.doDoc(os);
    }
 };
@@ -317,7 +320,7 @@ struct LongOptionSupport : NonInstantiable
    
    template<typename ParserT>
    static
-   tribool eval(ParserT& parser, cmdline::detail::ParserState& state)
+   tribool eval(ParserT& parser, simppl::cmdline::detail::ParserState& state)
    {
       tribool rc;
       
@@ -347,11 +350,11 @@ struct NoLongOptionSupport : NonInstantiable
    
    template<typename ParserT>
    static inline
-   tribool eval(ParserT&, cmdline::detail::ParserState&)
+   tribool eval(ParserT&, simppl::cmdline::detail::ParserState&)
    {
       // never accept long-only arguments in NoLongOptionSupport policy chosen
-      typedef typename Reverse<typename cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
-      static_assert(Find<char_< cmdline::NoChar>, arguments_type>::value < 0, "no_nochar_options_allowed_with_no_long_option_support_policy");
+      typedef typename Reverse<typename simppl::cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
+      static_assert(Find<char_< simppl::cmdline::NoChar>, arguments_type>::value < 0, "no_nochar_options_allowed_with_no_long_option_support_policy");
       
       return indeterminate;
    }
@@ -375,12 +378,12 @@ struct Parser : protected UnknownPolicyT, protected UsagePrinterT
    static
    bool parse(int argc, char** argv, const ParserT& parser)
    {
-      typedef typename Reverse<typename cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
+      typedef typename Reverse<typename simppl::cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type>::type arguments_type;
 
       // checks on extra options
-      static_assert(cmdline::detail::CheckMandatoryAfterOptionalExtraOption<arguments_type>::value, "mandatory_after_optional_extraoption_is_nonsense");
-      static_assert(cmdline::detail::CheckMultipleOptionalExtraOptions<arguments_type>::value, "multiple_optional_extraoptions_are_nonsense");
-      static_assert(cmdline::detail::CheckFurtherExtraOptionAfterMultiExtraOption<arguments_type>::value, "no_extra_option_after_multi_extra_option_allowed");
+      static_assert(simppl::cmdline::detail::CheckMandatoryAfterOptionalExtraOption<arguments_type>::value, "mandatory_after_optional_extraoption_is_nonsense");
+      static_assert(simppl::cmdline::detail::CheckMultipleOptionalExtraOptions<arguments_type>::value, "multiple_optional_extraoptions_are_nonsense");
+      static_assert(simppl::cmdline::detail::CheckFurtherExtraOptionAfterMultiExtraOption<arguments_type>::value, "no_extra_option_after_multi_extra_option_allowed");
       
       ParserT& _parser = const_cast<ParserT&>(parser);
       return doParse(argc, argv, _parser);
@@ -390,7 +393,7 @@ struct Parser : protected UnknownPolicyT, protected UsagePrinterT
 private:
    
    static 
-   bool evaluateReturnValue(tribool rc, cmdline::detail::ParserState& state)
+   bool evaluateReturnValue(tribool rc, simppl::cmdline::detail::ParserState& state)
    {
       if (indeterminate(rc))
       {
@@ -415,13 +418,13 @@ private:
    static
    bool doParse(int argc, char** argv, ParserT& parser)
    {
-      typedef typename cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type arguments_type;
-      cmdline::detail::longOptionSupport = LongOptionSupportPolicyT<UsagePrinterT>::longSupport;
+      typedef typename simppl::cmdline::detail::MakeTypeList<typename ParserT::arguments_type>::type arguments_type;
+      simppl::cmdline::detail::longOptionSupport = LongOptionSupportPolicyT<UsagePrinterT>::longSupport;
       
       // don't accept -h
       static_assert(Find<char_<'h'>, arguments_type>::value < 0, "h_is_reserved_for_help");
           
-      cmdline::detail::ParserState state(argc, argv);
+      simppl::cmdline::detail::ParserState state(argc, argv);
 
 #ifdef CMDLINE_ENABLE_RUNTIME_CHECK   
       if (!parser.plausibilityCheck(state) || state.longArguments_.find("help") != state.longArguments_.end())
@@ -512,7 +515,7 @@ struct DocumentationHelper
 };
 
 template<>
-struct DocumentationHelper<cmdline::NoChar>
+struct DocumentationHelper<simppl::cmdline::NoChar>
 {
    static inline 
    void eval(detail::stream_type& os, const char* longopt, const char* doc)
@@ -561,9 +564,9 @@ struct Documentation
    void doDoc_(detail::stream_type& os) const
    {
 #ifdef CMDLINE_HAVE_STL_STREAMS
-      os << "<arg" << ++cmdline::detail::extraOptionCounter << std::left << std::setw(PARSER_DESCRIPTION_INDENTATION-4-cmdline::detail::extraOptionCounter/10) << "> " << doc_ << std::endl;
+      os << "<arg" << ++simppl::cmdline::detail::extraOptionCounter << std::left << std::setw(PARSER_DESCRIPTION_INDENTATION-4-simppl::cmdline::detail::extraOptionCounter/10) << "> " << doc_ << std::endl;
 #else
-      fprintf(os, "<arg%d>%-15c %s\n", ++cmdline::detail::extraOptionCounter, ' ', doc_);
+      fprintf(os, "<arg%d>%-15c %s\n", ++simppl::cmdline::detail::extraOptionCounter, ' ', doc_);
 #endif
    }
    
@@ -650,7 +653,7 @@ protected:
    };
 
    template<bool HaveArgument>
-   struct Helper<cmdline::NoChar, HaveArgument>
+   struct Helper<simppl::cmdline::NoChar, HaveArgument>
    {
       static inline 
       void eval(detail::stream_type& os, const char* long__)
@@ -740,7 +743,7 @@ protected:
    };
 
    template<bool HaveArgument>
-   struct Helper<cmdline::NoChar, HaveArgument>
+   struct Helper<simppl::cmdline::NoChar, HaveArgument>
    {
       static inline 
       void eval(detail::stream_type& os, const char* long__)
@@ -764,9 +767,9 @@ protected:
    void genCmdline(detail::stream_type& os, const char* ext) const
    {
 #ifdef CMDLINE_HAVE_STL_STREAMS
-      os << "<arg" << ++cmdline::detail::extraOptionCounter << ext << "> ";
+      os << "<arg" << ++simppl::cmdline::detail::extraOptionCounter << ext << "> ";
 #else
-      fprintf(os, "<arg%d%s>", ++cmdline::detail::extraOptionCounter, ext);
+      fprintf(os, "<arg%d%s>", ++simppl::cmdline::detail::extraOptionCounter, ext);
 #endif
    }
    
@@ -956,7 +959,7 @@ struct LongSwitch;
 /**
  * The baseclass for all options and switches.
  */
-template<char Argument = cmdline::NoChar, typename MandatoryT = Optional, typename MultiSupportT = cmdline::detail::MultiSupport, 
+template<char Argument = simppl::cmdline::NoChar, typename MandatoryT = Optional, typename MultiSupportT = simppl::cmdline::detail::MultiSupport, 
          typename DocumentationT = detail::NoDocumentation, bool haveArgument = false>
 struct Switch : MandatoryT, DocumentationT, MultiSupportT
 {   
@@ -968,11 +971,11 @@ struct Switch : MandatoryT, DocumentationT, MultiSupportT
    static_assert((Argument >= 48 && Argument <=57) 
              || (Argument >=65 && Argument <=90) 
              || (Argument >=97 && Argument <=122) 
-             || Argument == cmdline::NoChar, 
+             || Argument == simppl::cmdline::NoChar, 
               "switch_argument_only_valid_in_0123456789abcdefgijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
    
    typedef char_<Argument> char_type;
-   typedef typename if_<Argument== cmdline::NoChar, cmdline::detail::InEquality, cmdline::detail::EqualityComparator<Argument> >::type equality_check_type;   
+   typedef typename if_<Argument== simppl::cmdline::NoChar, simppl::cmdline::detail::InEquality, simppl::cmdline::detail::EqualityComparator<Argument> >::type equality_check_type;   
    
    enum { LongSupport = false, HaveArgument = haveArgument };
 
@@ -1055,9 +1058,9 @@ protected:
    // this check here is mainly interesting only if extension points are part of the grammar
    // TODO maybe we can determine whether we need to do that or not before so no code is generated if possible
    inline 
-   bool plausibilityCheck(cmdline::detail::ParserState& state) const
+   bool plausibilityCheck(simppl::cmdline::detail::ParserState& state) const
    {
-      if (Argument == cmdline::NoChar)
+      if (Argument == simppl::cmdline::NoChar)
       {
          return true;
       }
@@ -1075,7 +1078,7 @@ protected:
 /**
  * An ordinary commandline option.
  */
-template<char Argument = cmdline::NoChar, typename MandatoryT = Optional, typename MultiSupportT = cmdline::detail::NoMultiSupport, typename DocumentationT = detail::NoDocumentation>
+template<char Argument = simppl::cmdline::NoChar, typename MandatoryT = Optional, typename MultiSupportT = simppl::cmdline::detail::NoMultiSupport, typename DocumentationT = detail::NoDocumentation>
 struct Option : Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>
 {
    template<typename> friend struct detail::HandlerCompositeBase;
@@ -1092,30 +1095,30 @@ struct Option : Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, true
 /**
  * A commandline option that could appear multiple times.
  */
-template<char Argument = cmdline::NoChar, typename MandatoryT = Optional, typename DocumentationT = detail::NoDocumentation>
-struct MultiOption : Option<Argument, MandatoryT, cmdline::detail::MultiSupport, DocumentationT>
+template<char Argument = simppl::cmdline::NoChar, typename MandatoryT = Optional, typename DocumentationT = detail::NoDocumentation>
+struct MultiOption : Option<Argument, MandatoryT, simppl::cmdline::detail::MultiSupport, DocumentationT>
 {
    template<typename> friend struct detail::HandlerCompositeBase;
    
    inline
    MultiOption()
-    : Option<Argument, MandatoryT, cmdline::detail::MultiSupport, DocumentationT>()
+    : Option<Argument, MandatoryT, simppl::cmdline::detail::MultiSupport, DocumentationT>()
    {
       // NOOP
    }
 };
 
 
-template<typename MandatoryT = Optional, typename MultiSupportT = cmdline::detail::NoMultiSupport, typename DocumentationT = detail::NoDocumentation>
+template<typename MandatoryT = Optional, typename MultiSupportT = simppl::cmdline::detail::NoMultiSupport, typename DocumentationT = detail::NoDocumentation>
 struct ExtraOption : MandatoryT, MultiSupportT, DocumentationT
 {
    template<typename, typename> friend struct detail::HandlerComposite; 
    template<typename> friend struct detail::HandlerCompositeBase;
    template<char, typename, typename, typename, bool> friend struct detail::LongSwitch;
 
-   typedef typename if_<std::is_same<MultiSupportT, cmdline::detail::MultiSupport>::value, 
-      cmdline::detail::MultiNoChar, 
-      typename if_<std::is_same<MandatoryT, Mandatory>::value, cmdline::detail::MandatoryNoChar, cmdline::detail::NoChar>::type>::type char_type;
+   typedef typename if_<std::is_same<MultiSupportT, simppl::cmdline::detail::MultiSupport>::value, 
+      simppl::cmdline::detail::MultiNoChar, 
+      typename if_<std::is_same<MandatoryT, Mandatory>::value, simppl::cmdline::detail::MandatoryNoChar, simppl::cmdline::detail::NoChar>::type>::type char_type;
    
    inline
    ExtraOption()
@@ -1147,7 +1150,7 @@ struct ExtraOption : MandatoryT, MultiSupportT, DocumentationT
 protected:
    
    inline
-   tribool operator()(cmdline::detail::ParserState& state)
+   tribool operator()(simppl::cmdline::detail::ParserState& state)
    {
       if (!MultiSupportT::handled())
       {
@@ -1172,7 +1175,7 @@ protected:
    
 #ifdef CMDLINE_ENABLE_RUNTIME_CHECK 
    inline 
-   bool plausibilityCheck(cmdline::detail::ParserState& /*state*/) const
+   bool plausibilityCheck(simppl::cmdline::detail::ParserState& /*state*/) const
    {
       return true;
    }
@@ -1249,7 +1252,7 @@ struct LongSwitch
    //inline
    void doDoc(detail::stream_type& os) const
    {
-      if (cmdline::detail::longOptionSupport)
+      if (simppl::cmdline::detail::longOptionSupport)
       {
          switch_.template doDoc_<Argument>(os, long_);
       }
@@ -1260,7 +1263,7 @@ struct LongSwitch
    //inline
    void genCmdline(detail::stream_type& os) const
    {
-      if (cmdline::detail::longOptionSupport)
+      if (simppl::cmdline::detail::longOptionSupport)
       {
          switch_.genCmdline(os, long_);
       }
@@ -1540,7 +1543,7 @@ struct Incrementor<false>
 template<typename AnchorT>
 struct HandlerCompositeBase
 {
-   static_assert(!std::is_same<typename AnchorT::char_type, char_< cmdline::NoChar> >::value || AnchorT::LongSupport, "only_long_options_may_support_no_char");
+   static_assert(!std::is_same<typename AnchorT::char_type, char_< simppl::cmdline::NoChar> >::value || AnchorT::LongSupport, "only_long_options_may_support_no_char");
    
 private:
    
@@ -1729,14 +1732,14 @@ struct ArgumentComposite;
 template<typename T1, typename T2>
 struct CompositeTypeDiscriminator
 {
-   static_assert(std::is_same<typename T1::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T1::arguments_type>::value || std::is_same<typename T1::arguments_type, char_<cmdline::NoChar> >::value || std::is_same<typename T1::arguments_type, typename T2::arguments_type>::value == 0, "no_same_arguments_allowed");
+   static_assert(std::is_same<typename T1::arguments_type, simppl::cmdline::ExtensionPoint>::value || IsExtraOption<typename T1::arguments_type>::value || std::is_same<typename T1::arguments_type, char_<simppl::cmdline::NoChar> >::value || std::is_same<typename T1::arguments_type, typename T2::arguments_type>::value == 0, "no_same_arguments_allowed");
    typedef TypeList<typename T1::arguments_type, TypeList<typename T2::arguments_type, NilType> > arguments_type;
 };
 
 template<typename T1, typename T2, typename T3>
 struct CompositeTypeDiscriminator<ArgumentComposite<T1, T2>, T3>
 {
-   static_assert(std::is_same<typename T3::arguments_type, cmdline::ExtensionPoint>::value || IsExtraOption<typename T3::arguments_type>::value || std::is_same<typename T3::arguments_type, char_<cmdline::NoChar> >::value || Find<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type>::value == -1, "no_same_arguments_allowed");
+   static_assert(std::is_same<typename T3::arguments_type, simppl::cmdline::ExtensionPoint>::value || IsExtraOption<typename T3::arguments_type>::value || std::is_same<typename T3::arguments_type, char_<simppl::cmdline::NoChar> >::value || Find<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type>::value == -1, "no_same_arguments_allowed");
    typedef TypeList<typename T3::arguments_type, typename ArgumentComposite<T1, T2>::arguments_type> arguments_type;
 };
 
@@ -1947,17 +1950,19 @@ struct BackInserter
    T& t_;
 };
 
-}   // end namespace detail
+}   // namespace detail
 
-}   // end namespace cmdline
+}   // namespace cmdline
+
+}   // namespace simppl
 
 
 template<typename T1, typename T2, typename T3>
 inline
-cmdline::detail::ArgumentComposite<T1, cmdline::detail::HandlerComposite<T2, T3> > 
-operator<= (T1 h1, cmdline::detail::HandlerComposite<T2, T3> h2)
+simppl::cmdline::detail::ArgumentComposite<T1, simppl::cmdline::detail::HandlerComposite<T2, T3> > 
+operator<= (T1 h1, simppl::cmdline::detail::HandlerComposite<T2, T3> h2)
 {
-   return cmdline::detail::ArgumentComposite<T1, cmdline::detail::HandlerComposite<T2, T3> >(h1, h2);
+   return simppl::cmdline::detail::ArgumentComposite<T1, simppl::cmdline::detail::HandlerComposite<T2, T3> >(h1, h2);
 };
 
 
@@ -1968,62 +1973,65 @@ operator<= (T1 h1, cmdline::detail::HandlerComposite<T2, T3> h2)
 //      that is, we need some static_assert here.
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, bool haveArgument, typename ActionT>
 inline
-cmdline::detail::HandlerComposite<cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>
-operator>> (cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument> t1, ActionT t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>
+operator>> (simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument> t1, ActionT t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>(t1, t2);
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>(t1, t2);
 }
 
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, bool haveArgument, typename ActionT>
 inline
-cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>
-operator>> (cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument> t1, ActionT t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>
+operator>> (simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument> t1, ActionT t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>(t1, t2);
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, haveArgument>, ActionT>(t1, t2);
 }
 
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, typename ActionT>
 inline
-cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, ActionT>
-operator>> (cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, ActionT t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, ActionT>
+operator>> (simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, ActionT t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, ActionT>(t1, t2);
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, ActionT>(t1, t2);
 }
 
 
 template<typename MandatoryT, typename MultiSupportT, typename DocumentationT, typename ActionT>
 inline
-cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, ActionT>
-operator>> (cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, ActionT t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, ActionT>
+operator>> (simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, ActionT t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, ActionT>(t1, t2);
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, ActionT>(t1, t2);
 }
 
 
 // for bool flagging
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT>
 inline
-cmdline::detail::HandlerComposite<cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, cmdline::detail::flag>
-operator>> (cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false> t1, bool& b)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, simppl::cmdline::detail::flag>
+operator>> (simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false> t1, bool& b)
 {
-   return cmdline::detail::HandlerComposite<cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, cmdline::detail::flag>(t1, cmdline::detail::flag(b));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Switch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, simppl::cmdline::detail::flag>(t1, simppl::cmdline::detail::flag(b));
 }
 
 
 // for bool flagging
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT>
 inline
-cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, cmdline::detail::flag>
-operator>> (cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false> t1, bool& b)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, simppl::cmdline::detail::flag>
+operator>> (simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false> t1, bool& b)
 {
-   return cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, cmdline::detail::flag>(t1, cmdline::detail::flag(b));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, false>, simppl::cmdline::detail::flag>(t1, simppl::cmdline::detail::flag(b));
 }
 
 
 // -------------------------------------------------------------------------
 
+
+namespace simppl
+{
 
 namespace cmdline
 {
@@ -2053,6 +2061,8 @@ struct inc
 
 }   // namespace cmdline
 
+}   // namespace simppl
+
 
 // --------------------------------------------------------------------------------
 
@@ -2060,28 +2070,28 @@ struct inc
 #define PARSER_MAKE_SHIFT_OPERATOR(datatype) \
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT> \
 inline \
-cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<datatype> > \
-operator>> (cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, datatype& t2) \
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<datatype> > \
+operator>> (simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, datatype& t2) \
 { \
-   return cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<datatype> >(t1, cmdline::detail::set<datatype>(t2)); \
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<datatype> >(t1, simppl::cmdline::detail::set<datatype>(t2)); \
 } \
 \
 \
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT> \
 inline \
-cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<datatype> >  \
-operator>> (cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, datatype& t2) \
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<datatype> >  \
+operator>> (simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, datatype& t2) \
 {\
-   return cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<datatype> >(t1, cmdline::detail::set<datatype>(t2)); \
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<datatype> >(t1, simppl::cmdline::detail::set<datatype>(t2)); \
 } \
 \
 \
 template<typename MandatoryT, typename MultiSupportT, typename DocumentationT> \
 inline \
-cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<datatype> >  \
-operator>> (cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, datatype& t2) \
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<datatype> >  \
+operator>> (simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, datatype& t2) \
 {\
-   return cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<datatype> >(t1, cmdline::detail::set<datatype>(t2)); \
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<datatype> >(t1, simppl::cmdline::detail::set<datatype>(t2)); \
 }
 
 PARSER_MAKE_SHIFT_OPERATOR(char)
@@ -2101,66 +2111,66 @@ PARSER_MAKE_SHIFT_OPERATOR(std::string)
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, typename T>
 inline
-cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<T*> > 
-operator>> (cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, T** t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<T*> > 
+operator>> (simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, T** t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<T*> >(t1, cmdline::detail::set<T*>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<T*> >(t1, simppl::cmdline::detail::set<T*>(t2));
 }
 
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT, typename T>
 inline
-cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<T*> > 
-operator>> (cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, T** t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<T*> > 
+operator>> (simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, T** t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<T*> >(t1, cmdline::detail::set<T*>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<T*> >(t1, simppl::cmdline::detail::set<T*>(t2));
 }
 
 
 template<typename MandatoryT, typename MultiSupportT, typename DocumentationT, typename T>
 inline
-cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<T*> > 
-operator>> (cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, T** t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<T*> > 
+operator>> (simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, T** t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<T*> >(t1, cmdline::detail::set<T*>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<T*> >(t1, simppl::cmdline::detail::set<T*>(t2));
 }
 
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT>
 inline
-cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<char[]> > 
-operator>> (cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, char t2[])
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<char[]> > 
+operator>> (simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT> t1, char t2[])
 {
-   return cmdline::detail::HandlerComposite<cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<char[]> >(t1, cmdline::detail::set<char[]>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::Option<Argument, MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<char[]> >(t1, simppl::cmdline::detail::set<char[]>(t2));
 }
 
 
 template<char Argument, typename MandatoryT, typename MultiSupportT, typename DocumentationT>
 inline
-cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<char[]> > 
-operator>> (cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, char t2[])
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<char[]> > 
+operator>> (simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true> t1, char t2[])
 {
-   return cmdline::detail::HandlerComposite<cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, cmdline::detail::set<char[]> >(t1, cmdline::detail::set<char[]>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::detail::LongSwitch<Argument, MandatoryT, MultiSupportT, DocumentationT, true>, simppl::cmdline::detail::set<char[]> >(t1, simppl::cmdline::detail::set<char[]>(t2));
 }
 
 
 template<typename MandatoryT, typename MultiSupportT, typename DocumentationT>
 inline
-cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<char[]> > 
-operator>> (cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, char t2[])
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<char[]> > 
+operator>> (simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT> t1, char t2[])
 {
-   return cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, cmdline::detail::set<char[]> >(t1, cmdline::detail::set<char[]>(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, MultiSupportT, DocumentationT>, simppl::cmdline::detail::set<char[]> >(t1, simppl::cmdline::detail::set<char[]>(t2));
 }
 
 
 #ifdef CMDLINE_HAVE_STD_VECTOR
 template<typename MandatoryT, typename DocumentationT, typename DataT>
 inline
-cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, cmdline::detail::MultiSupport, DocumentationT>, cmdline::detail::BackInserter<std::vector<DataT> > > 
-operator>> (cmdline::ExtraOption<MandatoryT, cmdline::detail::MultiSupport, DocumentationT> t1, std::vector<DataT>& t2)
+simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, simppl::cmdline::detail::MultiSupport, DocumentationT>, simppl::cmdline::detail::BackInserter<std::vector<DataT> > > 
+operator>> (simppl::cmdline::ExtraOption<MandatoryT, simppl::cmdline::detail::MultiSupport, DocumentationT> t1, std::vector<DataT>& t2)
 {
-   return cmdline::detail::HandlerComposite<cmdline::ExtraOption<MandatoryT, cmdline::detail::MultiSupport, DocumentationT>, 
-      cmdline::detail::BackInserter<std::vector<DataT> > >(t1, cmdline::detail::BackInserter<std::vector<DataT> >(t2));
+   return simppl::cmdline::detail::HandlerComposite<simppl::cmdline::ExtraOption<MandatoryT, simppl::cmdline::detail::MultiSupport, DocumentationT>, 
+      simppl::cmdline::detail::BackInserter<std::vector<DataT> > >(t1, simppl::cmdline::detail::BackInserter<std::vector<DataT> >(t2));
 }
 #endif
 

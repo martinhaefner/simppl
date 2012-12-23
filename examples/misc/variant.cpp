@@ -2,6 +2,8 @@
 
 #include "simppl/variant.h"
 
+using namespace simppl;
+
 
 struct MyVisitor : StaticVisitor<>
 {

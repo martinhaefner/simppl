@@ -29,7 +29,10 @@
 #define INIFILE_FRIEND_PARSER template<typename,typename,typename,typename,bool> friend struct Parser;
 
 
-namespace ini
+namespace simppl
+{
+   
+namespace inifile
 {
 
 // forward decls
@@ -290,19 +293,24 @@ private:
 // ----------------------------------------------------------------------------
 
 
-}   // namespace ini
+}   // namespace inifile
+
+}   // namespace simppl
 
 #include "detail/inifile.h"
 
-namespace ini
+namespace simppl
+{
+   
+namespace inifile
 {
 
    
 template<typename ParserT>
 inline
-ini::detail::ParserChainSection<ParserT> Section::operator[](ParserT parser)
+simppl::inifile::detail::ParserChainSection<ParserT> Section::operator[](ParserT parser)
 {
-   return ini::detail::ParserChainSection<ParserT>(*this, parser);
+   return simppl::inifile::detail::ParserChainSection<ParserT>(*this, parser);
 }
 
 
@@ -640,7 +648,9 @@ struct Parser : NonInstantiable
    }
 };
 
-}   // namespace ini
+}   // namespace inifile
+
+}   // namespace simppl
 
 
 // ------------------------------------------------------------------------------------------
@@ -650,21 +660,21 @@ struct Parser : NonInstantiable
 
 template<typename MandatoryT, typename T>
 inline
-ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::BackInserterContainerHandler<std::vector<T> > >
-operator>>(const ini::Key<MandatoryT>& key, std::vector<T>& v)
+simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> > >
+operator>>(const simppl::inifile::Key<MandatoryT>& key, std::vector<T>& v)
 {
-   return ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::BackInserterContainerHandler<std::vector<T> > >(
-      key, ini::detail::BackInserterContainerHandler<std::vector<T> >(v));
+   return simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> > >(
+      key, simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> >(v));
 }
 
 
 template<typename T>
 inline
-ini::detail::FullHandledSection<ini::detail::BackInserterContainerHandler<std::vector<T> > > 
-operator>>(const ini::Section& section, std::vector<T>& v)
+simppl::inifile::detail::FullHandledSection<simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> > > 
+operator>>(const simppl::inifile::Section& section, std::vector<T>& v)
 {
-   return ini::detail::FullHandledSection<ini::detail::BackInserterContainerHandler<std::vector<T> > >(
-      section, ini::detail::BackInserterContainerHandler<std::vector<T> >(v));
+   return simppl::inifile::detail::FullHandledSection<simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> > >(
+      section, simppl::inifile::detail::BackInserterContainerHandler<std::vector<T> >(v));
 }
 
 #endif   // INIFILE_HAVE_STD_VECTOR
@@ -672,20 +682,20 @@ operator>>(const ini::Section& section, std::vector<T>& v)
 
 template<typename MandatoryT, typename HandlerT>
 inline
-ini::detail::KeyHandlerComposite<MandatoryT, HandlerT>
-operator>>(const ini::Key<MandatoryT>& key, HandlerT handler)
+simppl::inifile::detail::KeyHandlerComposite<MandatoryT, HandlerT>
+operator>>(const simppl::inifile::Key<MandatoryT>& key, HandlerT handler)
 {
-   return ini::detail::KeyHandlerComposite<MandatoryT, HandlerT>(key, handler);
+   return simppl::inifile::detail::KeyHandlerComposite<MandatoryT, HandlerT>(key, handler);
 }
 
 
 #define INIFILE_DECLARE_STREAM_OPERATOR(type) \
 template<typename MandatoryT> \
 inline \
-ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::set<type> > \
-operator>>(const ini::Key<MandatoryT>& key, type& b) \
+simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::set<type> > \
+operator>>(const simppl::inifile::Key<MandatoryT>& key, type& b) \
 { \
-   return ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::set<type> >(key, ini::detail::set<type>(b)); \
+   return simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::set<type> >(key, simppl::inifile::detail::set<type>(b)); \
 } \
 
 INIFILE_DECLARE_STREAM_OPERATOR(bool)
@@ -705,20 +715,20 @@ INIFILE_DECLARE_STREAM_OPERATOR(std::string)
 
 template<typename MandatoryT> 
 inline 
-ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::set<char[]> > 
-operator>>(const ini::Key<MandatoryT>& key, char b[]) 
+simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::set<char[]> > 
+operator>>(const simppl::inifile::Key<MandatoryT>& key, char b[]) 
 { 
-   return ini::detail::KeyHandlerComposite<MandatoryT, ini::detail::set<char[]> >(key, ini::detail::set<char[]>(b)); 
+   return simppl::inifile::detail::KeyHandlerComposite<MandatoryT, simppl::inifile::detail::set<char[]> >(key, simppl::inifile::detail::set<char[]>(b)); 
 } 
 
 
 template<typename CompositeT, typename MandatoryT1, typename HandlerT1>
 inline
-ini::detail::HandlerComposite<MandatoryT1, HandlerT1, CompositeT>
-operator||(const CompositeT& lhs, const ini::detail::KeyHandlerComposite<MandatoryT1, HandlerT1>& rhs)
+simppl::inifile::detail::HandlerComposite<MandatoryT1, HandlerT1, CompositeT>
+operator||(const CompositeT& lhs, const simppl::inifile::detail::KeyHandlerComposite<MandatoryT1, HandlerT1>& rhs)
 {
    // assert for duplicate keys
-   return ini::detail::HandlerComposite<MandatoryT1, HandlerT1, CompositeT>(rhs, lhs);
+   return simppl::inifile::detail::HandlerComposite<MandatoryT1, HandlerT1, CompositeT>(rhs, lhs);
 }
 
 
@@ -728,18 +738,18 @@ operator||(const CompositeT& lhs, const ini::detail::KeyHandlerComposite<Mandato
 /// function objects handler
 template<typename HandlerT>
 inline
-ini::detail::FullHandledSection<HandlerT> operator>>(const ini::Section& section, const HandlerT& handler)
+simppl::inifile::detail::FullHandledSection<HandlerT> operator>>(const simppl::inifile::Section& section, const HandlerT& handler)
 {
-   return ini::detail::FullHandledSection<HandlerT>(section, handler);
+   return simppl::inifile::detail::FullHandledSection<HandlerT>(section, handler);
 }
 
 
 /// normal functions handler
 template<typename ReturnT, typename ArgumentT>
 inline
-ini::detail::FullHandledSection<ReturnT(*)(ArgumentT)> operator>>(const ini::Section& section, ReturnT(*handler)(ArgumentT))
+simppl::inifile::detail::FullHandledSection<ReturnT(*)(ArgumentT)> operator>>(const simppl::inifile::Section& section, ReturnT(*handler)(ArgumentT))
 {
-   return ini::detail::FullHandledSection<ReturnT(*)(ArgumentT)>(section, handler);
+   return simppl::inifile::detail::FullHandledSection<ReturnT(*)(ArgumentT)>(section, handler);
 }
 
 
@@ -748,20 +758,20 @@ ini::detail::FullHandledSection<ReturnT(*)(ArgumentT)> operator>>(const ini::Sec
 
 template<typename T1, typename T2, typename RightT>
 inline
-ini::detail::SectionatedIniFile<RightT, ini::detail::SectionatedIniFile<T1, T2> > 
-operator<=(const ini::detail::SectionatedIniFile<T1, T2>& left, const RightT& right)
+simppl::inifile::detail::SectionatedIniFile<RightT, simppl::inifile::detail::SectionatedIniFile<T1, T2> > 
+operator<=(const simppl::inifile::detail::SectionatedIniFile<T1, T2>& left, const RightT& right)
 {
-   return ini::detail::SectionatedIniFile<RightT, ini::detail::SectionatedIniFile<T1, T2> >(right, left);
+   return simppl::inifile::detail::SectionatedIniFile<RightT, simppl::inifile::detail::SectionatedIniFile<T1, T2> >(right, left);
 }
 
 
 template<typename RightT>
 inline
-ini::detail::SectionatedIniFile<RightT, ini::detail::SectionatedIniFile<ini::detail::NoopDefaultSection, ini::File> > 
-operator<=(const ini::File& f, const RightT& right)
+simppl::inifile::detail::SectionatedIniFile<RightT, simppl::inifile::detail::SectionatedIniFile<simppl::inifile::detail::NoopDefaultSection, simppl::inifile::File> > 
+operator<=(const simppl::inifile::File& f, const RightT& right)
 {
-   return ini::detail::SectionatedIniFile<RightT, ini::detail::SectionatedIniFile<ini::detail::NoopDefaultSection, ini::File> >(
-      right, ini::detail::SectionatedIniFile<ini::detail::NoopDefaultSection, ini::File>(ini::detail::NoopDefaultSection(), f));
+   return simppl::inifile::detail::SectionatedIniFile<RightT, simppl::inifile::detail::SectionatedIniFile<simppl::inifile::detail::NoopDefaultSection, simppl::inifile::File> >(
+      right, simppl::inifile::detail::SectionatedIniFile<simppl::inifile::detail::NoopDefaultSection, simppl::inifile::File>(simppl::inifile::detail::NoopDefaultSection(), f));
 }
 
 

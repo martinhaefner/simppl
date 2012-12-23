@@ -13,6 +13,7 @@
 
 
 using namespace std::placeholders;
+namespace ini = simppl::inifile;
 
 
 void funca(const char* text, int i)

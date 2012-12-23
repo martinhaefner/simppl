@@ -6,8 +6,10 @@
 
 #include "simppl/tribool.h"
 
-
-namespace ini
+namespace simppl
+{
+   
+namespace inifile
 {
    
 // forward decl
@@ -27,7 +29,7 @@ namespace detail
 struct IniFileSectionReturn
 {
    template<typename T>
-   static inline ini::Section& eval(T& t)
+   static inline simppl::inifile::Section& eval(T& t)
    {
       return t.section_;
    }
@@ -37,7 +39,7 @@ struct IniFileSectionReturn
 struct SubCompositeSectionReturn
 {
    template<typename T>
-   static inline ini::Section& eval(T& t)
+   static inline simppl::inifile::Section& eval(T& t)
    {
       return t.included_.defaultSection();
    }
@@ -712,18 +714,18 @@ struct set<char[]>
 // ---------------------------------------------------------------------------------------
 
 
-struct ParserChainSectionBase : ini::Section
+struct ParserChainSectionBase : simppl::inifile::Section
 {
    explicit inline
-   ParserChainSectionBase(const ini::Section& section)
-    : ini::Section(section)
+   ParserChainSectionBase(const simppl::inifile::Section& section)
+    : simppl::inifile::Section(section)
    {
       // NOOP
    }
    
    inline
    ParserChainSectionBase()
-    : ini::Section()
+    : simppl::inifile::Section()
    {
       // NOOP
    }
@@ -751,7 +753,7 @@ struct ParserChainSection : ParserChainSectionBase
 {
    /// named section
    inline
-   ParserChainSection(const ini::Section& section, ParserT parser)
+   ParserChainSection(const simppl::inifile::Section& section, ParserT parser)
     : ParserChainSectionBase(section)
     , parser_(parser)
    {
@@ -783,11 +785,11 @@ struct ParserChainSection : ParserChainSectionBase
 };
 
 
-struct NoopDefaultSection : ini::Section
+struct NoopDefaultSection : simppl::inifile::Section
 {
    explicit inline
    NoopDefaultSection()
-    : ini::Section()
+    : simppl::inifile::Section()
    {
       // NOOP
    }
@@ -795,11 +797,11 @@ struct NoopDefaultSection : ini::Section
 
 
 template<typename HandlerT>
-struct FullHandledSection : ini::Section
+struct FullHandledSection : simppl::inifile::Section
 {
    inline
-   FullHandledSection(const ini::Section& section, HandlerT handler)
-    : ini::Section(section)
+   FullHandledSection(const simppl::inifile::Section& section, HandlerT handler)
+    : simppl::inifile::Section(section)
     , handler_(handler)
    {
       // NOOP
@@ -1110,7 +1112,9 @@ struct HeaderlineEvaluator<NoopHeaderParser>
 
 }   // namespace detail
 
-}   // namespace ini
+}   // namespace inifile
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_INIFILE_H

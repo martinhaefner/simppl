@@ -7,6 +7,8 @@
 
 using std::placeholders::_1;
 
+namespace cmd = simppl::cmdline;
+
 
 //#define USE_GETOPT_PARSER
 
@@ -48,21 +50,21 @@ void g1(const std::string& value)
 }
 
 
-cmdline::ExtensionPoint globalExtensionPoint = 
-      cmdline::Option<cmdline::NoChar>()["jiji1"].doc("Tolle Show, hier!") >> g1
-   <= cmdline::Switch<cmdline::NoChar>()["kurios"] >> simppl::bind(&Nix::sayHello, n, 42)
-   <= cmdline::Option<cmdline::NoChar>()["jiji2"].doc("Tolle Show, hier123!") >> g
+cmd::ExtensionPoint globalExtensionPoint = 
+      cmd::Option<cmd::NoChar>()["jiji1"].doc("Tolle Show, hier!") >> g1
+   <= cmd::Switch<cmd::NoChar>()["kurios"] >> simppl::bind(&Nix::sayHello, n, 42)
+   <= cmd::Option<cmd::NoChar>()["jiji2"].doc("Tolle Show, hier123!") >> g
    ;
 
-cmdline::ExtensionPoint secondExtensionPoint = 
-      cmdline::Option<cmdline::NoChar>()["jiji4"].doc("Tolle Show, hier!") >> g
-   <= cmdline::Option<cmdline::NoChar>()["jiji5"].doc("Tolle Show, hier123!") >> g
+cmd::ExtensionPoint secondExtensionPoint = 
+      cmd::Option<cmd::NoChar>()["jiji4"].doc("Tolle Show, hier!") >> g
+   <= cmd::Option<cmd::NoChar>()["jiji5"].doc("Tolle Show, hier123!") >> g
    ;
 
 // yet another argument to be added here
 bool registerExtension()
 {
-   globalExtensionPoint += cmdline::Option<cmdline::NoChar>()["jiji3"].doc("Noch ne tolle Show, hier!") >> g;
+   globalExtensionPoint += cmd::Option<cmd::NoChar>()["jiji3"].doc("Noch ne tolle Show, hier!") >> g;
 }
 
 static bool registered = registerExtension();
@@ -105,7 +107,7 @@ void h(int j)
 }
 
 
-struct MyUsage : /*Noop*/cmdline::DefaultUsagePrinter
+struct MyUsage : /*Noop*/cmd::DefaultUsagePrinter
 {
    inline
    void operator()(std::ostream& os)
@@ -200,33 +202,33 @@ int main(int argc, char** argv)
 //#   define _ERASE(a) 
 #   define _ERASE(a) a 
 #if 0
-   bool rc = cmdline::Parser<cmdline::IgnoreUnknown, cmdline::LongOptionSupport, cmdline::DefaultUsagePrinter/*MyUsage*/>
+   bool rc = cmd::Parser<cmd::IgnoreUnknown, cmd::LongOptionSupport, cmd::DefaultUsagePrinter/*MyUsage*/>
       ::parse(argc, argv,
-              cmdline::Switch<'v'>().doc("super") >> cmdline::inc(k) 
+              cmd::Switch<'v'>().doc("super") >> cmd::inc(k) 
               <= globalExtensionPoint 
               /*<= Switch<'w'>().doc("super") >> inc(k) 
               <= secondExtensionPoint
-              <= cmdline::Switch<'x'>().doc("super") >> inc(k)*/
+              <= cmd::Switch<'x'>().doc("super") >> inc(k)*/
              );
 #endif
   // #if 0
-   bool rc = cmdline::Parser<cmdline::IgnoreUnknown, cmdline::LongOptionSupport, /*cmdline::NoopUsagePrinter*/MyUsage>
+   bool rc = cmd::Parser<cmd::IgnoreUnknown, cmd::LongOptionSupport, /*cmd::NoopUsagePrinter*/MyUsage>
       ::parse(argc, argv,
-              //cmdline::Switch<'v'>().doc("super") >> cmdline::inc(k) ||
-              //cmdline::MultiOption<>()["bp"].doc("toll") >> h
+              //cmd::Switch<'v'>().doc("super") >> cmd::inc(k) ||
+              //cmd::MultiOption<>()["bp"].doc("toll") >> h
               
-              cmdline::Option<cmdline::NoChar, cmdline::Mandatory>()_ERASE(["gaga"].doc("Hallo welt")) >> h 
-              <= cmdline::Switch<'y'>() >> gFlag 
-              <= cmdline::Switch<>()["gagaga"].doc("super") >> gFlag 
-              <= cmdline::Option<'x'>()_ERASE(["haha"].doc("Super Ding fuer int")) >> k                // integer
-              <= cmdline::Option<'v'>()_ERASE(["hehe"].doc("Super Ding fuer ptr")) >> &ptr             // const char ptrs
-              <= cmdline::Option<'w'>()_ERASE(["hihi"].doc("Super Ding fuer char arrays")) >> what     // char arrays
-              <= cmdline::Option<'u'>()_ERASE(["huhu"].doc("Super Ding fuer std::string")) >> strng    // std::strings
-              <= cmdline::ExtraOption<cmdline::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> simppl::bind(&A::store1, &a, _1) 
+              cmd::Option<cmd::NoChar, cmd::Mandatory>()_ERASE(["gaga"].doc("Hallo welt")) >> h 
+              <= cmd::Switch<'y'>() >> gFlag 
+              <= cmd::Switch<>()["gagaga"].doc("super") >> gFlag 
+              <= cmd::Option<'x'>()_ERASE(["haha"].doc("Super Ding fuer int")) >> k                // integer
+              <= cmd::Option<'v'>()_ERASE(["hehe"].doc("Super Ding fuer ptr")) >> &ptr             // const char ptrs
+              <= cmd::Option<'w'>()_ERASE(["hihi"].doc("Super Ding fuer char arrays")) >> what     // char arrays
+              <= cmd::Option<'u'>()_ERASE(["huhu"].doc("Super Ding fuer std::string")) >> strng    // std::strings
+              <= cmd::ExtraOption<cmd::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> simppl::bind(&A::store1, &a, _1) 
               //ExtraOption<Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> bind(&std::vector<std::string>::push_back, &vec, _1) 
-              <= cmdline::MultiExtraOption<cmdline::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> vec 
-              //cmdline::ExtraOption<Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> what 
-              //cmdline::ExtraOption<>()_ERASE(.doc("tolles Argument, ehrlich, wirklich")) >> bind(&A::store2, &a, _1)
+              <= cmd::MultiExtraOption<cmd::Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> vec 
+              //cmd::ExtraOption<Mandatory>()_ERASE(.doc("tolles Argument, echt super")) >> what 
+              //cmd::ExtraOption<>()_ERASE(.doc("tolles Argument, ehrlich, wirklich")) >> bind(&A::store2, &a, _1)
               <= globalExtensionPoint
               
              );

@@ -4,7 +4,10 @@
 #include "intrusive_list.h"
 
 
-namespace ini
+namespace simppl
+{
+
+namespace inifile
 {
 
 namespace detail
@@ -167,7 +170,9 @@ struct SectionatedIniFile<ExtensionPoint, IncludedSectionT>
 
 }   // end namespace detail
 
-}   // end namespace ini
+}   // end namespace inifile
+
+}   // end namespace simppl
 
 
 #endif   // SIMPPL_INIFILE_EXTENSIONPOINT_H

@@ -6,6 +6,9 @@
 #include "simppl/intrusive_list.h"
 
 
+namespace simppl
+{
+
 namespace cmdline
 {
 
@@ -216,7 +219,9 @@ public:
    mutable holder_type holder_;   // move semantics
 };
 
-}   // end namespace cmdline
+}   // namespace cmdline
+
+}   // namespace simppl 
 
 
 // ---------------------------------------------------------------------------------------------------
@@ -224,18 +229,18 @@ public:
 
 template<typename T1, typename T2>
 inline
-cmdline::detail::ArgumentComposite<cmdline::detail::ArgumentComposite<T1, T2>, cmdline::ExtensionPoint> 
-operator<= (cmdline::detail::ArgumentComposite<T1, T2> h1, cmdline::ExtensionPoint h2)
+simppl::cmdline::detail::ArgumentComposite<simppl::cmdline::detail::ArgumentComposite<T1, T2>, simppl::cmdline::ExtensionPoint> 
+operator<= (simppl::cmdline::detail::ArgumentComposite<T1, T2> h1, simppl::cmdline::ExtensionPoint h2)
 {
-   return cmdline::detail::ArgumentComposite<cmdline::detail::ArgumentComposite<T1, T2>, cmdline::ExtensionPoint>(h1, h2);
+   return simppl::cmdline::detail::ArgumentComposite<simppl::cmdline::detail::ArgumentComposite<T1, T2>, simppl::cmdline::ExtensionPoint>(h1, h2);
 };
 
 
 inline
-cmdline::detail::ArgumentComposite<cmdline::ExtensionPoint, cmdline::ExtensionPoint> 
-operator<= (cmdline::ExtensionPoint h1, cmdline::ExtensionPoint h2)
+simppl::cmdline::detail::ArgumentComposite<simppl::cmdline::ExtensionPoint, simppl::cmdline::ExtensionPoint> 
+operator<= (simppl::cmdline::ExtensionPoint h1, simppl::cmdline::ExtensionPoint h2)
 {
-   return cmdline::detail::ArgumentComposite<cmdline::ExtensionPoint, cmdline::ExtensionPoint>(h1, h2);
+   return simppl::cmdline::detail::ArgumentComposite<simppl::cmdline::ExtensionPoint, simppl::cmdline::ExtensionPoint>(h1, h2);
 };
 
 
