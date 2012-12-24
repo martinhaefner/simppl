@@ -6,6 +6,12 @@
 #include "simppl/stub.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 struct BrokerClient 
 {
    typedef std::multimap<std::string, std::function<void(std::string, std::string)> > waitersmap_type;
@@ -139,6 +145,10 @@ private:
 
    BrokerStub stub_;
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_BROKERCLIENT_H

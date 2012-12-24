@@ -6,6 +6,12 @@
 #include <map>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
 
@@ -56,6 +62,10 @@ struct SignalSender
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_SIGNALRECIPIENT_H

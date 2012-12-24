@@ -9,6 +9,12 @@
 #include "simppl/detail/parented.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 // forward decls
 struct Dispatcher;
 struct ClientResponseBase;
@@ -95,6 +101,10 @@ protected:
    int fd_;                 ///< connected socket
    uint32_t current_sessionid_;
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_STUBBASE_H

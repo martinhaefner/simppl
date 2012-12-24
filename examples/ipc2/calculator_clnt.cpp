@@ -12,6 +12,8 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 struct CalculatorClient;
 static CalculatorClient* calc = 0;
@@ -19,10 +21,10 @@ static CalculatorClient* calc = 0;
 static const char* rolename = "calculator";
    
 
-struct CalculatorClient : Stub<Calculator>
+struct CalculatorClient : spl::Stub<Calculator>
 {
    CalculatorClient(const char* location)
-    : Stub<Calculator>(rolename, location)
+    : spl::Stub<Calculator>(rolename, location)
    {
       connected >> std::bind(&CalculatorClient::handleConnected, this);
    }
@@ -39,7 +41,7 @@ struct CalculatorClient : Stub<Calculator>
 };
 
 
-void ClientsFactory(Dispatcher* disp, const std::string& fullName, const std::string& location)
+void ClientsFactory(spl::Dispatcher* disp, const std::string& fullName, const std::string& location)
 {
    if (fullName == disp->fullQualifiedName("Calculator", rolename))
    {
@@ -53,9 +55,9 @@ void ClientsFactory(Dispatcher* disp, const std::string& fullName, const std::st
 
 void* threadRunner(void* arg)
 {
-   Dispatcher disp;
+   spl::Dispatcher disp;
 
-   BrokerClient broker(disp);
+   spl::BrokerClient broker(disp);
    broker.waitForService(disp.fullQualifiedName("Calculator", rolename), std::bind(ClientsFactory, &disp, _1, _2));
    
    disp.run();

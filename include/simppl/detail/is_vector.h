@@ -5,6 +5,12 @@
 #include <vector>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
    
@@ -22,6 +28,10 @@ struct is_vector<std::vector<T> >
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_IS_VECTOR_H

@@ -8,10 +8,12 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 
+namespace spl = simppl::ipc;
+
 
 struct Complex
 {
-   typedef make_serializer<double, double>::type serializer_type;
+   typedef spl::make_serializer<double, double>::type serializer_type;
    
    // you always need the default constructor
    inline
@@ -81,10 +83,10 @@ INTERFACE(Interface)
 };
 
 
-struct InterfaceClient : Stub<Interface>
+struct InterfaceClient : spl::Stub<Interface>
 {
    InterfaceClient(const char* role)
-    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       resultOfAdd >> std::bind(&InterfaceClient::handleResultAdd, this, _1, _2);
       resultOfSub >> std::bind(&InterfaceClient::handleResultSub, this, _1, _2);
@@ -104,13 +106,13 @@ struct InterfaceClient : Stub<Interface>
       add(42);
    }
    
-   void handleResultAdd(const CallState& state, int response)
+   void handleResultAdd(const spl::CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       sub(21);
    }
    
-   void handleResultSub(const CallState& state, int response)
+   void handleResultSub(const spl::CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       display("Hello World!");
@@ -123,10 +125,10 @@ struct InterfaceClient : Stub<Interface>
 };
 
 
-struct InterfaceClient2 : Stub<Interface>
+struct InterfaceClient2 : spl::Stub<Interface>
 {
    InterfaceClient2(const char* role)
-    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       connected >> std::bind(&InterfaceClient2::handleConnected, this);
    }
@@ -144,10 +146,10 @@ struct InterfaceClient2 : Stub<Interface>
 };
 
 
-struct InterfaceClient3 : Stub<Interface>
+struct InterfaceClient3 : spl::Stub<Interface>
 {
    InterfaceClient3(const char* role)
-    : Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       connected >> std::bind(&InterfaceClient3::handleConnected, this);
    }
@@ -165,10 +167,10 @@ struct InterfaceClient3 : Stub<Interface>
 };
 
 
-struct InterfaceServer : Skeleton<Interface>
+struct InterfaceServer : spl::Skeleton<Interface>
 {
    InterfaceServer(const char* role)
-    : Skeleton<Interface>(role)
+    : spl::Skeleton<Interface>(role)
     , result_(0)
    {      
       add >> std::bind(&InterfaceServer::handleAdd, this, _1);
@@ -191,7 +193,7 @@ struct InterfaceServer : Skeleton<Interface>
       result_ -= i;
       std::cout << "subtracting " << i << ", result=" << result_ << std::endl;      
       
-      ServerRequestDescriptor rq = deferResponse();
+      spl::ServerRequestDescriptor rq = deferResponse();
       respondOn(rq, resultOfSub(result_));   // rq will be invalidated here-in
       
       sig1.emit(result_);
@@ -220,7 +222,7 @@ struct InterfaceServer : Skeleton<Interface>
 
 void* server(void* dispatcher)
 {
-   Dispatcher& d = *(Dispatcher*)dispatcher;
+   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
    
    InterfaceServer s1("myrole1");
    d.addServer(s1);
@@ -235,7 +237,7 @@ void* server(void* dispatcher)
 
 struct CheckMeToo
 {
-   typedef make_serializer<int, std::map<std::string, std::string> >::type serializer_type;
+   typedef spl::make_serializer<int, std::map<std::string, std::string> >::type serializer_type;
    
    int i;
    std::map<std::string, std::string> s;
@@ -244,7 +246,7 @@ struct CheckMeToo
 
 struct CheckMe
 {
-   typedef make_serializer<int, double, CheckMeToo>::type serializer_type;
+   typedef spl::make_serializer<int, double, CheckMeToo>::type serializer_type;
    
    int i;
    double d;
@@ -255,14 +257,14 @@ struct CheckMe
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("tcp:127.0.0.1:9978");
+   spl::Dispatcher server_dispatcher("tcp:127.0.0.1:9978");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
-   Dispatcher d;
+   spl::Dispatcher d;
    
    InterfaceClient c1("myrole1");
    d.addClient(c1);
@@ -283,6 +285,6 @@ int main()
    server_dispatcher.stop();
    pthread_join(tid, 0);
    
-   static_assert(detail::isValidType<CheckMe>::value, "ooops");
+   static_assert(spl::detail::isValidType<CheckMe>::value, "ooops");
    return 0;
 }

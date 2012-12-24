@@ -2,10 +2,13 @@
 #define CALLTRAITS_H
 
 
-#include "if.h"
+#include "simppl/if.h"
 
 #include <type_traits>
 
+
+namespace simppl
+{
 
 // FIXME references of T should stay references here!!!
 // FIXME pointers constness is still a question?!
@@ -31,6 +34,8 @@ struct CallTraits
    typedef typename if_<std::is_pointer<T>::value, typename std::remove_pointer<typename std::remove_reference<T>::type>::type const*, 
       typename if_<std::is_reference<T>::value, const_value_type, const_reference_type>::type>::type const_return_type;
 };
+
+}   // namespace simppl
 
 
 #endif   // CALLTRAITS_H

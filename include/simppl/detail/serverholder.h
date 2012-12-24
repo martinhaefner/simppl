@@ -5,6 +5,12 @@
 #include "simppl/detail/serversignalbase.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
 
@@ -65,6 +71,10 @@ struct ServerHolder : ServerHolderBase
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_SERVERHOLDER_H

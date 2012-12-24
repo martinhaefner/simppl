@@ -1,6 +1,12 @@
 #include "simppl/detail/serversignalbase.h"
 
 
+namespace simppl
+{
+
+namespace ipc
+{
+
 namespace detail
 {
    
@@ -51,3 +57,7 @@ ServerSignalBase::~ServerSignalBase()
 }
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl

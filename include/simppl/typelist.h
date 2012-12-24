@@ -8,6 +8,9 @@
 #include "simppl/if.h"
 
 
+namespace simppl
+{
+
 struct NilType {};
 
 template<typename HeadT, typename TailT> 
@@ -291,6 +294,8 @@ struct make_typelist<T>
 {
    typedef TypeList<T, NilType> type;
 };
+
+}   // namespace simppl
 
 
 #endif // SIMPPL_TYPELIST_H

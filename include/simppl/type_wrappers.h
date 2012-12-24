@@ -2,6 +2,9 @@
 #define SIMPPL_TYPE_WRAPPERS_H
 
 
+namespace simppl
+{
+   
 /**
  * integral constant wrapper
  */
@@ -32,6 +35,8 @@ struct bool_
 
 typedef bool_<true> tTrueType;
 typedef bool_<false> tFalseType;
+
+}   // namespace simppl
 
 
 #endif  // SIMPPL_TYPE_WRAPPERS_H

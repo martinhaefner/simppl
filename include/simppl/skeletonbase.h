@@ -1,13 +1,18 @@
 #ifndef SIMPPL_SKELETONBASE_H
 #define SIMPPL_SKELETONBASE_H
 
-
 #include <tuple>
 
 #include "simppl/exception.h"
 #include "simppl/serverside.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 // forward decl
 struct Dispatcher;
 
@@ -58,6 +63,9 @@ protected:
    ServerRequestDescriptor current_request_;
 };
 
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_SKELETONBASE_H

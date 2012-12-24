@@ -7,6 +7,12 @@
 #include "simppl/exception.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 struct CallState
 {
    explicit inline
@@ -67,6 +73,10 @@ private:
    std::unique_ptr<IPCException> ex_;
    uint32_t sequence_nr_;
 };
+
+}   // namespace ipc
+   
+}   // namespace simppl
 
 
 #endif   // SIMPPL_CALLSTATE_H

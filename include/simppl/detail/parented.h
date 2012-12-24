@@ -9,13 +9,22 @@ struct StubBase;
 struct Dispatcher;
    
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
+struct StubBase;
+struct Dispatcher;
+
 namespace detail
 {
 
 struct Parented
 {
-   friend struct ::StubBase;
-   friend struct ::Dispatcher;
+   friend struct simppl::ipc::StubBase;
+   friend struct simppl::ipc::Dispatcher;
    
 protected:
  
@@ -51,6 +60,10 @@ protected:
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_PARENTED_H

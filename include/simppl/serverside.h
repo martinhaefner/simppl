@@ -13,10 +13,27 @@
 #include "simppl/detail/serversignalbase.h"
 #include "simppl/detail/validation.h"
 
+#if !(defined(SIMPPL_SKELETONBASE_H) || defined(SIMPPL_DISPATCHER_CPP))
+#   error "Don't include this file manually. Include 'skeleton.h' instead".
+#endif
 
+
+namespace simppl
+{
+   
+namespace ipc
+{
+
+// forward decl
+namespace detail
+{
+   struct ServerRequestBaseSetter;
+}
+   
+   
 struct ServerRequestBase
 {
-   friend struct ServerRequestBaseSetter;
+   friend struct detail::ServerRequestBaseSetter;
    
    virtual void eval(const void* payload, size_t length) = 0;
 
@@ -145,14 +162,6 @@ struct ServerRequest : ServerRequestBase
 };
 
 
-template<typename FunctorT, typename... T>
-inline 
-void operator>> (ServerRequest<T...>& r, const FunctorT& f)
-{
-   r.handledBy(f);
-}
-
-
 // ---------------------------------------------------------------------------------------------
 
 
@@ -265,25 +274,6 @@ struct ServerVectorAttributeUpdate
    uint32_t where_;
    uint32_t len_;
 };
-
-
-template<typename VectorT>
-detail::Serializer& operator<<(detail::Serializer& ostream, const ServerVectorAttributeUpdate<VectorT>& updt)
-{
-   ostream << (uint32_t)updt.how_;
-   ostream << updt.where_;
-   ostream << updt.len_;
-   
-   if (updt.how_ != Remove)
-   {
-      for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
-      {
-         ostream << updt.data_[i];
-      }
-   }
-   
-   return ostream;
-}
 
 
 namespace detail
@@ -589,6 +579,37 @@ struct ServerAttribute
       emitWithId(registrationid, this->t_);
    }
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
+
+
+template<typename FunctorT, typename... T>
+inline 
+void operator>>(simppl::ipc::ServerRequest<T...>& r, const FunctorT& f)
+{
+   r.handledBy(f);
+}
+
+
+template<typename VectorT>
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& ostream, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>& updt)
+{
+   ostream << (uint32_t)updt.how_;
+   ostream << updt.where_;
+   ostream << updt.len_;
+   
+   if (updt.how_ != simppl::ipc::Remove)
+   {
+      for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
+      {
+         ostream << updt.data_[i];
+      }
+   }
+   
+   return ostream;
+}
 
 
 #endif   // SIMPPL_SERVERSIDE_H

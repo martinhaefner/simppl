@@ -6,7 +6,13 @@
 #include <sys/types.h>
 
 
-// forward decls
+namespace simppl
+{
+   
+namespace ipc
+{
+
+// forward decl
 struct ServerResponseBase;
 
 
@@ -34,6 +40,10 @@ struct ServerResponseHolder
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_SERVERRESPONSEHOLDER_H

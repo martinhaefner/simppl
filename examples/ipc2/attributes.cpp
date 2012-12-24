@@ -6,10 +6,12 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 struct MyStruct
 {
-   typedef make_serializer<int, std::string>::type serializer_type;
+   typedef spl::make_serializer<int, std::string>::type serializer_type;
    
    inline
    MyStruct()
@@ -45,7 +47,7 @@ INTERFACE(Interface)
    Attribute<int> myInt;
    Attribute<MyStruct> myStruct;
    Attribute<std::vector<int> > myVector;
-   Attribute<int, Committed> comInt;
+   Attribute<int, spl::Committed> comInt;
    
    inline
    Interface()
@@ -61,10 +63,10 @@ INTERFACE(Interface)
 };
 
 
-struct Server : Skeleton<Interface>
+struct Server : spl::Skeleton<Interface>
 {
    Server(const char* role)
-    : Skeleton<Interface>(role)
+    : spl::Skeleton<Interface>(role)
    {      
       myStruct = MyStruct(0, "No answer yet.");
       comInt = 41;
@@ -92,7 +94,7 @@ struct Server : Skeleton<Interface>
 };
 
 
-struct Client : Stub<Interface>
+struct Client : spl::Stub<Interface>
 {
    Client(const char* role)
     : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
@@ -114,7 +116,7 @@ struct Client : Stub<Interface>
       doSomething(42);
    }
    
-   void handleResultDoSomething(const CallState& state, int response)
+   void handleResultDoSomething(const spl::CallState& state, int response)
    {
       std::cout << "Response is " << response << std::endl;
       std::cout << "Attribute myStruct is now [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;
@@ -133,7 +135,7 @@ struct Client : Stub<Interface>
       std::cout << "Attribute was committed: value=" << i << std::endl;
    }
 
-   void vectorChanged(const std::vector<int>& iv, How how, uint32_t where, uint32_t len)
+   void vectorChanged(const std::vector<int>& iv, spl::How how, uint32_t where, uint32_t len)
    {
       std::cout << "Yes, vector changed(" << how << "," << where << "," << len << "): ";
 
@@ -151,7 +153,7 @@ struct Client : Stub<Interface>
 
 void* server(void* dispatcher)
 {
-   Dispatcher& d = *(Dispatcher*)dispatcher;
+   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
    
    Server s1("myrole");
    d.addServer(s1);
@@ -164,14 +166,14 @@ void* server(void* dispatcher)
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("unix:myserver");
+   spl::Dispatcher server_dispatcher("unix:myserver");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
-   Dispatcher d;
+   spl::Dispatcher d;
    
    Client c("myrole");
    d.addClient(c);

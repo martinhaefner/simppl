@@ -20,6 +20,12 @@
 #endif
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 // forward decls
 struct BrokerClient;
 struct StubBase;
@@ -302,6 +308,11 @@ void Dispatcher::addServer(ServerT& serv)
    
    serv.disp_ = this;
 }
+
+
+}   // namespace ipc
+   
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DISPATCHER_H

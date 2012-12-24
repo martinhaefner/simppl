@@ -5,6 +5,12 @@
 #include "simppl/skeletonbase.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
    template<typename> struct ServerHolder;
@@ -41,6 +47,10 @@ protected:
    Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_SKELETON_H

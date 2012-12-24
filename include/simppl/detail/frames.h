@@ -8,6 +8,12 @@
 #include <cstring>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
 
@@ -290,6 +296,10 @@ size_t headersize[] {
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_FRAMES_H

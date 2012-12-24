@@ -2,8 +2,6 @@
 #define SIMPPL_CALCULATOR_H
 
 
-//#include "simppl/stub.h"
-//#include "simppl/skeleton.h"
 #include "simppl/interface.h"
 
 
@@ -15,7 +13,7 @@ INTERFACE(Calculator)
    Request<double> add;
    Request<double> sub;
    
-   Attribute<double, Always> value;
+   Attribute<double, simppl::ipc::Always> value;
 
    inline
    Calculator()

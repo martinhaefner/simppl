@@ -6,11 +6,13 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
 
-struct CalculatorImpl : Skeleton<Calculator>
+
+struct CalculatorImpl : spl::Skeleton<Calculator>
 {
    CalculatorImpl(const char* role)
-    : Skeleton<Calculator>(role)
+    : spl::Skeleton<Calculator>(role)
    {
       clear >> std::bind(&CalculatorImpl::handleClear, this);
       add >> std::bind(&CalculatorImpl::handleAdd, this, _1);
@@ -42,7 +44,7 @@ int main(int argc, char** argv)
    if (argc > 1)
       role = argv[1];
    
-   Dispatcher disp("unix:calculator");
+   spl::Dispatcher disp("unix:calculator");
    disp.enableBrokerage();
 
    CalculatorImpl calc(role);

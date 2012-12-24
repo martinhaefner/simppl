@@ -5,6 +5,9 @@
 #include "simppl/typelist.h"
 
 
+namespace simppl
+{
+
 // template forward declaration
 template<typename T>
 struct FunctionTraits;
@@ -301,6 +304,8 @@ struct FunctionTraits<ReturnT(ObjT::*)(T1, T2, T3, T4, T5, T6) const>
    typedef T5 arg5_type;
    typedef T6 arg6_type;
 };
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_FUNCTION_TRAITS_H

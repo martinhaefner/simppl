@@ -6,6 +6,8 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 INTERFACE(Interface)
 {   
@@ -28,10 +30,10 @@ INTERFACE(Interface)
 };
 
 
-struct Server : Skeleton<Interface>
+struct Server : spl::Skeleton<Interface>
 {
    Server(const char* role)
-    : Skeleton<Interface>(role)
+    : spl::Skeleton<Interface>(role)
    {      
       doSomething >> std::bind(&Server::handleDoSomething, this, _1);
    }
@@ -43,7 +45,7 @@ struct Server : Skeleton<Interface>
       //throw RuntimeError(-i, "Shit also happens");   // also possible here
       if (i == 42)
       {
-         respondWith(RuntimeError(-i, "Shit happens"));
+         respondWith(spl::RuntimeError(-i, "Shit happens"));
       }
       else
          respondWith(resultOfDoSomething(i));
@@ -51,10 +53,10 @@ struct Server : Skeleton<Interface>
 };
 
 
-struct Client : Stub<Interface>
+struct Client : spl::Stub<Interface>
 {
    Client(const char* role)
-    : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
+    : spl::Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
       connected >> std::bind(&Client::handleConnected, this);
       
@@ -70,7 +72,7 @@ struct Client : Stub<Interface>
       doSomething(42);
    }
    
-   void handleResultDoSomething(const CallState& state, int response)
+   void handleResultDoSomething(const spl::CallState& state, int response)
    {
       if (state)
       {
@@ -89,7 +91,7 @@ struct Client : Stub<Interface>
 
 void* server(void* dispatcher)
 {
-   Dispatcher& d = *(Dispatcher*)dispatcher;
+   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
    
    Server s1("myrole");
    d.addServer(s1);
@@ -102,14 +104,14 @@ void* server(void* dispatcher)
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("unix:myserver");
+   spl::Dispatcher server_dispatcher("unix:myserver");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
-   Dispatcher d;
+   spl::Dispatcher d;
    
    Client c("myrole");
    d.addClient(c);

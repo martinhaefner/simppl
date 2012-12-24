@@ -9,6 +9,12 @@
 struct ClientResponseBase;
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 namespace detail
 {
 
@@ -27,6 +33,10 @@ struct ClientResponseHolder
 };
 
 } // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_CLIENTRESPONSEHOLDER_H

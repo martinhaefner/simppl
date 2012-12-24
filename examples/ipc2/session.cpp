@@ -5,6 +5,8 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 struct SessionSpec
 {
@@ -36,10 +38,10 @@ INTERFACE(BankAccount)
 };
 
 
-struct Server : Skeleton<BankAccount>
+struct Server : spl::Skeleton<BankAccount>
 {
    Server(const char* role)
-    : Skeleton<BankAccount>(role)
+    : spl::Skeleton<BankAccount>(role)
    {  
       login >> std::bind(&Server::handleLogin, this, _1, _2);
       getDeposit >> std::bind(&Server::handleGetDeposit, this);
@@ -81,15 +83,15 @@ struct Server : Skeleton<BankAccount>
          respondWith(resultOfGetDeposit(session->returnvalue_));
       }
       else
-         respondWith(RuntimeError(-1, "login invalid"));
+         respondWith(spl::RuntimeError(-1, "login invalid"));
    }
 };
 
 
-struct Client : Stub<BankAccount>
+struct Client : spl::Stub<BankAccount>
 {
    Client(const char* user, const char* role)
-    : Stub<BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
+    : spl::Stub<BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
     , user_(user)
    {
       connected >> std::bind(&Client::handleConnected, this);
@@ -102,7 +104,7 @@ struct Client : Stub<BankAccount>
       getDeposit();
    }
    
-   void handleGetDeposit(const CallState& state, int value)
+   void handleGetDeposit(const spl::CallState& state, int value)
    {
       if (state)
       {
@@ -118,7 +120,7 @@ struct Client : Stub<BankAccount>
 
 void* server(void* dispatcher)
 {
-   Dispatcher& d = *(Dispatcher*)dispatcher;
+   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
    
    Server s1("myrole");
    d.addServer(s1);
@@ -131,14 +133,14 @@ void* server(void* dispatcher)
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("unix:myserver");
+   spl::Dispatcher server_dispatcher("unix:myserver");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
-   Dispatcher d;
+   spl::Dispatcher d;
    
    Client c1("hinz", "myrole");
    d.addClient(c1);

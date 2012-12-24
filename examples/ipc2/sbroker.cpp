@@ -5,6 +5,8 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 struct ServiceHandle
 {
@@ -29,7 +31,7 @@ struct ServiceHandle
 struct PushBackService
 {
    inline
-   PushBackService(std::vector<ServiceInfo>& v)
+   PushBackService(std::vector<spl::ServiceInfo>& v)
     : v_(v)
    {
       // NOOP
@@ -38,10 +40,10 @@ struct PushBackService
    inline
    void operator()(const std::pair<std::string, ServiceHandle>& entry) const
    {
-      v_.push_back(ServiceInfo(entry.first, entry.second.location_));
+      v_.push_back(spl::ServiceInfo(entry.first, entry.second.location_));
    }
    
-   std::vector<ServiceInfo>& v_;
+   std::vector<spl::ServiceInfo>& v_;
 };
 
 
@@ -65,14 +67,14 @@ struct PushBackWaiter
 };
 
 
-struct BrokerImpl : Skeleton<Broker>
+struct BrokerImpl : spl::Skeleton<Broker>
 {
    typedef std::map<std::string, ServiceHandle> servicemap_type;
-   typedef std::multimap<std::string, ServerRequestDescriptor> waitersmap_type;
+   typedef std::multimap<std::string, spl::ServerRequestDescriptor> waitersmap_type;
    
    inline
    BrokerImpl()
-    : Skeleton<Broker>("broker")
+    : spl::Skeleton<Broker>("broker")
    {
       waitForService >> std::bind(&BrokerImpl::handleWaitForService, this, _1);
       registerService >> std::bind(&BrokerImpl::handleRegisterService, this, _1, _2);
@@ -82,7 +84,7 @@ struct BrokerImpl : Skeleton<Broker>
    
    void handleListServices()
    {
-      std::vector<ServiceInfo> rc;
+      std::vector<spl::ServiceInfo> rc;
       std::for_each(services_.begin(), services_.end(), PushBackService(rc));
       
       respondWith(serviceList(rc));
@@ -122,7 +124,7 @@ struct BrokerImpl : Skeleton<Broker>
          respondWith(serviceReady(serv, iter->second.location_));
       }
       else
-         waiters_.insert(std::pair<std::string, ServerRequestDescriptor>(serv, deferResponse()));
+         waiters_.insert(make_pair(serv, deferResponse()));
    }
    
    void removeAllFrom(int fd)
@@ -157,10 +159,10 @@ private:
 };
 
 
-struct BrokerDispatcher : Dispatcher
+struct BrokerDispatcher : spl::Dispatcher
 {
    BrokerDispatcher(BrokerImpl& impl)
-    : Dispatcher("unix:the_broker")
+    : spl::Dispatcher("unix:the_broker")
     , impl_(impl)
    {
       addServer(impl);

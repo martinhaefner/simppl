@@ -11,6 +11,12 @@
 #include "simppl/detail/constants.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 // forward decl
 template<typename> struct InterfaceNamer;
 
@@ -50,6 +56,10 @@ public:
       return rc;
    }
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 // ---------------------------------------------------------------------------------

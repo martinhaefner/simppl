@@ -8,8 +8,15 @@
 
 #include "simppl/detail/parented.h"
 #include "simppl/detail/serversignalbase.h"
+#include "simppl/detail/serverrequestbasesetter.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 // forward decls
 template<typename...> struct ClientRequest;
 template<typename...> struct ClientResponse;
@@ -79,63 +86,60 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
    std::map<uint32_t, detail::ServerSignalBase*> signals_;
 };
 
+}   // namespace ipc
 
+}   // namespace simppl
+
+
+/// make sure to NOT put this macro into a namespace
 #define INTERFACE(iface) \
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \
-            template<typename,typename=OnChange> class Attribute> \
+            template<typename,typename=simppl::ipc::OnChange> class Attribute> \
       struct iface; \
             \
-   template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
-   template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
+   namespace simppl { namespace ipc { \
+      template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
+      template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
+   } } \
+   \
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \
-            template<typename,typename=OnChange> class Attribute> \
-      struct iface : InterfaceBase<Request>
+            template<typename,typename=simppl::ipc::OnChange> class Attribute> \
+      struct iface : simppl::ipc::InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
-   request(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->container_)
+   request(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->container_)
 
 #define INIT_RESPONSE(response) \
    response()
 
 #define INIT_SIGNAL(signal) \
-   signal(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->signals_)
+   signal(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
 
 // an attribute is nothing more that an encapsulated signal
 #define INIT_ATTRIBUTE(attr) \
-   attr(((AbsoluteInterfaceBase*)this)->nextId(), ((InterfaceBase<Request>*)this)->signals_)
+   attr(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
 
 
 template<typename... T, typename... T2>
 inline
-void operator>> (ClientRequest<T...>& request, ClientResponse<T2...>& response)
+void operator>> (simppl::ipc::ClientRequest<T...>& request, simppl::ipc::ClientResponse<T2...>& response)
 {
    assert(!request.handler_);
    request.handler_ = &response;
 }
 
 
-struct ServerRequestBaseSetter
-{
-   template<typename T>
-   static inline
-   void setHasResponse(T& t)
-   {
-      t.hasResponse_ = true;
-   }
-};
-
-
 template<typename... T, typename... T2>
 inline
-void operator>> (ServerRequest<T...>& request, ServerResponse<T2...>& response)
+void operator>> (simppl::ipc::ServerRequest<T...>& request, simppl::ipc::ServerResponse<T2...>& response)
 {
    assert(!request.hasResponse());
    
-   ServerRequestBaseSetter::setHasResponse(request);
+   simppl::ipc::detail::ServerRequestBaseSetter::setHasResponse(request);
    response.allowedRequests_.insert(&request);   
 }
 

@@ -11,6 +11,8 @@
 
 using namespace std::placeholders;
 
+namespace spl = simppl::ipc;
+
 
 static const char* rolename = "calculator";
    
@@ -18,10 +20,10 @@ struct CalculatorClient;
 static CalculatorClient* calc = 0;
 
 
-struct CalculatorClient : Stub<Calculator>
+struct CalculatorClient : spl::Stub<Calculator>
 {
    CalculatorClient()
-    : Stub<Calculator>(rolename, "auto:")
+    : spl::Stub<Calculator>(rolename, "auto:")
    {
       connected >> std::bind(&CalculatorClient::handleConnected, this);
    }
@@ -41,7 +43,7 @@ struct CalculatorClient : Stub<Calculator>
 
 void* threadRunner(void* arg)
 {
-   Dispatcher disp;
+   spl::Dispatcher disp;
    disp.enableBrokerage();
    
    CalculatorClient clnt;

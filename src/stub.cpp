@@ -8,6 +8,12 @@
 #include <cstring>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 StubBase::StubBase(const char* iface, const char* role, const char* boundname)
  : iface_(iface) 
  , role_(role)
@@ -108,3 +114,8 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
       genericSend(fd(), f, 0);
    }
 }
+
+}   // namespace ipc
+
+}   // namespace simppl
+

@@ -1,6 +1,12 @@
 #include "simppl/detail/serialization.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 detail::Serializer::Serializer(size_t initial)
  : capacity_(initial)
  , buf_(capacity_ > 0 ? (char*)malloc(capacity_) : 0)
@@ -110,3 +116,7 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
 
    return *this;
 }
+
+}   // namespace ipc
+
+}   // namespace simppl

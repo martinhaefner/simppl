@@ -3,6 +3,12 @@
 #include "simppl/detail/serialization.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 namespace detail
 {
    
@@ -48,4 +54,7 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
 }
 
 }   // namespace detail
-   
+
+}   // namespace ipc
+
+}   // namespace simppl

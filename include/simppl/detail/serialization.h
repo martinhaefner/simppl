@@ -14,9 +14,14 @@
 #include <tuple>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 // forward decl
 struct CallState;
-
 
 namespace detail
 {
@@ -323,10 +328,14 @@ private:
 
 }   // namespace detail
 
+}   // namespace ipc
+
+}   // namespace simppl
+
 
 #define MAKE_SERIALIZER(type) \
 inline \
-detail::Serializer& operator<<(detail::Serializer& s, type t) \
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, type t) \
 { \
    return s.write(t); \
 }
@@ -349,28 +358,28 @@ MAKE_SERIALIZER(double)
 
 
 inline 
-detail::Serializer& operator<<(detail::Serializer& s, const std::string& str) 
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::string& str) 
 { 
    return s.write(str); 
 }
 
 template<typename T>
 inline 
-detail::Serializer& operator<<(detail::Serializer& s, const std::vector<T>& v) 
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::vector<T>& v) 
 { 
    return s.write(v); 
 }
 
 template<typename KeyT, typename ValueT>
 inline 
-detail::Serializer& operator<<(detail::Serializer& s, const std::map<KeyT, ValueT>& m) 
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::map<KeyT, ValueT>& m) 
 { 
    return s.write(m); 
 }
 
 template<typename StructT>
 inline
-detail::Serializer& operator<<(detail::Serializer& s, const StructT& st)
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const StructT& st)
 {
    const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
    return s.write(tuple);
@@ -378,7 +387,7 @@ detail::Serializer& operator<<(detail::Serializer& s, const StructT& st)
 
 template<typename... T>
 inline
-detail::Serializer& operator<<(detail::Serializer& s, const std::tuple<T...>& t)
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::tuple<T...>& t)
 {
    return s.write(t);
 }
@@ -386,6 +395,12 @@ detail::Serializer& operator<<(detail::Serializer& s, const std::tuple<T...>& t)
 
 // -----------------------------------------------------------------------------
 
+
+namespace simppl
+{
+   
+namespace ipc
+{
 
 namespace detail
 {
@@ -504,10 +519,14 @@ private:
 
 }   // namespace detail
 
+}   // namespace ipc
+
+}   // namespace simppl
+
 
 #define MAKE_DESERIALIZER(type) \
 inline \
-detail::Deserializer& operator>>(detail::Deserializer& s, type& t) \
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, type& t) \
 { \
    return s.read(t); \
 }
@@ -530,28 +549,28 @@ MAKE_DESERIALIZER(double)
 
 
 inline 
-detail::Deserializer& operator>>(detail::Deserializer& s, std::string& str) 
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::string& str) 
 { 
    return s.read(str); 
 }
 
 template<typename T>
 inline 
-detail::Deserializer& operator>>(detail::Deserializer& s, std::vector<T>& v) 
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::vector<T>& v) 
 { 
    return s.read(v); 
 }
 
 template<typename KeyT, typename ValueT>
 inline 
-detail::Deserializer& operator>>(detail::Deserializer& s, std::map<KeyT, ValueT>& m) 
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::map<KeyT, ValueT>& m) 
 { 
    return s.read(m); 
 }
 
 template<typename StructT>
 inline
-detail::Deserializer& operator>>(detail::Deserializer& s, StructT& st)
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, StructT& st)
 {
    typename StructT::serializer_type& tuple = *(typename StructT::serializer_type*)&st;
    return s.read(tuple);
@@ -559,7 +578,7 @@ detail::Deserializer& operator>>(detail::Deserializer& s, StructT& st)
 
 template<typename... T>
 inline
-detail::Deserializer& operator>>(detail::Deserializer& s, std::tuple<T...>& t)
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
 }
@@ -568,6 +587,12 @@ detail::Deserializer& operator>>(detail::Deserializer& s, std::tuple<T...>& t)
 // ------------------------------------------------------------------------
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 namespace detail
 {
 
@@ -643,7 +668,7 @@ struct FunctionCaller<-1, TupleT>
 
 
 template<typename... T>
-struct DeserializeAndCall : NonInstantiable
+struct DeserializeAndCall : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -657,7 +682,7 @@ struct DeserializeAndCall : NonInstantiable
    
    template<typename FunctorT>
    static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const CallState& cs)
+   void evalResponse(Deserializer& d, FunctorT& f, const simppl::ipc::CallState& cs)
    {
       std::tuple<T...> tuple;
       
@@ -669,7 +694,7 @@ struct DeserializeAndCall : NonInstantiable
 };
 
 
-struct DeserializeAndCall0 : NonInstantiable
+struct DeserializeAndCall0 : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
@@ -680,7 +705,7 @@ struct DeserializeAndCall0 : NonInstantiable
    
    template<typename FunctorT>
    static inline
-   void evalResponse(Deserializer& /*d*/, FunctorT& f, const CallState& cs)
+   void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::ipc::CallState& cs)
    {
       f(cs);
    }
@@ -688,12 +713,16 @@ struct DeserializeAndCall0 : NonInstantiable
 
 
 template<typename... T>
-struct GetCaller : NonInstantiable
+struct GetCaller : simppl::NonInstantiable
 {
    typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_SERIALIZATION_H

@@ -6,6 +6,12 @@
 #include "simppl/detail/serialization.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
 
@@ -30,6 +36,10 @@ protected:
 };
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_SERVERSIGNALBASE_H

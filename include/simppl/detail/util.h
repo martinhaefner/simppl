@@ -7,6 +7,12 @@
 #include <cstdio>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
    
@@ -31,6 +37,10 @@ bool genericSend(int fd, const FrameT& f, const void* payload)
 }
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_UTIL_H

@@ -5,9 +5,11 @@
 #include "simppl/stub.h"
 #include "simppl/sbroker.h"
 
+namespace spl = simppl::ipc;
+
 
 inline
-void printServiceInfo(const ServiceInfo& info)
+void printServiceInfo(const spl::ServiceInfo& info)
 {
    std::cout << "   " << info.name_ << " at " << info.location_ << std::endl;
 }
@@ -22,14 +24,14 @@ void printWaiterInfo(const std::string& info)
 
 int main()
 {
-   Dispatcher disp;
+   spl::Dispatcher disp;
 
-   Stub<Broker> broker("broker", "unix:the_broker");
+   spl::Stub<Broker> broker("broker", "unix:the_broker");
    disp.addClient(broker);
    
    if (broker.connect())
    {
-      std::vector<ServiceInfo> services;
+      std::vector<spl::ServiceInfo> services;
       if (disp.waitForResponse(broker.listServices(), services))
       {
          std::cout << "Available services: " << std::endl;

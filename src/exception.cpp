@@ -5,6 +5,12 @@
 #include <cstring>
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 RuntimeError::RuntimeError(int error)
  : IPCException()
  , error_(error)
@@ -78,3 +84,7 @@ const char* TransportError::what() const throw()
    
    return buf_;
 }
+
+}   // namespace ipc
+
+}   // namespace simppl

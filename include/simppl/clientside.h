@@ -16,6 +16,12 @@
 #include "simppl/detail/clientresponseholder.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 // forward decl
 template<typename> struct InterfaceNamer;
 
@@ -119,14 +125,6 @@ struct ClientSignal : ClientSignalBase
 };
 
 
-template<typename... T, typename FuncT>
-inline
-void operator>>(ClientSignal<T...>& sig, const FuncT& func)
-{
-   sig.handledBy(func);
-}
-
-
 // ---------------------------------------------------------------------------------------------
 
 
@@ -147,27 +145,6 @@ struct ClientVectorAttributeUpdate
    uint32_t where_;
    uint32_t len_;
 };
-
-
-template<typename VectorT>
-detail::Deserializer& operator>>(detail::Deserializer& istream, ClientVectorAttributeUpdate<VectorT>& updt)
-{
-   istream >> (uint32_t&)updt.how_;
-   istream >> updt.where_;
-   istream >> updt.len_;
-   
-   if (updt.how_ != Remove)
-   {
-      updt.data_.resize(updt.len_);
-      
-      for(int i=0; i<updt.len_; ++i)
-      {
-         istream >> updt.data_[i];
-      }
-   }
-   
-   return istream;
-}
 
 
 namespace detail
@@ -303,14 +280,6 @@ private:
 };
 
 
-template<typename DataT, typename EmitPolicyT, typename FuncT>
-inline
-void operator>>(ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
-{
-   attr.handledBy(func);
-}
-
-
 // --------------------------------------------------------------------------------
 
 
@@ -377,14 +346,54 @@ struct ClientResponse : ClientResponseBase
    function_type f_;
 };
 
+}   // namespace ipc
+
+}   // namespace simppl
+
+
+template<typename VectorT>
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& istream, simppl::ipc::ClientVectorAttributeUpdate<VectorT>& updt)
+{
+   istream >> (uint32_t&)updt.how_;
+   istream >> updt.where_;
+   istream >> updt.len_;
+   
+   if (updt.how_ != simppl::ipc::Remove)
+   {
+      updt.data_.resize(updt.len_);
+      
+      for(int i=0; i<updt.len_; ++i)
+      {
+         istream >> updt.data_[i];
+      }
+   }
+   
+   return istream;
+}
 
 
 template<typename FunctorT, typename... T>
 inline 
-ClientResponse<T...>& operator>> (ClientResponse<T...>& r, const FunctorT& f)
+simppl::ipc::ClientResponse<T...>& operator>>(simppl::ipc::ClientResponse<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
    return r;
+}
+
+
+template<typename DataT, typename EmitPolicyT, typename FuncT>
+inline
+void operator>>(simppl::ipc::ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
+{
+   attr.handledBy(func);
+}
+
+
+template<typename... T, typename FuncT>
+inline
+void operator>>(simppl::ipc::ClientSignal<T...>& sig, const FuncT& func)
+{
+   sig.handledBy(func);
 }
 
 

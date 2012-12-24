@@ -7,10 +7,12 @@
 
 using std::placeholders::_1;
 
+namespace spl = simppl::ipc;
+
 
 struct Complex
 {
-   typedef make_serializer<double, double>::type serializer_type;
+   typedef spl::make_serializer<double, double>::type serializer_type;
    
    // you always need the default constructor
    inline
@@ -77,10 +79,10 @@ INTERFACE(Interface)
 };
 
 
-struct InterfaceClient : Stub<Interface>
+struct InterfaceClient : spl::Stub<Interface>
 {
    InterfaceClient(const char* role)
-    : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
+    : spl::Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
       // NOOP
    }
@@ -93,10 +95,10 @@ void cleared()
 }
 
 
-struct InterfaceServer : Skeleton<Interface>
+struct InterfaceServer : spl::Skeleton<Interface>
 {
    InterfaceServer(const char* role)
-    : Skeleton<Interface>(role)
+    : spl::Skeleton<Interface>(role)
     , result_(0)
    {      
       add >> std::bind(&InterfaceServer::handleAdd, this, _1);
@@ -122,11 +124,11 @@ struct InterfaceServer : Skeleton<Interface>
       
       if (i < 0)
       {
-         respondWith(RuntimeError(-1, "negative value is invalid"));
+         respondWith(spl::RuntimeError(-1, "negative value is invalid"));
       }
       else
       {
-         ServerRequestDescriptor rq = deferResponse();
+         spl::ServerRequestDescriptor rq = deferResponse();
          respondOn(rq, resultOfSub(result_));   // rq will be invalidated here-in
       
          sig1.emit(result_);
@@ -161,7 +163,7 @@ struct InterfaceServer : Skeleton<Interface>
 
 void* server(void* dispatcher)
 {
-   Dispatcher& d = *(Dispatcher*)dispatcher;
+   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
    
    InterfaceServer s1("myrole1");
    d.addServer(s1);
@@ -174,14 +176,14 @@ void* server(void* dispatcher)
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
-   Dispatcher server_dispatcher("unix:myserver");
+   spl::Dispatcher server_dispatcher("unix:myserver");
    
    pthread_t tid;
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
-   Dispatcher d;
+   spl::Dispatcher d;
    
    InterfaceClient c1("myrole1");
    d.addClient(c1);
@@ -207,7 +209,7 @@ int main()
       {
          d.waitForResponse(c1.sub(-1), result);
       }
-      catch(const RuntimeError& err)
+      catch(const spl::RuntimeError& err)
       {
          std::cout << "Result of sub is invalid: " << err.what() << std::endl;
       }

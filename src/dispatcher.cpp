@@ -10,11 +10,12 @@
 
 #include "simppl/detail/frames.h"
 #include "simppl/detail/util.h"
+
+#define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
+#undef SIMPPL_DISPATCHER_CPP
+
 #include "simppl/brokerclient.h"
-
-
-std::unique_ptr<char> NullUniquePtr;
 
 
 namespace
@@ -58,6 +59,16 @@ const char* fullQualifiedName(char* buf, const char* ifname, const char* rolenam
 
 
 // ---------------------------------------------------------------------------------------
+
+
+namespace simppl
+{
+
+namespace ipc
+{
+
+// global
+std::unique_ptr<char> NullUniquePtr;
 
 
 std::string Dispatcher::fullQualifiedName(const char* ifname, const char* rolename)
@@ -755,3 +766,7 @@ void Dispatcher::clearSlot(int idx)
    fds_[idx].fd = 0;
    fds_[idx].events = 0;
 }
+
+}   // namespace ipc
+
+}   // namespace simppl

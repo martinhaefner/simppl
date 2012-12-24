@@ -5,6 +5,12 @@
 #include "simppl/interface.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+   
 struct ServiceInfo
 {
    typedef make_serializer<std::string, std::string>::type serializer_type;
@@ -28,6 +34,11 @@ struct ServiceInfo
 };
 
 
+}   // namespace ipc
+
+}   // namespace simppl
+
+
 /// servicebroker
 INTERFACE(Broker)
 {   
@@ -35,7 +46,7 @@ INTERFACE(Broker)
    
    /// FIXME must be a vector of locations
    Request<std::string/*servicename*/, std::string/*location*/> registerService;
-   Request<std::vector<ServiceInfo> > registerServices;
+   Request<std::vector<simppl::ipc::ServiceInfo> > registerServices;
    
    Request<std::string/*servicename*/> unregisterService;
    Request<std::vector<std::string/*servicename*/> > unregisterServices;
@@ -44,7 +55,7 @@ INTERFACE(Broker)
    Request<> listWaiters;
    
    Response<std::string/*servicename*/, std::string/*location*/> serviceReady;
-   Response<std::vector<ServiceInfo> > serviceList;
+   Response<std::vector<simppl::ipc::ServiceInfo> > serviceList;
    Response<std::vector<std::string> > waitersList;
    
    inline

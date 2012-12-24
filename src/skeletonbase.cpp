@@ -6,6 +6,12 @@
 #include "simppl/detail/frames.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 SkeletonBase::SkeletonBase(const char* role)
  : role_(role)
  , disp_(0)
@@ -160,3 +166,7 @@ std::tuple<void*,void(*)(void*)> SkeletonBase::clientAttached()
 {
    return std::tuple<void*,void(*)(void*)>(nullptr, nullptr);   // the default does not create any session data
 }
+
+}   // namespace ipc
+
+}   // namespace simppl

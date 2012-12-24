@@ -2,6 +2,12 @@
 #define SIMPPL_DETAIL_VALIDATION_H
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 namespace detail
 {
 
@@ -181,6 +187,10 @@ struct isValidType
 #endif   // SIMPPL_HAVE_VALIDATION
 
 }   // namespace detail
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_DETAIL_VALIDATION_H

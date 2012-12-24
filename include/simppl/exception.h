@@ -8,7 +8,14 @@
 #include "simppl/detail/constants.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 /// Base class for all IPC related exceptions.
+/// FIXME rename to just Exception
 struct IPCException : std::exception
 {
    inline
@@ -97,6 +104,10 @@ struct TransportError : IPCException
    int errno_;
    mutable char buf_[128];
 };
+
+}   // namespace simppl
+   
+}   // namespace ipc
 
 
 #endif   // SIMPPL_EXCEPTION_H

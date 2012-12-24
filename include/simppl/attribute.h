@@ -5,6 +5,12 @@
 #include "simppl/detail/is_vector.h"
 
 
+namespace simppl
+{
+   
+namespace ipc
+{
+
 /// partial update mode for container attributes of type vector
 enum How
 {
@@ -55,6 +61,10 @@ struct Committed
       return false;
    }
 };
+
+}   // namespace ipc
+
+}   // namespace simppl
 
 
 #endif   // SIMPPL_ATTRIBUTE_H
