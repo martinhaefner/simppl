@@ -3,7 +3,7 @@
 
 #include <tuple>
 
-#include "simppl/exception.h"
+#include "simppl/error.h"
 #include "simppl/serverside.h"
 
 

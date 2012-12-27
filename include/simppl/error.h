@@ -1,5 +1,5 @@
-#ifndef SIMPPL_EXCEPTION_H
-#define SIMPPL_EXCEPTION_H
+#ifndef SIMPPL_ERROR_H
+#define SIMPPL_ERROR_H
 
 
 #include <exception>
@@ -15,18 +15,17 @@ namespace ipc
 {
 
 /// Base class for all IPC related exceptions.
-/// FIXME rename to just Exception
-struct IPCException : std::exception
+struct Error : std::exception
 {
    inline
-   IPCException()
+   Error()
     : sequence_nr_(INVALID_SEQUENCE_NR)
    {
       // NOOP
    }
 
    explicit inline
-   IPCException(uint32_t sequence_nr)
+   Error(uint32_t sequence_nr)
     : sequence_nr_(sequence_nr)
    {
       // NOOP
@@ -49,7 +48,7 @@ private:
 
 
 /// blocking calls will throw, eventloop driven approach will call separate handlers
-struct RuntimeError : IPCException
+struct RuntimeError : Error
 {
    explicit
    RuntimeError(int error);
@@ -88,7 +87,7 @@ private:
 };
 
 
-struct TransportError : IPCException
+struct TransportError : Error
 {
    explicit
    TransportError(int errno__, uint32_t sequence_nr);
@@ -110,4 +109,4 @@ struct TransportError : IPCException
 }   // namespace ipc
 
 
-#endif   // SIMPPL_EXCEPTION_H
+#endif   // SIMPPL_ERROR_H

@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "simppl/exception.h"
+#include "simppl/error.h"
 
 
 namespace simppl
@@ -24,7 +24,7 @@ struct CallState
    }
    
    explicit inline
-   CallState(IPCException* ex)
+   CallState(Error* ex)
     : ex_(ex)
     , sequence_nr_(INVALID_SEQUENCE_NR)
    {
@@ -62,7 +62,7 @@ struct CallState
    }
    
    inline
-   const IPCException& exception() const
+   const Error& exception() const
    {
       return *ex_;
    }
@@ -70,7 +70,7 @@ struct CallState
    
 private:
    
-   std::unique_ptr<IPCException> ex_;
+   std::unique_ptr<Error> ex_;
    uint32_t sequence_nr_;
 };
 

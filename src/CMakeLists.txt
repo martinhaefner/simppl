@@ -1,5 +1,5 @@
 add_library(simppl dispatcher.cpp 
-   exception.cpp 
+   error.cpp 
    serverresponseholder.cpp 
    serversignalbase.cpp 
    sessiondata.cpp 

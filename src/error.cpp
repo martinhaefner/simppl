@@ -1,4 +1,4 @@
-#include "simppl/exception.h"
+#include "simppl/error.h"
 
 
 #include <cassert>
@@ -12,7 +12,7 @@ namespace ipc
 {
 
 RuntimeError::RuntimeError(int error)
- : IPCException()
+ : Error()
  , error_(error)
  , message_(nullmsg_)
 {
@@ -21,7 +21,7 @@ RuntimeError::RuntimeError(int error)
 
 
 RuntimeError::RuntimeError(int error, const char* message)
- : IPCException()
+ : Error()
  , error_(error)
  , message_(message ? new char[::strlen(message)+1] : nullmsg_)
 {
@@ -40,7 +40,7 @@ RuntimeError::~RuntimeError() throw()
 
 
 RuntimeError::RuntimeError(const RuntimeError& rhs)
- : IPCException()
+ : Error()
  , error_(rhs.error_)
  , message_(rhs.message_)
 {
@@ -51,7 +51,7 @@ RuntimeError::RuntimeError(const RuntimeError& rhs)
 
 
 RuntimeError::RuntimeError(int error, const char* message, uint32_t sequence_nr)
- : IPCException(sequence_nr)
+ : Error(sequence_nr)
  , error_(error)
  , message_(message ? new char[::strlen(message)+1] : nullmsg_)
 {
@@ -66,7 +66,7 @@ RuntimeError::RuntimeError(int error, const char* message, uint32_t sequence_nr)
    
 
 TransportError::TransportError(int errno__, uint32_t sequence_nr)
- : IPCException(sequence_nr)
+ : Error(sequence_nr)
  , errno_(errno__)
 {
    buf_[0] = '\0';
