@@ -1,42 +1,24 @@
-This library was developed as an education project for learning how to 
-implement more advanced C++ patterns as used e.g. by the boost (and in the meanwhile tr1 and C++11) 
-libary. That's why you can find interfaces directly compatible with boost classes.
-
-
-These are:
-
- * generic functors and binders
- * tribool
- * calltraits
- * typetraits
- * signals and slots
- * tuple
- * if_
- * typelists and appropriate algorithms
-
-
-The more sophisticated library parts built on-top of these intrinsics are:
+The simppl C++ library provides high-level abstraction layers for the following
+coding domains:
 
  * generative commandline parser framework
  * generative inifile parser framework
- * generative service-oriented IPC library introducing a C++ embedded DSL for defining service 
-   interfaces
-
-So you can use all these generative frameworks with C++11 supporting compilers.
+ * generative service-oriented IPC library introducing a C++ embedded DSL for 
+   the definition of service interfaces
 
 
 Compilers:
 
 Well, I only developed on GCC >4.6. Due to the extreme usage of templating techniques and C++11 
-language fragments I will not guarantee that any of the code will work with other compilers 
+language features I cannot guarantee that any of the code fragments will work with other compilers 
 (especially VS compiler).
 
 
 Status:
 
 Most of the source is rapid prototyping. It may work or it may not. Feel free to make a 
-real good project from any of the parts. I plan to make simppl a fully operable IPC library
-and remove all the education stuff someday.
+real good project from any of the parts. I plan to make all parts of simppl fully operable 
+but I can't tell you when this happens.
 
 
 CopyLeft:
