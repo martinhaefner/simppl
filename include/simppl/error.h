@@ -43,10 +43,6 @@ private:
 };
 
 
-// FIXME add a namespace simppl to everything in here
-// FIXME move private stuff to detail namespace
-
-
 /// blocking calls will throw, eventloop driven approach will call separate handlers
 struct RuntimeError : Error
 {

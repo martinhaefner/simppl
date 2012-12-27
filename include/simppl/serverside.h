@@ -62,18 +62,6 @@ protected:
 };
 
 
-// FIXME move to namespace detail
-/*struct ServerRequestBaseSetter
-{
-   template<typename T>
-   static inline
-   void setHasResponse(T& t)
-   {
-      t.hasResponse_ = true;
-   }
-};*/
-
-
 struct ServerResponseBase
 {
    std::set<ServerRequestBase*> allowedRequests_;
