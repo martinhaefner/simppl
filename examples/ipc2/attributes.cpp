@@ -68,6 +68,7 @@ struct Server : spl::Skeleton<Interface>
    Server(const char* role)
     : spl::Skeleton<Interface>(role)
    {      
+      myInt = 99;
       myStruct = MyStruct(0, "No answer yet.");
       comInt = 41;
       
@@ -154,7 +155,7 @@ struct Client : spl::Stub<Interface>
 void* server(void* dispatcher)
 {
    spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
-   
+
    Server s1("myrole");
    d.addServer(s1);
    
@@ -172,7 +173,7 @@ int main()
    pthread_create(&tid, 0, server, &server_dispatcher);
    while(!server_dispatcher.isRunning());   // wait for other thread
    
-   // run client in separate thread (not really necessary, just for blocking interfaces)
+// run client in separate thread (not really necessary, just for blocking interfaces)
    spl::Dispatcher d;
    
    Client c("myrole");

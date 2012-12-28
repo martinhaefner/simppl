@@ -43,8 +43,6 @@ protected:
       return iter != ((interface_type*)this)->container_.end();
    }
    
-   const char* role_;
-   Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
 };
 

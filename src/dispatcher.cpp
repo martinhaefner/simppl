@@ -91,7 +91,7 @@ Dispatcher::~Dispatcher()
    if (broker_)
    {
       delete broker_;
-      broker_ = 0;
+      broker_ = nullptr;
    }
    
    while(::close(selfpipe_[0]) && errno == EINTR);
@@ -243,21 +243,24 @@ void Dispatcher::addClient(StubBase& clnt)
 
 bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr)
 {
-   bool alreadyAttached = false;
-   
-   // FIXME check attached list here...
-   
-   for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
-   {
-      if (iter->second == &s)
-      {
-         alreadyAttached = true;
-         break;
-      }
-   }
+   bool alreadyAttached = std::find_if(sighandlers_.begin(), sighandlers_.end(), 
+         [&s](const sighandlers_type::value_type& v){ return v.second == &s; 
+      }) != sighandlers_.end();
    
    if (!alreadyAttached)
-      outstanding_sig_registrs_[sequence_nr] = &s;
+   {
+      for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
+      {
+         if (iter->second == &s)
+         {
+            alreadyAttached = true;
+            break;
+         }
+      }
+      
+      if (!alreadyAttached)
+         outstanding_sig_registrs_[sequence_nr] = &s;
+   }
    
    return !alreadyAttached;
 }
@@ -632,7 +635,7 @@ Dispatcher::Dispatcher(const char* boundname)
  : running_(false)
  , sequence_(0)
  , nextid_(0)
- , broker_(0)
+ , broker_(nullptr)
 {
    ::memset(fds_, 0, sizeof(fds_));
    ::memset(af_, 0, sizeof(af_));

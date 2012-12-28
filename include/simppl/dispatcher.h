@@ -231,7 +231,7 @@ private:
    outstanding_interface_resolves_type dangling_interface_resolves_;
    
    uint32_t nextid_;
-   bool running_;
+   volatile bool running_;
    
    pollfd fds_[32];
    

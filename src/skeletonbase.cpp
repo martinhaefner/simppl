@@ -14,7 +14,7 @@ namespace ipc
 
 SkeletonBase::SkeletonBase(const char* role)
  : role_(role)
- , disp_(0)
+ , disp_(nullptr)
 {
    assert(role_);
 }

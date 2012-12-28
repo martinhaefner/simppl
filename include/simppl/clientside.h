@@ -177,6 +177,7 @@ struct ClientAttribute
    ClientAttribute(uint32_t id, std::vector<detail::Parented*>& parent)
     : signal_(id, parent)
     , data_()
+    , last_update_(0)
    {
       // NOOP
    }
@@ -212,6 +213,12 @@ struct ClientAttribute
    {
       (void)signal_.detach();
       return *this;
+   }
+   
+   inline
+   time_t lastUpdate() const
+   {
+      return last_update_;
    }
    
 private:
@@ -269,12 +276,14 @@ private:
    }
 
    void valueChanged(typename CallTraits<signal_arg_type>::param_type arg)
-   {      
+   {
+      last_update_ = ::time(0);
       setAndCall(arg);
    }
       
    signal_type signal_;
    DataT data_;
+   time_t last_update_;
    
    function_type f_;
 };

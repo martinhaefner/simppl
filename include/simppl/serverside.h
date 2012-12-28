@@ -105,7 +105,7 @@ protected:
    {
       detail::Serializer s;
       serialize(s, t...);
-
+    
       detail::SignalSender(s.data(), s.size())(detail::ServerSignalBase::recipients_[registrationid]);
    }
 };
@@ -554,11 +554,12 @@ struct ServerAttribute
    inline
    ServerAttribute& operator=(const DataT& data)
    {
-      this->t_ = data;
-      
       if (EmitPolicyT::eval(this->t_, data))
-         emit(this->t_);
+      {
+         emit(data);
+      }
       
+      this->t_ = data;
       return *this;
    }   
    
