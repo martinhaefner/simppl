@@ -82,6 +82,8 @@ protected:
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
    
+   bool isSignalRegistered(ClientSignalBase& sigbase) const;
+   
    bool dispatcherIsRunning() const;
    
    inline

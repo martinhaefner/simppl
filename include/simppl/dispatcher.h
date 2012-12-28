@@ -195,6 +195,8 @@ public:
    
    int run();
    
+   bool isSignalRegistered(ClientSignalBase& sigbase) const;
+   
    void clearSlot(int idx);
    
    inline

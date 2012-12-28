@@ -110,6 +110,12 @@ struct ClientSignal : ClientSignalBase
       return *this;
    }
    
+   inline
+   bool isAttached() const
+   {
+      // FIXME 
+   }
+   
    void eval(const void* payload, size_t length)
    {
       if (f_)

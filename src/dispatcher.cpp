@@ -241,11 +241,17 @@ void Dispatcher::addClient(StubBase& clnt)
 }
 
 
-bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr)
+bool Dispatcher::isSignalRegistered(ClientSignalBase& s) const
 {
-   bool alreadyAttached = std::find_if(sighandlers_.begin(), sighandlers_.end(), 
+   return std::find_if(sighandlers_.begin(), sighandlers_.end(), 
          [&s](const sighandlers_type::value_type& v){ return v.second == &s; 
       }) != sighandlers_.end();
+}
+   
+
+bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr)
+{
+   bool alreadyAttached = isSignalRegistered(s);
    
    if (!alreadyAttached)
    {

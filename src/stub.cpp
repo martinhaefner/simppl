@@ -74,6 +74,13 @@ uint32_t StubBase::sendRequest(detail::Parented& requestor, ClientResponseBase* 
 }
 
 
+bool StubBase::isSignalRegistered(ClientSignalBase& sigbase) const
+{
+   assert(disp_);
+   return disp_->isSignalRegistered(sigbase);
+}
+
+
 void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
