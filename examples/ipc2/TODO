@@ -1,7 +1,5 @@
 TODOs 
 
-Allow serialization of std::tuples.
-
 
 ThreadingModel as a Policy
 ==========================
@@ -62,32 +60,10 @@ and global data.
 Error support
 =============
 
-Make exceptions part of CallStatus object that is the first argument to response functions.
-
-
-struct CallStatus
-{
-   inline
-   CallStatus(uint32_t sequence_nr = INVALID_SEQUENCE_NR)
-    : exception_(0)
-    , sequence_nr_(sequence_nr)
-   {
-      // NOOP
-   }
-   
-   inline
-   operator const void*() const
-   {
-      return !exception;
-   } 
-   
-   IPCException* exception_;
-   uint32_t sequence_nr_;
-};
-
-Maybe blocking function calls could indeed register other handlers to the 
-exception is really thrown while the callback function must contain this argument. 
-How could an interface designer introduce other exception classes?
+How could an interface designer introduce other exception classes? Currently, I think
+there is no need for this since either the user-defined exception is trivial or must again
+be modeled like a complete response and therefore could just be a modeled as-so. The interface
+designer could use any self-written enum to use this instead of the implementation used integer.
 
 
 Transport error detection
@@ -101,7 +77,11 @@ Session support
 
  * clients may send explicit detach calls to the server
  * maybe have handlers to be implemented to see if clients attach to a server 
-
+ * Allow to send events to a certain client only (by adding the session_id
+   of the client to the emit() call of the event. Any further functionality
+   must be implemented by the user logic (e.g. how to register/unregister
+   and when to send the event to a certain client).
+   
 
 Next Steps
 ==========

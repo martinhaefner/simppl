@@ -2,7 +2,14 @@
 #define SIMPPL_SESSIONDATA_H
 
 
-/// session data holder
+/**
+ * Session data holder.
+ * 
+ * Currently, a session is defined by an ResolveInterface request no a
+ * server. Therefore, a session identifies a client instance which is
+ * connected to a server. There is no cross-client concept or multi-session
+ * concept for single clients.
+ */
 struct SessionData
 {
    SessionData();
