@@ -54,8 +54,8 @@ struct BrokerImpl : Skeleton<Broker>
    BrokerImpl()
     : Skeleton<Broker>("broker")
    {
-      waitForService >> std::tr1::bind(&BrokerImpl::handleWaitForService, this, _1);
-      registerService >> std::tr1::bind(&BrokerImpl::handleRegisterService, this, _1, _2);
+      waitForService >> std::bind(&BrokerImpl::handleWaitForService, this, _1);
+      registerService >> std::bind(&BrokerImpl::handleRegisterService, this, _1, _2);
    }
    
    void handleRegisterService(const std::string& serv, const std::string& loc)
@@ -96,7 +96,7 @@ struct HelloWorldImpl : Skeleton<HelloWorld>
    HelloWorldImpl()
     : Skeleton<HelloWorld>("helloworld")
    {
-      sayHello >> std::tr1::bind(&HelloWorldImpl::handleSayHello, this, _1);
+      sayHello >> std::bind(&HelloWorldImpl::handleSayHello, this, _1);
    }
    
    void handleSayHello(const std::string& str)
@@ -114,7 +114,7 @@ struct HelloWorldClient : Stub<HelloWorld>
    HelloWorldClient(const char* loc)
     : Stub<HelloWorld>("helloworld", loc)
    {
-      connected >> std::tr1::bind(&HelloWorldClient::handleConnected, this);
+      connected >> std::bind(&HelloWorldClient::handleConnected, this);
    }
    
    void handleConnected()
@@ -129,7 +129,7 @@ struct BrokerClientOnServerSide : Stub<Broker>
    BrokerClientOnServerSide()
     : Stub<Broker>("broker", "unix:the_broker")
    {
-      connected >> std::tr1::bind(&BrokerClientOnServerSide::handleConnected, this);
+      connected >> std::bind(&BrokerClientOnServerSide::handleConnected, this);
    }
    
    void handleConnected()
@@ -145,8 +145,8 @@ struct BrokerClientOnClientSide : Stub<Broker>
    BrokerClientOnClientSide()
     : Stub<Broker>("broker", "unix:the_broker")
    {
-      serviceReady >> std::tr1::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1, _2);
-      connected >> std::tr1::bind(&BrokerClientOnClientSide::handleConnected, this);
+      serviceReady >> std::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1, _2);
+      connected >> std::bind(&BrokerClientOnClientSide::handleConnected, this);
    }
    
    void handleConnected()
