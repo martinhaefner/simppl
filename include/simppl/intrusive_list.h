@@ -228,13 +228,13 @@ public:
       ListIterator operator++()
       {
           if (ptr_)
-              ptr_ = next(ptr_);
+              ptr_ = this->next(ptr_);
       }
 
       ListIterator operator--()
       {
           if (ptr_)
-              ptr_ = prev(ptr_);
+              ptr_ = this->prev(ptr_);
       }
 
       typename IteratorTraits<IteratorDataT>::pointerType operator->()
@@ -332,12 +332,12 @@ public:
   {
       this->add();
 
-      setNext(&e, 0);
-      setPrev(&e, last_);
+      this->setNext(&e, 0);
+      this->setPrev(&e, last_);
       last_ = &e;
 
-      if (prev(&e))
-          setNext(prev(&e), &e);
+      if (this->prev(&e))
+          this->setNext(this->prev(&e), &e);
 
       if (!first_)
           first_ = &e;
@@ -349,9 +349,9 @@ public:
       {
           void* last = last_;
 
-          if (prev(last_))
+          if (this->prev(last_))
           {
-              setNext(prev(last_)) = 0;
+              this->setNext(this->prev(last_)) = 0;
           }
           else
           {

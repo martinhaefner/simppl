@@ -404,14 +404,14 @@ public:
    void push_back(const value_type& val)
    {
       this->t_.push_back(val);
-      emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, this->t_.size()-1, 1));
+      this->emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, this->t_.size()-1, 1));
    }
    
    inline
    void pop_back()
    {
       this->t_.pop_back();
-      emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, this->t_.size(), 1));
+      this->emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, this->t_.size(), 1));
    }
    
    inline
@@ -556,7 +556,7 @@ struct ServerAttribute
    {
       if (EmitPolicyT::eval(this->t_, data))
       {
-         emit(data);
+         this->emit(data);
       }
       
       this->t_ = data;
@@ -565,7 +565,7 @@ struct ServerAttribute
    
    void onAttach(uint32_t registrationid)
    {
-      emitWithId(registrationid, this->t_);
+      this->emitWithId(registrationid, this->t_);
    }
 };
 

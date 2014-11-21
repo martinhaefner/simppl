@@ -5,6 +5,9 @@
 #include "simppl/noninstantiable.h"
 #include "simppl/typelist.h"
 
+// FIXME remove this
+#include <iostream>
+
 #include <map>
 #include <vector>
 #include <tuple>
@@ -183,19 +186,21 @@ struct StdTupleForEach
    static inline
    void eval(TupleT& t, FunctorT func)
    {
-      func(std::get<N>(t));
+	  enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - N };
+      func(std::get<__M>(t));
       StdTupleForEach<N-1>::template eval(t, func);
    }
 };
 
 template<>
-struct StdTupleForEach<0>
+struct StdTupleForEach<1>
 {
    template<typename TupleT, typename FunctorT>
    static inline
    void eval(TupleT& t, FunctorT func)
    {
-      func(std::get<0>(t));
+	  enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - 1 };
+      func(std::get<__M>(t));
    }
 };
 
@@ -204,7 +209,7 @@ template<typename TupleT, typename FunctorT>
 inline
 void std_tuple_for_each(TupleT& t, FunctorT functor)
 {
-   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value-1>::template eval(t, functor);
+   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value>::template eval(t, functor);
 }
 
 
@@ -637,7 +642,7 @@ struct FunctionCaller
    static inline
    void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
    {
-      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
+	  FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
    }
    
    template<typename FunctorT, typename... T>
