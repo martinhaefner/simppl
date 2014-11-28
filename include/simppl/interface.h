@@ -33,7 +33,7 @@ struct ServerRequestBaseSetter;
 
 
 struct AbsoluteInterfaceBase
-{      
+{    
    inline
    uint32_t nextId()
    {
@@ -108,7 +108,7 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
             template<typename...> class Response, \
             template<typename...> class Signal, \
             template<typename,typename=simppl::ipc::OnChange> class Attribute> \
-      struct iface : simppl::ipc::InterfaceBase<Request>
+      struct iface : public simppl::ipc::InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
    request(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->container_)

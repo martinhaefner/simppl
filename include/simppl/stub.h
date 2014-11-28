@@ -39,7 +39,7 @@ public:
    Stub(const char* role, const char* boundname)
     : StubBase(InterfaceNamer<interface_type>::name(), role, boundname)
    {
-      std::for_each(((interface_type*)this)->container_.begin(), ((interface_type*)this)->container_.end(), std::bind(&StubBase::reparent, this, std::placeholders::_1));
+      std::for_each(((interface_type*)this)->container_.begin(), ((interface_type*)this)->container_.end(), std::bind(&Stub<IfaceT>::reparent, this, std::placeholders::_1));
       ((interface_type*)this)->container_.clear();
    }
    

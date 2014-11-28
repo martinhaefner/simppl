@@ -229,12 +229,16 @@ public:
       {
           if (ptr_)
               ptr_ = this->next(ptr_);
+              
+          return *this;
       }
 
       ListIterator operator--()
       {
           if (ptr_)
               ptr_ = this->prev(ptr_);
+              
+          return *this;
       }
 
       typename IteratorTraits<IteratorDataT>::pointerType operator->()

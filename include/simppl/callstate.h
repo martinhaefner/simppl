@@ -31,11 +31,13 @@ struct CallState
       // NOOP
    }
    
-   inline
-   operator const void*() const
+   
+   explicit inline
+   operator bool() const
    {
-      return ex_.get() ? 0 : this;
-   }
+	   return ex_.get() ? false : true;
+   } 
+   
    
    inline
    uint32_t sequenceNr() const

@@ -83,10 +83,10 @@ INTERFACE(Interface)
 };
 
 
-struct InterfaceClient : spl::Stub<Interface>
+struct InterfaceClient : spl::Stub<::Interface>
 {
    InterfaceClient(const char* role)
-    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<::Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       resultOfAdd >> std::bind(&InterfaceClient::handleResultAdd, this, _1, _2);
       resultOfSub >> std::bind(&InterfaceClient::handleResultSub, this, _1, _2);
@@ -125,10 +125,10 @@ struct InterfaceClient : spl::Stub<Interface>
 };
 
 
-struct InterfaceClient2 : spl::Stub<Interface>
+struct InterfaceClient2 : spl::Stub<::Interface>
 {
    InterfaceClient2(const char* role)
-    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<::Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       connected >> std::bind(&InterfaceClient2::handleConnected, this);
    }
@@ -146,10 +146,10 @@ struct InterfaceClient2 : spl::Stub<Interface>
 };
 
 
-struct InterfaceClient3 : spl::Stub<Interface>
+struct InterfaceClient3 : spl::Stub<::Interface>
 {
    InterfaceClient3(const char* role)
-    : spl::Stub<Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
+    : spl::Stub<::Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
       connected >> std::bind(&InterfaceClient3::handleConnected, this);
    }
@@ -167,10 +167,10 @@ struct InterfaceClient3 : spl::Stub<Interface>
 };
 
 
-struct InterfaceServer : spl::Skeleton<Interface>
+struct InterfaceServer : spl::Skeleton<::Interface>
 {
    InterfaceServer(const char* role)
-    : spl::Skeleton<Interface>(role)
+    : spl::Skeleton<::Interface>(role)
     , result_(0)
    {      
       add >> std::bind(&InterfaceServer::handleAdd, this, _1);

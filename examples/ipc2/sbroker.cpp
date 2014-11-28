@@ -67,14 +67,14 @@ struct PushBackWaiter
 };
 
 
-struct BrokerImpl : spl::Skeleton<Broker>
+struct BrokerImpl : spl::Skeleton<::Broker>
 {
    typedef std::map<std::string, ServiceHandle> servicemap_type;
    typedef std::multimap<std::string, spl::ServerRequestDescriptor> waitersmap_type;
    
    inline
    BrokerImpl()
-    : spl::Skeleton<Broker>("broker")
+    : spl::Skeleton<::Broker>("broker")
    {
       waitForService >> std::bind(&BrokerImpl::handleWaitForService, this, _1);
       registerService >> std::bind(&BrokerImpl::handleRegisterService, this, _1, _2);

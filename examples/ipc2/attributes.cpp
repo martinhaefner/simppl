@@ -1,7 +1,8 @@
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
-#include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/dispatcher.h"
+
 
 
 using namespace std::placeholders;
@@ -63,10 +64,10 @@ INTERFACE(Interface)
 };
 
 
-struct Server : spl::Skeleton<Interface>
+struct Server : spl::Skeleton<::Interface>
 {
    Server(const char* role)
-    : spl::Skeleton<Interface>(role)
+    : spl::Skeleton<::Interface>(role)
    {      
       myInt = 99;
       myStruct = MyStruct(0, "No answer yet.");
@@ -95,10 +96,10 @@ struct Server : spl::Skeleton<Interface>
 };
 
 
-struct Client : spl::Stub<Interface>
+struct Client : spl::Stub<::Interface>
 {
    Client(const char* role)
-    : Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
+    : Stub<::Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
       connected >> std::bind(&Client::handleConnected, this);
       

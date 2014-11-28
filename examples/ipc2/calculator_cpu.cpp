@@ -9,10 +9,10 @@ using namespace std::placeholders;
 namespace spl = simppl::ipc;
 
 
-struct CalculatorImpl : spl::Skeleton<Calculator>
+struct CalculatorImpl : spl::Skeleton<::Calculator>
 {
    CalculatorImpl(const char* role)
-    : spl::Skeleton<Calculator>(role)
+    : spl::Skeleton<::Calculator>(role)
    {
       clear >> std::bind(&CalculatorImpl::handleClear, this);
       add >> std::bind(&CalculatorImpl::handleAdd, this, _1);

@@ -97,12 +97,12 @@ private:
    };
    
    
-   struct BrokerStub : Stub<Broker>
+   struct BrokerStub : Stub< ::Broker>
    {
       
       inline
       BrokerStub()
-       : Stub<Broker>("broker", "unix:the_broker")
+       : Stub< ::Broker>("broker", "unix:the_broker")
       {
          serviceReady >> std::bind(&BrokerStub::handleServiceReady, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
          connected >> std::bind(&BrokerStub::handleConnected, this);

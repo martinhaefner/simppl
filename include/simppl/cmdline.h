@@ -564,7 +564,8 @@ struct Documentation
    void doDoc_(detail::stream_type& os) const
    {
 #ifdef CMDLINE_HAVE_STL_STREAMS
-      os << "<arg" << ++simppl::cmdline::detail::extraOptionCounter << std::left << std::setw(PARSER_DESCRIPTION_INDENTATION-4-simppl::cmdline::detail::extraOptionCounter/10) << "> " << doc_ << std::endl;
+	  ++simppl::cmdline::detail::extraOptionCounter;
+      os << "<arg" << simppl::cmdline::detail::extraOptionCounter << std::left << std::setw(PARSER_DESCRIPTION_INDENTATION-4-simppl::cmdline::detail::extraOptionCounter/10) << "> " << doc_ << std::endl;
 #else
       fprintf(os, "<arg%d>%-15c %s\n", ++simppl::cmdline::detail::extraOptionCounter, ' ', doc_);
 #endif
@@ -1585,7 +1586,7 @@ public:
       if (anchor_(theChar, state))
       {
          incrementor_type inc(state.current_);
-         return OptionChecker<AnchorT::HaveArgument>::eval(state) && ActionCaller<action_return_type, AnchorT::HaveArgument>::template eval(action, state) || inc.rollback();
+         return (OptionChecker<AnchorT::HaveArgument>::eval(state) && ActionCaller<action_return_type, AnchorT::HaveArgument>::template eval(action, state)) || inc.rollback();
       }
       return indeterminate;
    }

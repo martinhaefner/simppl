@@ -5,6 +5,8 @@
 
 #include "simppl/bind_adapter.h"
 
+#pragma clang diagnostic ignored "-Woverloaded-shift-op-parentheses"
+
 using std::placeholders::_1;
 
 namespace cmd = simppl::cmdline;
@@ -65,6 +67,7 @@ cmd::ExtensionPoint secondExtensionPoint =
 bool registerExtension()
 {
    globalExtensionPoint += cmd::Option<cmd::NoChar>()["jiji3"].doc("Noch ne tolle Show, hier!") >> g;
+   return true;
 }
 
 static bool registered = registerExtension();

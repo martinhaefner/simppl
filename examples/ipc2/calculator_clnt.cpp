@@ -21,10 +21,10 @@ static CalculatorClient* calc = 0;
 static const char* rolename = "calculator";
    
 
-struct CalculatorClient : spl::Stub<Calculator>
+struct CalculatorClient : spl::Stub<::Calculator>
 {
    CalculatorClient(const char* location)
-    : spl::Stub<Calculator>(rolename, location)
+    : spl::Stub<::Calculator>(rolename, location)
    {
       connected >> std::bind(&CalculatorClient::handleConnected, this);
    }

@@ -26,7 +26,7 @@ int main()
 {
    spl::Dispatcher disp;
 
-   spl::Stub<Broker> broker("broker", "unix:the_broker");
+   spl::Stub<::Broker> broker("broker", "unix:the_broker");
    disp.addClient(broker);
    
    if (broker.connect())

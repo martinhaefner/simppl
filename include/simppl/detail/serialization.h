@@ -4,9 +4,7 @@
 
 #include "simppl/noninstantiable.h"
 #include "simppl/typelist.h"
-
-// FIXME remove this
-#include <iostream>
+#include "simppl/callstate.h"
 
 #include <map>
 #include <vector>
@@ -23,8 +21,10 @@ namespace simppl
 namespace ipc
 {
 
-// forward decl
-struct CallState;
+// forward decls
+template<typename> struct ServerVectorAttributeUpdate;
+template<typename> struct ClientVectorAttributeUpdate;
+
 
 namespace detail
 {
@@ -129,10 +129,7 @@ struct TupleSerializer // : noncopable
    }
    
    template<typename T>
-   void operator()(const T& t)   // seems to be already a reference so no copy is done
-   {
-      s_ << t;
-   }
+   void operator()(const T& t);
    
    SerializerT& s_;
 };
@@ -148,10 +145,7 @@ struct TupleDeserializer // : noncopable
    }
    
    template<typename T>
-   void operator()(T& t)
-   {
-      s_ >> t;
-   }
+   void operator()(T& t);
    
    DeserializerT& s_;
 };
@@ -362,6 +356,11 @@ MAKE_SERIALIZER(long long)
 MAKE_SERIALIZER(double)
 
 
+// forward decl
+template<typename VectorT> 
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer&, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>&);
+
+
 inline 
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::string& str) 
 { 
@@ -395,6 +394,15 @@ inline
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::tuple<T...>& t)
 {
    return s.write(t);
+}
+
+
+template<typename SerializerT>   
+template<typename T>
+inline
+void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
+{
+  s_ << t;
 }
 
 
@@ -553,6 +561,11 @@ MAKE_DESERIALIZER(long long)
 MAKE_DESERIALIZER(double)
 
 
+// forward decl
+template<typename VectorT>
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&, simppl::ipc::ClientVectorAttributeUpdate<VectorT>&);
+
+
 inline 
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::string& str) 
 { 
@@ -586,6 +599,15 @@ inline
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
+}
+
+
+template<typename DeserializerT>
+template<typename T>
+inline
+void simppl::ipc::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
+{
+   s_ >> t;
 }
 
 

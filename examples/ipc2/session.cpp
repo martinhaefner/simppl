@@ -38,10 +38,10 @@ INTERFACE(BankAccount)
 };
 
 
-struct Server : spl::Skeleton<BankAccount>
+struct Server : spl::Skeleton<::BankAccount>
 {
    Server(const char* role)
-    : spl::Skeleton<BankAccount>(role)
+    : spl::Skeleton<::BankAccount>(role)
    {  
       login >> std::bind(&Server::handleLogin, this, _1, _2);
       getDeposit >> std::bind(&Server::handleGetDeposit, this);
@@ -88,10 +88,10 @@ struct Server : spl::Skeleton<BankAccount>
 };
 
 
-struct Client : spl::Stub<BankAccount>
+struct Client : spl::Stub<::BankAccount>
 {
    Client(const char* user, const char* role)
-    : spl::Stub<BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
+    : spl::Stub<::BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
     , user_(user)
    {
       connected >> std::bind(&Client::handleConnected, this);

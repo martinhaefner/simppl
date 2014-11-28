@@ -686,6 +686,8 @@ int Dispatcher::run()
    
    // now enter infinite eventloop
    loopUntil();
+   
+   return 0;
 }
 
 

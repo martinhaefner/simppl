@@ -79,10 +79,10 @@ INTERFACE(Interface)
 };
 
 
-struct InterfaceClient : spl::Stub<Interface>
+struct InterfaceClient : spl::Stub<::Interface>
 {
    InterfaceClient(const char* role)
-    : spl::Stub<Interface>(role, "unix:myserver")   // connect the client to 'myserver'
+    : spl::Stub<::Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
       // NOOP
    }
@@ -95,10 +95,10 @@ void cleared()
 }
 
 
-struct InterfaceServer : spl::Skeleton<Interface>
+struct InterfaceServer : spl::Skeleton<::Interface>
 {
    InterfaceServer(const char* role)
-    : spl::Skeleton<Interface>(role)
+    : spl::Skeleton<::Interface>(role)
     , result_(0)
    {      
       add >> std::bind(&InterfaceServer::handleAdd, this, _1);
