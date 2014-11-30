@@ -1,24 +1,26 @@
-The simppl C++ library provides high-level abstraction layers for the following
-coding domains:
+The simppl C++ library provides high-level abstraction layers by using solely
+the C++ language and compiler for the definition of domain specific languages
+in the following functional domains: 
 
  * generative commandline parser framework
  * generative inifile parser framework
  * generative service-oriented IPC library introducing a C++ embedded DSL for 
-   the definition of service interfaces
+   the definition of service interfaces and serializable data structures.
 
 
 Compilers:
 
-Well, I only developed on GCC >4.6. Due to the extreme usage of templating techniques and C++11 
-language features I cannot guarantee that any of the code fragments will work with other compilers 
+Well, I only developed on GCC >4.6 and clang/LLVM 3.4. Due to the heavy 
+usage of templating techniques and C++11 language features I cannot 
+guarantee that any of the code fragments will work with other compilers 
 (especially VS compiler).
 
 
 Status:
 
-Most of the source is rapid prototyping. It may work or it may not. Feel free to make a 
-real good project from any of the parts. I plan to make all parts of simppl fully operable 
-but I can't tell you when this happens.
+Most of the source is rapid prototyping. It may work or it may not. Feel 
+free to make a real good project from any of the parts. I plan to make 
+all parts of simppl fully operable but I can't tell you when this happens.
 
 
 CopyLeft:
