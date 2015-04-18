@@ -15,6 +15,14 @@ usage of templating techniques and C++11 language features I cannot
 guarantee that any of the code fragments will work with other compilers 
 (especially VS compiler).
 
+For structure serialization boost::fusion can be used. See benchmark example
+for more information how to serialize structures when sending remote messages.
+The boost way is the formal and correct way to serialize structures. The old
+way of defining serializer_type's within structures is no longer recommended
+since that one makes heavy use of C++ language to memory mappings and will 
+definitely not work with complex data types containing virtual functions or 
+containing multiple inheritence.
+
 
 Status:
 

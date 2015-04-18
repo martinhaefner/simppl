@@ -25,8 +25,8 @@ target_link_libraries(calculator_clnt1 simppl)
 add_executable(scat scat.cpp)
 target_link_libraries(scat simppl)
 
-#add_executable(benchmark benchmark.cpp)
-#target_link_libraries(benchmark simppl)
+add_executable(benchmark benchmark.cpp)
+target_link_libraries(benchmark simppl)
 
 add_executable(sbroker sbroker.cpp)
 target_link_libraries(sbroker simppl)

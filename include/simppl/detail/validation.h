@@ -2,6 +2,11 @@
 #define SIMPPL_DETAIL_VALIDATION_H
 
 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+#   include <boost/fusion/support/is_sequence.hpp>
+#endif
+
+
 namespace simppl
 {
    
@@ -79,7 +84,11 @@ struct isValidStruct
    template<typename U>
    static char senseless(...);
    
-   enum { value = TupleValidator<T, sizeof(senseless<T>(0))>::value };
+   enum { value = TupleValidator<T, sizeof(senseless<T>(0))>::value 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+      || boost::fusion::traits::is_sequence<T>::type::value 
+#endif      
+   };   
 };
 
 
@@ -140,7 +149,7 @@ struct isMap
 template<typename T>
 struct isString
 {
-   enum { value = is_same<T, std::string>::value };
+   enum { value = std::is_same<T, std::string>::value };
 };
 
 

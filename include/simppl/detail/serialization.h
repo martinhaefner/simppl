@@ -14,6 +14,11 @@
 #include <algorithm>
 #include <tuple>
 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+#   include <boost/fusion/support/is_sequence.hpp>
+#   include <boost/fusion/algorithm.hpp>
+#endif
+
 
 namespace simppl
 {
@@ -173,6 +178,96 @@ struct make_serializer_imp<TypeList<T, NilType> >
 // ------------------------------------------------------------------------------------
 
 
+template<typename T>
+struct StructSerializationHelper
+{
+   template<typename SerializerT, typename StructT>
+   static inline
+   void write(SerializerT& s, const StructT& st)
+   {
+      const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
+      s.write(tuple);
+   }
+   
+   template<typename DeserializerT, typename StructT>
+   static inline
+   void read(DeserializerT& s, StructT& st)
+   {
+      typename StructT::serializer_type& tuple = *(typename StructT::serializer_type*)&st;
+      s.read(tuple);
+   }
+};
+
+
+// ---------------------------------------------------------------------
+
+
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+template<typename SerializerT>
+struct FusionWriter
+{
+   explicit inline
+   FusionWriter(SerializerT& s)
+    : s_(s)
+   {
+      // NOOP
+   }
+   
+   template<typename T>
+   inline
+   void operator()(const T& t) const
+   {
+      s_.write(t);
+   }
+   
+   SerializerT& s_;
+};
+
+
+template<typename DeserializerT>
+struct FusionReader
+{
+   explicit inline
+   FusionReader(DeserializerT& s)
+    : s_(s)
+   {
+      // NOOP
+   }
+   
+   template<typename T>
+   inline
+   void operator()(T& t) const
+   {
+      s_.read(t);
+   }
+   
+   DeserializerT& s_;
+};
+
+
+template<>
+struct StructSerializationHelper<boost::mpl::true_>
+{
+   template<typename SerializerT, typename StructT>
+   static inline
+   void write(SerializerT& s, const StructT& st)
+   {
+      boost::fusion::for_each(st, FusionWriter<SerializerT>(s));         
+   }
+   
+   template<typename DeserializerT, typename StructT>
+   static inline
+   void read(DeserializerT& s, StructT& st)
+   {
+      boost::fusion::for_each(st, FusionReader<DeserializerT>(s));         
+   }
+};
+#endif
+
+
+// ------------------------------------------------------------------------------------
+
+
 template<size_t N>
 struct StdTupleForEach
 {
@@ -180,7 +275,7 @@ struct StdTupleForEach
    static inline
    void eval(TupleT& t, FunctorT func)
    {
-	  enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - N };
+     enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - N };
       func(std::get<__M>(t));
       StdTupleForEach<N-1>::template eval(t, func);
    }
@@ -193,7 +288,7 @@ struct StdTupleForEach<1>
    static inline
    void eval(TupleT& t, FunctorT func)
    {
-	  enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - 1 };
+     enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - 1 };
       func(std::get<__M>(t));
    }
 };
@@ -260,8 +355,17 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(const T& t, tFalseType)
    {
-      return write(*(const typename T::serializer_type*)&t);
+      StructSerializationHelper<
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+         typename boost::fusion::traits::is_sequence<T>::type
+#else
+         int
+#endif            
+         >::template write(*this, t);      
+         
+      return *this;
    }
+   
    
    Serializer& write(const std::string& str);
    
@@ -307,6 +411,7 @@ struct Serializer // : noncopyable
       tuple.write(*this);
       return *this;
    }
+
  
 private:
    
@@ -367,12 +472,14 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
    return s.write(str); 
 }
 
+
 template<typename T>
 inline 
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::vector<T>& v) 
 { 
    return s.write(v); 
 }
+
 
 template<typename KeyT, typename ValueT>
 inline 
@@ -381,13 +488,14 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
    return s.write(m); 
 }
 
+
 template<typename StructT>
 inline
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const StructT& st)
 {
-   const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
-   return s.write(tuple);
+   return s.write(st);   
 }
+
 
 template<typename... T>
 inline
@@ -453,7 +561,13 @@ struct Deserializer // : noncopyable
    template<typename T>
    Deserializer& read(T& t, tFalseType)
    {
-      return read(*(typename T::serializer_type*)&t);
+      StructSerializationHelper<
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+         typename boost::fusion::traits::is_sequence<T>::type
+#else
+         int
+#endif            
+         >::template read(*this, t);      
    }
    
    Deserializer& read(char*& str);
@@ -589,9 +703,8 @@ simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&
 template<typename StructT>
 inline
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, StructT& st)
-{
-   typename StructT::serializer_type& tuple = *(typename StructT::serializer_type*)&st;
-   return s.read(tuple);
+{   
+   return s.read(st);
 }
 
 template<typename... T>
@@ -664,7 +777,7 @@ struct FunctionCaller
    static inline
    void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
    {
-	  FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
+     FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
    }
    
    template<typename FunctorT, typename... T>

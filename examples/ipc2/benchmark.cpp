@@ -1,7 +1,12 @@
+#define SIMPPL_HAVE_VALIDATION
+#define SIMPPL_HAVE_BOOST_FUSION
+
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+
+#include <boost/fusion/include/define_struct.hpp>
 
 
 using namespace std::placeholders;
@@ -17,15 +22,14 @@ unsigned int current_time_ms()
 }
 
 
-struct PODStruct
-{
-   typedef make_serializer<int32_t, double, double, std::string>::type serializer_type;
-   
-   int32_t anInt32;
-   double aDouble;
-   double anotherDouble;
-   std::string aString;
-};
+BOOST_FUSION_DEFINE_STRUCT(
+   (), PODStruct,
+   (int32_t, anInt32)
+   (double, aDouble)
+   (double, anotherDouble)
+   (std::string, aString)
+)
+
 
 typedef std::vector<PODStruct> PODStructVector;
 
@@ -60,19 +64,18 @@ INTERFACE(DSIBenchmark)
 };
 
 
-#ifndef SERVER
-struct Client : Stub<DSIBenchmark>
+struct Client : simppl::ipc::Stub<DSIBenchmark>
 {
    Client(int calls = 1)   
-    : Stub<DSIBenchmark>("bench", "DSIBenchmark")    
+    : simppl::ipc::Stub<DSIBenchmark>("bench", "unix:DSIBenchmark")    
     , mCalls(calls)
     , mCounter(0u)
     , mFactor(10u)
     , mStartTime(0u)
    {
       rCallNoArg >> std::bind(&Client::handleCallNoArg, this);
-      rCallStruct >> std::bind(&Client::handleCallStruct, this, _1);
-      rCallStructVector >> std::bind(&Client::handleCallStructVector, this, _1);
+      rCallStruct >> std::bind(&Client::handleCallStruct, this, _1, _2);
+      rCallStructVector >> std::bind(&Client::handleCallStructVector, this, _1, _2);
    
       mPodStruct.anInt32 = 1;
       mPodStruct.aDouble = 2;
@@ -110,7 +113,7 @@ struct Client : Stub<DSIBenchmark>
       }
    }
    
-   void handleCallStruct(const PODStruct& s)
+   void handleCallStruct(const simppl::ipc::CallState& state, const PODStruct& s)
    {
       if (mCounter++ < mCalls)
       {
@@ -131,7 +134,7 @@ struct Client : Stub<DSIBenchmark>
       }
    }
    
-   void handleCallStructVector(const PODStructVector& v)
+   void handleCallStructVector(const simppl::ipc::CallState& state, const PODStructVector& v)
    {
       if (mCounter++ < mCalls)
       {
@@ -164,7 +167,7 @@ struct Client : Stub<DSIBenchmark>
    {
       const unsigned int totalTime = current_time_ms() - mStartTime;
 
-      //a ping-pong loop has 2 messages
+      // a ping-pong loop has 2 messages
       std::cout << mCalls << " calls in " << totalTime << " ms, " <<(mCalls * 1000 * 2) / totalTime << " msgs/s"
                 << std::endl;
    }
@@ -178,12 +181,11 @@ struct Client : Stub<DSIBenchmark>
    PODStructVector mPodStructVector;
 };
 
-#else
 
-struct Server : Skeleton<DSIBenchmark>
+struct Server : simppl::ipc::Skeleton<DSIBenchmark>
 {
    Server()
-    : Skeleton<DSIBenchmark>("bench")
+    : simppl::ipc::Skeleton<DSIBenchmark>("bench")
    {
       shutdown >> std::bind(&Server::handleShutdown, this);
       callNoArg >> std::bind(&Server::handleNoArg, this);
@@ -211,35 +213,41 @@ struct Server : Skeleton<DSIBenchmark>
       respondWith(rCallStructVector(v));
    }
 };
-#endif
 
 
 #define PING_COUNT 100
 
 
 int main(int argc, char** argv)
-{
-#ifdef SERVER
-   Dispatcher d("DSIBenchmark");
-   Server s;
-   d.addServer(s);
-   d.run();
-#else
-
+{   
    int calls = PING_COUNT;    // take this as default count of calls
    if (argc >= 2)
-   {
+   {      
       if (!strncmp(argv[1], "--pings=", 8))
       {
          calls = atoi(argv[1] + 8);
          assert(calls > 0);
+         
+         simppl::ipc::Dispatcher d;
+         Client c(calls);
+         d.addClient(c);
+         d.run();
+         
+         return EXIT_SUCCESS;
+      }
+      
+      if (!strcmp(argv[1], "--server"))
+      {
+         simppl::ipc::Dispatcher d("unix:DSIBenchmark");
+         Server s;
+         d.addServer(s);
+         d.run();
+         
+         return EXIT_SUCCESS;
       }
    }
    
-   Dispatcher d;
-   Client c(calls);
-   d.addClient(c);
-   d.run();
-#endif
+   std::cout << "Invalid command line options: either '--server' or '--pings=<x>'" << std::endl;
+   return EXIT_FAILURE;
 }
 
