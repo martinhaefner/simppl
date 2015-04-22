@@ -75,6 +75,20 @@ struct TupleValidator<T, 1>
 };
 
 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+namespace boost_adapter
+{
+   
+template<typename T>
+struct isValidType
+{
+   typedef typename boost::mpl::if_c<simppl::ipc::detail::isValidType<T>::value, boost::mpl::true_, boost::mpl::false_>::type type;
+};
+
+}   // namespace boost_adapter
+#endif
+
+
 template<typename T>
 struct isValidStruct
 {
@@ -83,10 +97,17 @@ struct isValidStruct
    
    template<typename U>
    static char senseless(...);
-   
+      
    enum { value = TupleValidator<T, sizeof(senseless<T>(0))>::value 
 #ifdef SIMPPL_HAVE_BOOST_FUSION
-      || boost::fusion::traits::is_sequence<T>::type::value 
+      || ( boost::fusion::traits::is_sequence<T>::type::value 
+         && std::is_same<
+            typename boost::mpl::find_if<
+               T, 
+               boost::mpl::not_<boost_adapter::isValidType<boost::mpl::_> >
+            >::type, 
+            typename boost::mpl::end<T>::type
+         >::value )         
 #endif      
    };   
 };

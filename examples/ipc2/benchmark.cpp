@@ -1,5 +1,5 @@
 #define SIMPPL_HAVE_VALIDATION
-#define SIMPPL_HAVE_BOOST_FUSION
+//#define SIMPPL_HAVE_BOOST_FUSION
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
@@ -22,6 +22,7 @@ unsigned int current_time_ms()
 }
 
 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
 BOOST_FUSION_DEFINE_STRUCT(
    (), PODStruct,
    (int32_t, anInt32)
@@ -29,6 +30,17 @@ BOOST_FUSION_DEFINE_STRUCT(
    (double, anotherDouble)
    (std::string, aString)
 )
+#else
+struct PODStruct
+{
+   typedef simppl::ipc::make_serializer<int32_t, double, double, std::string>::type serializer_type;
+   
+   int32_t anInt32;
+   double aDouble;
+   double anotherDouble;
+   std::string aString;
+};
+#endif 
 
 
 typedef std::vector<PODStruct> PODStructVector;
@@ -218,8 +230,15 @@ struct Server : simppl::ipc::Skeleton<DSIBenchmark>
 #define PING_COUNT 100
 
 
+template<typename T>
+struct isValidType
+{
+   typedef typename boost::mpl::if_c<simppl::ipc::detail::isValidType<T>::value, boost::mpl::true_, boost::mpl::false_>::type type;
+};
+
+
 int main(int argc, char** argv)
-{   
+{    
    int calls = PING_COUNT;    // take this as default count of calls
    if (argc >= 2)
    {      
