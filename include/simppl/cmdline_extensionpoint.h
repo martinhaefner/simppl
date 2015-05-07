@@ -5,6 +5,8 @@
 #include "simppl/cmdline.h"
 #include "simppl/intrusive_list.h"
 
+#include <functional>
+
 
 namespace simppl
 {
