@@ -83,7 +83,7 @@ std::string Dispatcher::fullQualifiedName(const char* ifname, const char* rolena
 
 Dispatcher::~Dispatcher()
 {
-   for(servermap_type::iterator iter = servers_.begin(); iter != servers_.end(); ++iter)
+   for(auto iter = servers_.begin(); iter != servers_.end(); ++iter)
    {
       delete iter->second;
    }
@@ -138,7 +138,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
    assert(strcmp(the_location, "auto:"));
    
    // 1. connect the socket physically - if not yet done
-   socketsmap_type::iterator iter = socks_.find(the_location);
+   auto iter = socks_.find(the_location);
    if (iter != socks_.end())
    {
       stub.fd_ = iter->second;
@@ -255,7 +255,7 @@ bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr
    
    if (!alreadyAttached)
    {
-      for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
+      for (auto iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
       {
          if (iter->second == &s)
          {
@@ -291,7 +291,7 @@ uint32_t Dispatcher::removeSignalRegistration(ClientSignalBase& s)
 {
    uint32_t rc = 0;
    
-   for (sighandlers_type::iterator iter = sighandlers_.begin(); iter != sighandlers_.end(); ++iter)
+   for (auto iter = sighandlers_.begin(); iter != sighandlers_.end(); ++iter)
    {
       if (iter->second == &s)
       {
@@ -302,7 +302,7 @@ uint32_t Dispatcher::removeSignalRegistration(ClientSignalBase& s)
    }
    
    // maybe still outstanding?
-   for (outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
+   for (auto iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
    {
       if (iter->second == &s)
       {
@@ -420,7 +420,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                      {
                      case FRAME_TYPE_REQUEST:
                         { 
-                           servermapid_type::iterator iter = servers_by_id_.find(hdr.rqf.serverid_);
+                           auto iter = servers_by_id_.find(hdr.rqf.serverid_);
                            if (iter != servers_by_id_.end())
                            {
                               iter->second->eval(hdr.rqf.func_, hdr.rqf.sequence_nr_, hdr.rqf.sessionid_, fds_[i].fd, buf.get(), hdr.rqf.payloadsize_);
@@ -446,8 +446,8 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                         
                      case FRAME_TYPE_RESPONSE:
                         {  
-                           outstanding_requests_type::iterator iter;
-                           if ((iter = outstandings_.find(hdr.rf.sequence_nr_)) != outstandings_.end())
+                           auto iter = outstandings_.find(hdr.rf.sequence_nr_);
+                           if (iter != outstandings_.end())
                            {
                               if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
                               {
@@ -486,14 +486,12 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                               
                               outstandings_.erase(iter);
                            }
-                           else
-                              std::cerr << "Got response for request never sent..." << std::endl;
                         }
                         break;
                      
                      case FRAME_TYPE_REGISTER_SIGNAL:
                         {
-                           servermapid_type::iterator iter = servers_by_id_.find(hdr.rsf.serverid_);
+                           auto iter = servers_by_id_.find(hdr.rsf.serverid_);
                            if (iter != servers_by_id_.end())
                            {
                               uint32_t registrationid = generateId();
@@ -519,7 +517,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                         
                      case FRAME_TYPE_UNREGISTER_SIGNAL:
                         {
-                           serversignalers_type::iterator iter = server_sighandlers_.find(hdr.usf.registrationid_);
+                           auto iter = server_sighandlers_.find(hdr.usf.registrationid_);
                            if (iter != server_sighandlers_.end())
                            {
                               iter->second->removeRecipient(hdr.usf.registrationid_);
@@ -531,7 +529,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                      
                      case FRAME_TYPE_REGISTER_SIGNAL_RESPONSE:
                         {
-                           outstanding_signalregistrations_type::iterator iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
+                           auto iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
                            if (iter != outstanding_sig_registrs_.end())
                            {
                               sighandlers_[hdr.srf.id_] = iter->second;
@@ -547,7 +545,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
 
                      case FRAME_TYPE_SIGNAL:
                         {
-                           sighandlers_type::iterator iter = sighandlers_.find(hdr.sef.id_);
+                           auto iter = sighandlers_.find(hdr.sef.id_);
                            if (iter != sighandlers_.end())
                            {
                               iter->second->eval(buf.get(), hdr.sef.payloadsize_);
@@ -562,10 +560,10 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                            detail::InterfaceResolveResponseFrame rf(0, generateId());
                            rf.sequence_nr_ = hdr.irf.sequence_nr_;
                               
-                           servermap_type::iterator iter = servers_.find(std::string((char*)buf.get()));
+                           auto iter = servers_.find(std::string((char*)buf.get()));
                            if (iter != servers_.end())
                            {
-                              for(servermapid_type::iterator iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
+                              for(auto iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
                               {
                                  if (iter->second == iditer->second)
                                  {
@@ -583,7 +581,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                      
                      case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
                         {
-                           outstanding_interface_resolves_type::iterator iter = dangling_interface_resolves_.find(hdr.irrf.sequence_nr_);
+                           auto iter = dangling_interface_resolves_.find(hdr.irrf.sequence_nr_);
                            if (iter != dangling_interface_resolves_.end())
                            {
                               StubBase* stub = iter->second;
@@ -632,7 +630,40 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       }
    }
    
+   checkOutstandings(sequence_nr);
+   
    return retval;
+}
+
+
+void Dispatcher::checkOutstandings(uint32_t current_sequence_number)
+{
+	for (auto iter = outstandings_.begin(); iter != outstandings_.end(); ++iter)
+	{
+		uint64_t duetime = std::get<2>(iter->second);
+		
+		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+		
+		if (duetime > 0)
+		{
+			if (duetime <= now)
+			{
+				if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
+				{
+					CallState cs(new TransportError(ETIMEDOUT, iter->first));
+					std::get<1>(iter->second)->eval(cs, 0, 0);
+				}
+				else
+				{
+					running_ = false;   
+					throw TransportError(ETIMEDOUT, iter->first);
+				}
+			}
+			else
+			   break;
+		}
+	}
 }
 
 
@@ -642,6 +673,7 @@ Dispatcher::Dispatcher(const char* boundname)
  , sequence_(0)
  , nextid_(0)
  , broker_(nullptr)
+ , request_timeout_(-1)
 {
    ::memset(fds_, 0, sizeof(fds_));
    ::memset(af_, 0, sizeof(af_));
@@ -675,7 +707,7 @@ int Dispatcher::run()
 {
    running_ = true;
    
-   for(clientmap_type::iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+   for(auto iter = clients_.begin(); iter != clients_.end(); ++iter)
    {
       if (strcmp(iter->second->boundname_, "auto:"))
       {
@@ -743,7 +775,7 @@ bool Dispatcher::attach(const char* endpoint)
 
 void* Dispatcher::getSessionData(uint32_t sessionid)
 {
-   sessionmap_type::iterator iter = sessions_.find(sessionid);
+   auto iter = sessions_.find(sessionid);
    if (iter != sessions_.end())
       return iter->second.data_;
    
@@ -755,12 +787,12 @@ void Dispatcher::clearSlot(int idx)
 {
    while(::close(fds_[idx].fd) && errno == EINTR);
    
-   for (serversignalers_type::iterator iter = server_sighandlers_.begin(); iter != server_sighandlers_.end(); ++iter)
+   for (auto iter = server_sighandlers_.begin(); iter != server_sighandlers_.end(); ++iter)
    {
       iter->second->removeAllWithFd(fds_[idx].fd);
    }
    
-   for (sessionmap_type::iterator iter = sessions_.begin(); iter != sessions_.end();)
+   for (auto iter = sessions_.begin(); iter != sessions_.end();)
    {
       if (iter->second.fd_ == fds_[idx].fd)
       {

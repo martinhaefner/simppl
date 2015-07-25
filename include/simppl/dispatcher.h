@@ -5,6 +5,7 @@
 #include <map>
 #include <iostream>
 #include <memory>
+#include <chrono>
 #include <sys/poll.h>
 
 #include "simppl/detail/serverholder.h"
@@ -77,7 +78,8 @@ struct Dispatcher
    typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
    
    // temporary maps, should always shrink again, maybe could drop entries on certain timeouts
-   typedef std::map<uint32_t/*=sequencenr*/, std::tuple<detail::Parented*, ClientResponseBase*> > outstanding_requests_type;
+   typedef std::map<uint32_t/*=sequencenr*/, 
+	  std::tuple<detail::Parented*, ClientResponseBase*, uint64_t/*=duetime*/> > outstanding_requests_type;
    typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
    typedef std::map<uint32_t/*=sequencenr*/, StubBase*> outstanding_interface_resolves_type;
    
@@ -100,6 +102,12 @@ struct Dispatcher
    /// allow dispatcher to talk to broker for registering new services and to
    /// wait for clients to attach services
    void enableBrokerage();
+   
+   template<typename RepT, typename PeriodT>
+   void setRequestTimeout(std::chrono::duration<RepT, PeriodT> duration)
+   {
+      request_timeout_ = duration;
+   }
    
    virtual ~Dispatcher();
    
@@ -124,7 +132,7 @@ struct Dispatcher
    inline
    void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
    {
-      outstandings_[sequence_nr] = std::tuple<detail::Parented*, ClientResponseBase*>(&req, &resp);
+      outstandings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime());
    }
    
    bool addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr);
@@ -171,10 +179,10 @@ struct Dispatcher
       return rc == 0;
    }
 
-   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 2000);
+   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 500);
    
    inline
-   int once(unsigned int timeoutMs = 2000)
+   int once(unsigned int timeoutMs = 500)
    {
       char* data = nullptr;
       return once_(INVALID_SEQUENCE_NR, &data, 0, timeoutMs);
@@ -184,6 +192,18 @@ struct Dispatcher
    
    
 private:
+
+   // FIXME rename outstandings to pendings
+   void checkOutstandings(uint32_t current_sequence_number);
+   
+   uint64_t dueTime() const
+   {
+      if (request_timeout_.count() < 0)
+         return 0;
+      
+      return std::chrono::duration_cast<std::chrono::milliseconds>(
+         std::chrono::steady_clock::now().time_since_epoch() + request_timeout_).count();
+   }
 
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
    
@@ -258,6 +278,7 @@ private:
    sessionmap_type sessions_;
    
    int selfpipe_[2];
+   std::chrono::milliseconds request_timeout_;
 };
 
 

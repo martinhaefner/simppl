@@ -23,6 +23,7 @@ struct CallState
       // NOOP
    }
    
+   /// @param ex The function takes ownership of the exception.
    explicit inline
    CallState(Error* ex)
     : ex_(ex)

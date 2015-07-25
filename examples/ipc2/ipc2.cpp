@@ -121,6 +121,8 @@ struct InterfaceServer : spl::Skeleton<::Interface>
    {
       result_ -= i;
       std::cout << "subtracting " << i << ", result=" << result_ << std::endl;      
+    
+    sleep(5);
       
       if (i < 0)
       {
@@ -184,6 +186,7 @@ int main()
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
    spl::Dispatcher d;
+   d.setRequestTimeout(std::chrono::milliseconds(1000));
    
    InterfaceClient c1("myrole1");
    d.addClient(c1);
@@ -192,6 +195,8 @@ int main()
    {
       // FIXME must spool all requests until the eventloop is running 
       //c1.cleared.attach() >> std::bind(&InterfaceClient::handleCleared, &c1);
+try
+{
    
       int result;
       d.waitForResponse(c1.add(42), result);
@@ -202,7 +207,7 @@ int main()
 
       d.waitForResponse(c1.sub(21), result);
       std::cout << "Result of sub is " << result << std::endl;
-      
+ 
       c1.reqt(std::make_tuple(42, 3.1415, std::string("Hallo Welt")));
          
       try
@@ -213,12 +218,26 @@ int main()
       {
          std::cout << "Result of sub is invalid: " << err.what() << std::endl;
       }
-   }
-    
-   sleep(1);
+}
+catch(const simppl::ipc::TransportError& ex)
+{
+   std::cout << "ooh: " << ex.what() << std::endl;
+}     
+catch(const std::exception& ex)
+{
+   std::cout << "ooh: " << ex.what() << std::endl;
+}     
+catch(...)
+{ 
+   std::cout << "Hey" << std::endl;
+}
+}
+
+sleep(1);
    
    server_dispatcher.stop();
    pthread_join(tid, 0);
+
    
    return 0;
 }
