@@ -26,6 +26,7 @@ namespace ipc
 template<typename> struct InterfaceNamer;
 
 
+// FIXME remove these types of interfaces in favour of std::function interface
 struct ClientResponseBase
 {
    virtual void eval(const CallState& state, const void* payload, size_t len) = 0;

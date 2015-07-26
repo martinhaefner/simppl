@@ -53,7 +53,7 @@ uint32_t StubBase::sendRequest(detail::Parented& requestor, ClientResponseBase* 
    if (genericSend(fd(), f, s.data()))
    {
       if (handler)
-         disp_->addRequest(requestor, *handler, f.sequence_nr_);
+         disp_->addRequest(requestor, *handler, f.sequence_nr_, fd());
    }
    else
    {

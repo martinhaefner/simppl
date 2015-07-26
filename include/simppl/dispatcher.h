@@ -6,6 +6,8 @@
 #include <iostream>
 #include <memory>
 #include <chrono>
+#include <atomic>
+
 #include <sys/poll.h>
 
 #include "simppl/detail/serverholder.h"
@@ -127,9 +129,9 @@ struct Dispatcher
    }
    
    inline
-   void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
+   void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr, int outfd)
    {
-      pendings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime());
+      pendings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime(), outfd);
    }
    
    bool addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr);
@@ -153,7 +155,7 @@ struct Dispatcher
    bool waitForResponse(const detail::ClientResponseHolder& resp, T1& t1, T&... t)
    {
       assert(resp.r_);
-      assert(!running_);
+      assert(!running_.load());
       
       char* data = nullptr;
       size_t len = 0;
@@ -191,12 +193,11 @@ struct Dispatcher
 private:
 
    void checkPendings(uint32_t current_sequence_number);
+   void removePendingsForFd(int fd, uint32_t current_sequence_number);
    
-   std::chrono::steady_clock::time_point dueTime() const
-   {
-      return std::chrono::steady_clock::now() + request_timeout_;
-   }
-
+   /// calculate duetime for request
+   std::chrono::steady_clock::time_point dueTime() const;
+   
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
    
    int accept_socket(int acceptor);
@@ -209,18 +210,18 @@ public:
    
    bool isSignalRegistered(ClientSignalBase& sigbase) const;
    
-   void clearSlot(int idx);
+   void clearSlot(int idx, uint32_t current_sequence_nr);
    
    inline
    void stop()
    {
-      running_ = false;
+      running_.store(false);
    }
    
    inline
    bool isRunning() const
    {
-      return running_;
+      return running_.load();
    }
    
    void* getSessionData(uint32_t sessionid);
@@ -245,7 +246,7 @@ private:
    std::map<uint32_t/*=sequencenr*/, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_interface_resolves_;
    
    uint32_t nextid_;
-   volatile bool running_;   // FIXME better use atomic instead of volatile
+   std::atomic_bool running_;
    
    pollfd fds_[32];
    
@@ -257,8 +258,13 @@ private:
    
    uint32_t sequence_;
    
-   std::map<uint32_t/*=sequencenr*/, 
-     std::tuple<detail::Parented*, ClientResponseBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pendings_;
+   std::map<
+      uint32_t/*=sequencenr*/, 
+      std::tuple<detail::Parented*, 
+                ClientResponseBase*, 
+                std::chrono::steady_clock::time_point/*=duetime*/, 
+                int/*outfd*/>
+      > pendings_;
    
    outstanding_signalregistrations_type outstanding_sig_registrs_;
    sighandlers_type sighandlers_;   

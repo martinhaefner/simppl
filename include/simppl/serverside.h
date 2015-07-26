@@ -165,7 +165,7 @@ struct ServerResponse : ServerResponseBase
    }
    
    inline
-   detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type&... t)
+   detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
    { 
       detail::Serializer s;
       return detail::ServerResponseHolder(serialize(s, t...), *this);

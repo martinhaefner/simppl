@@ -101,6 +101,13 @@ Dispatcher::~Dispatcher()
       delete broker_;
       broker_ = nullptr;
    }
+
+   for(unsigned int i=0; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
+   {
+      // FIXME what's about fd == 0? Should better be -1 !
+      if (fds_[i].fd > 0)
+         while(::close(fds_[i].fd) && errno == EINTR);
+   }
    
    while(::close(selfpipe_[0]) && errno == EINTR);
    while(::close(selfpipe_[1]) && errno == EINTR);
@@ -121,7 +128,7 @@ void Dispatcher::registerAtBroker(const std::string& service, const std::string&
 bool Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
 {
    assert(resp.r_);
-   assert(!running_);
+   assert(!running_.load());
    
    char* data = nullptr;
    size_t len = 0;
@@ -287,13 +294,13 @@ bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr
 int Dispatcher::loopUntil(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs)
 {
    int retval = 0;
-   running_ = true;
+   running_.store(true);
    
    do
    {
       retval = once_(sequence_nr, argData, argLen, timeoutMs);
    }
-   while(running_);
+   while(running_.load());
    
    return retval;
 }
@@ -477,7 +484,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                               else
                               {
                                  assert(argLen);
-                                 running_ = false;
+                                 running_.store(false);
                                  
                                  if (hdr.rf.result_ == 0)
                                  {
@@ -551,7 +558,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                               std::cerr << "No such signal registration found." << std::endl;
                            
                            if (sequence_nr == hdr.srf.sequence_nr_)
-                              running_ = false;
+                              running_.store(false);
                         }
                         break;
 
@@ -612,7 +619,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                                      stub->connected();
                               }
                               else if (sequence_nr == hdr.irrf.sequence_nr_)
-                                 running_ = false;
+                                 running_.store(false);
                            }
                         }
                         break;
@@ -623,10 +630,10 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                      }
                   }
                   else
-                     clearSlot(i);
+                     clearSlot(i, sequence_nr);
                }
                else
-                  clearSlot(i);                      
+                  clearSlot(i, sequence_nr);                      
                
                break;
             }
@@ -638,13 +645,22 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       if (errno != EINTR)
       {
          retval = -1;
-         running_ = false;
+         running_.store(false);
       }
    }
    
    checkPendings(sequence_nr);
    
    return retval;
+}
+
+
+std::chrono::steady_clock::time_point Dispatcher::dueTime() const
+{
+   if (request_timeout_ == std::chrono::milliseconds::max())
+      return std::chrono::steady_clock::time_point::max(); 
+      
+   return std::chrono::steady_clock::now() + request_timeout_;
 }
 
 
@@ -666,7 +682,7 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
          }
          else
          {
-            running_ = false;   
+            running_.store(false);   
             throw TransportError(ETIMEDOUT, iter->first);
          }
          
@@ -674,6 +690,34 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
       }
       else
          break;
+   }
+}
+
+
+void Dispatcher::removePendingsForFd(int fd, uint32_t current_sequence_number)
+{
+   auto iter = pendings_.begin();
+   
+   while(iter != pendings_.end())
+   {
+      if (std::get<3>(iter->second) == fd)
+      {
+         // FIXME bring this sequence together into one function (normal response, checkPendings, ...)
+         if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
+         {
+            CallState cs(new TransportError(ECONNABORTED, iter->first));
+            std::get<1>(iter->second)->eval(cs, 0, 0);
+         }
+         else
+         {
+            running_.store(false);   
+            throw TransportError(ECONNABORTED, iter->first);
+         }
+         
+         iter = pendings_.erase(iter);
+      }
+      else
+         ++iter;
    }
 }
 
@@ -717,7 +761,7 @@ void Dispatcher::socketDisconnected(int /*fd*/)
 
 int Dispatcher::run()
 {
-   running_ = true;
+   running_.store(true);
    
    for(auto iter = clients_.begin(); iter != clients_.end(); ++iter)
    {
@@ -795,8 +839,10 @@ void* Dispatcher::getSessionData(uint32_t sessionid)
 }
 
 
-void Dispatcher::clearSlot(int idx)
+void Dispatcher::clearSlot(int idx, uint32_t current_sequence_number)
 {
+   removePendingsForFd(fds_[idx].fd, current_sequence_number);
+   
    while(::close(fds_[idx].fd) && errno == EINTR);
    
    for (auto iter = server_sighandlers_.begin(); iter != server_sighandlers_.end(); ++iter)
