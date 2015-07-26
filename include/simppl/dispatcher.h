@@ -78,10 +78,7 @@ struct Dispatcher
    typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
    
    // temporary maps, should always shrink again, maybe could drop entries on certain timeouts
-   typedef std::map<uint32_t/*=sequencenr*/, 
-	  std::tuple<detail::Parented*, ClientResponseBase*, uint64_t/*=duetime*/> > outstanding_requests_type;
    typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
-   typedef std::map<uint32_t/*=sequencenr*/, StubBase*> outstanding_interface_resolves_type;
    
    // signal handling client- and server-side
    typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
@@ -132,7 +129,7 @@ struct Dispatcher
    inline
    void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr)
    {
-      outstandings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime());
+      pendings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime());
    }
    
    bool addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr);
@@ -193,16 +190,11 @@ struct Dispatcher
    
 private:
 
-   // FIXME rename outstandings to pendings
-   void checkOutstandings(uint32_t current_sequence_number);
+   void checkPendings(uint32_t current_sequence_number);
    
-   uint64_t dueTime() const
+   std::chrono::steady_clock::time_point dueTime() const
    {
-      if (request_timeout_.count() < 0)
-         return 0;
-      
-      return std::chrono::duration_cast<std::chrono::milliseconds>(
-         std::chrono::steady_clock::now().time_since_epoch() + request_timeout_).count();
+      return std::chrono::steady_clock::now() + request_timeout_;
    }
 
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
@@ -250,10 +242,10 @@ private:
    //registered servers
    servermap_type servers_;
    servermapid_type servers_by_id_;
-   outstanding_interface_resolves_type dangling_interface_resolves_;
+   std::map<uint32_t/*=sequencenr*/, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_interface_resolves_;
    
    uint32_t nextid_;
-   volatile bool running_;
+   volatile bool running_;   // FIXME better use atomic instead of volatile
    
    pollfd fds_[32];
    
@@ -265,7 +257,9 @@ private:
    
    uint32_t sequence_;
    
-   outstanding_requests_type outstandings_;
+   std::map<uint32_t/*=sequencenr*/, 
+	  std::tuple<detail::Parented*, ClientResponseBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pendings_;
+   
    outstanding_signalregistrations_type outstanding_sig_registrs_;
    sighandlers_type sighandlers_;   
    serversignalers_type server_sighandlers_;

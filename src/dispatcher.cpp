@@ -20,6 +20,14 @@
 
 namespace
 {
+
+inline
+std::chrono::steady_clock::time_point
+get_lookup_duetime()
+{
+   return std::chrono::steady_clock::now() + std::chrono::seconds(5);
+}   
+
    
 void makeInetAddress(struct sockaddr_in& addr, const char* endpoint)
 {
@@ -203,7 +211,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
       f.payloadsize_ = strlen(buf)+1;
       f.sequence_nr_ = generateSequenceNr();
 
-      dangling_interface_resolves_[f.sequence_nr_] = &stub;
+      pending_interface_resolves_[f.sequence_nr_] = std::make_tuple(&stub, get_lookup_duetime());
       genericSend(stub.fd_, f, buf);
       
       if (blockUntilResponse)
@@ -255,14 +263,18 @@ bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr
    
    if (!alreadyAttached)
    {
-      for (auto iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
+      alreadyAttached = std::find_if(outstanding_sig_registrs_.begin(), outstanding_sig_registrs_.end(), [&s](decltype(*outstanding_sig_registrs_.begin())& e){
+         return e.second == &s;
+      }) != outstanding_sig_registrs_.end();
+      
+      /*for (auto iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
       {
          if (iter->second == &s)
          {
             alreadyAttached = true;
             break;
          }
-      }
+      }*/
       
       if (!alreadyAttached)
          outstanding_sig_registrs_[sequence_nr] = &s;
@@ -446,8 +458,8 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                         
                      case FRAME_TYPE_RESPONSE:
                         {  
-                           auto iter = outstandings_.find(hdr.rf.sequence_nr_);
-                           if (iter != outstandings_.end())
+                           auto iter = pendings_.find(hdr.rf.sequence_nr_);
+                           if (iter != pendings_.end())
                            {
                               if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
                               {
@@ -484,7 +496,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                                     throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
                               }
                               
-                              outstandings_.erase(iter);
+                              pendings_.erase(iter);
                            }
                         }
                         break;
@@ -581,23 +593,23 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
                      
                      case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
                         {
-                           auto iter = dangling_interface_resolves_.find(hdr.irrf.sequence_nr_);
-                           if (iter != dangling_interface_resolves_.end())
+                           auto iter = pending_interface_resolves_.find(hdr.irrf.sequence_nr_);
+                           if (iter != pending_interface_resolves_.end())
                            {
-                              StubBase* stub = iter->second;
+                              StubBase* stub = std::get<0>(iter->second);
                               stub->id_ = hdr.irrf.id_;
                               stub->current_sessionid_ = hdr.irrf.sessionid_;
-                              dangling_interface_resolves_.erase(iter);
+                              pending_interface_resolves_.erase(iter);
                               
                               if (sequence_nr == INVALID_SEQUENCE_NR)
                               {
                                  // eventloop driven
-                                 if (!iter->second->connected)
+                                 if (!stub->connected)
                                  {
                                      std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
                                  }
                                  else
-                                     iter->second->connected();
+                                     stub->connected();
                               }
                               else if (sequence_nr == hdr.irrf.sequence_nr_)
                                  running_ = false;
@@ -630,40 +642,36 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       }
    }
    
-   checkOutstandings(sequence_nr);
+   checkPendings(sequence_nr);
    
    return retval;
 }
 
 
-void Dispatcher::checkOutstandings(uint32_t current_sequence_number)
+void Dispatcher::checkPendings(uint32_t current_sequence_number)
 {
-	for (auto iter = outstandings_.begin(); iter != outstandings_.end(); ++iter)
+   auto now = std::chrono::steady_clock::now();
+      
+	for (auto iter = pendings_.begin(); iter != pendings_.end(); ++iter)
 	{
-		uint64_t duetime = std::get<2>(iter->second);
+		auto duetime = std::get<2>(iter->second);
 		
-		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
-			std::chrono::steady_clock::now().time_since_epoch()).count();
-		
-		if (duetime > 0)
-		{
-			if (duetime <= now)
-			{
-				if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
-				{
-					CallState cs(new TransportError(ETIMEDOUT, iter->first));
-					std::get<1>(iter->second)->eval(cs, 0, 0);
-				}
-				else
-				{
-					running_ = false;   
-					throw TransportError(ETIMEDOUT, iter->first);
-				}
-			}
-			else
-			   break;
-		}
-	}
+      if (duetime <= now)
+      {
+         if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
+         {
+            CallState cs(new TransportError(ETIMEDOUT, iter->first));
+            std::get<1>(iter->second)->eval(cs, 0, 0);
+         }
+         else
+         {
+            running_ = false;   
+            throw TransportError(ETIMEDOUT, iter->first);
+         }
+      }
+      else
+         break;
+   }
 }
 
 
@@ -690,6 +698,7 @@ Dispatcher::Dispatcher(const char* boundname)
    fds_[selfpipe_[0]].fd = selfpipe_[0];
    fds_[selfpipe_[0]].events = POLLIN;
 }
+
 
 void Dispatcher::socketConnected(int /*fd*/)
 {
