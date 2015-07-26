@@ -652,10 +652,11 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
 {
    auto now = std::chrono::steady_clock::now();
       
-	for (auto iter = pendings_.begin(); iter != pendings_.end(); ++iter)
-	{
-		auto duetime = std::get<2>(iter->second);
-		
+   for (auto iter = pendings_.begin(); iter != pendings_.end(); /*NOOP*/)
+   {
+      auto duetime = std::get<2>(iter->second);
+      
+      // FIXME maybe have request specific timeouts, so there is no strict ordering
       if (duetime <= now)
       {
          if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
@@ -668,6 +669,8 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
             running_ = false;   
             throw TransportError(ETIMEDOUT, iter->first);
          }
+         
+         iter = pendings_.erase(iter);
       }
       else
          break;
@@ -681,7 +684,7 @@ Dispatcher::Dispatcher(const char* boundname)
  , sequence_(0)
  , nextid_(0)
  , broker_(nullptr)
- , request_timeout_(-1)
+ , request_timeout_(std::chrono::milliseconds::max())    // FIXME move this to a config header, also other timeout defaults
 {
    ::memset(fds_, 0, sizeof(fds_));
    ::memset(af_, 0, sizeof(af_));

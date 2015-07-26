@@ -176,7 +176,7 @@ struct Dispatcher
       return rc == 0;
    }
 
-   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 500);
+   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
    
    inline
    int once(unsigned int timeoutMs = 500)
@@ -258,7 +258,7 @@ private:
    uint32_t sequence_;
    
    std::map<uint32_t/*=sequencenr*/, 
-	  std::tuple<detail::Parented*, ClientResponseBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pendings_;
+     std::tuple<detail::Parented*, ClientResponseBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pendings_;
    
    outstanding_signalregistrations_type outstanding_sig_registrs_;
    sighandlers_type sighandlers_;   
