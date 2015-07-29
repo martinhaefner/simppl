@@ -23,6 +23,10 @@
 #endif
 
 
+// forward decl
+struct inotify_event;
+
+
 namespace simppl
 {
    
@@ -239,6 +243,12 @@ private:
 
    bool connect(StubBase& stub, bool blockUntilResponse = false, const char* location = 0);
 
+   uint32_t send_resolve_interface(StubBase& stub);
+   void handle_inotify_event(struct inotify_event* evt);
+   void add_inotify_location(StubBase& stub, const char* socketpath, bool block);
+   
+   int inotify_fd_;
+   std::multimap<std::string, std::tuple<StubBase*, bool>> pending_lookups_;
    
    //registered servers
    servermap_type servers_;

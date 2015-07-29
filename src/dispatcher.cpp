@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sys/inotify.h>
+
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -171,6 +173,9 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          sprintf(addr.sun_path, "/tmp/dispatcher/%s", the_location + 5);
          
          rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
+         
+         if (rc < 0)
+            add_inotify_location(stub, the_location + 5, blockUntilResponse);
       }
       else if (!strncmp(the_location, "tcp:", 4))
       {
@@ -207,25 +212,59 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
    // 2. initialize interface resolution
    if (stub.fd_ > 0)
    {
-      // don't cache anything here, a sessionid will be 
-      // created no the server for any resolve request
-      detail::InterfaceResolveFrame f(42);
-      char buf[128];
-      
-      assert(strlen(stub.iface_) + 2 + strlen(stub.role_) < sizeof(buf));
-      ::fullQualifiedName(buf, stub.iface_, stub.role_);
-                              
-      f.payloadsize_ = strlen(buf)+1;
-      f.sequence_nr_ = generateSequenceNr();
-
-      pending_interface_resolves_[f.sequence_nr_] = std::make_tuple(&stub, get_lookup_duetime());
-      genericSend(stub.fd_, f, buf);
+      int seq = send_resolve_interface(stub);
       
       if (blockUntilResponse)
-         loopUntil(f.sequence_nr_);
+         loopUntil(seq);
    }
       
    return stub.fd_ > 0;
+}
+
+
+void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath, bool block)
+{
+   pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, block)));
+   
+   if (block)
+      loopUntil(1, 0, 0 /*FIXME*/);   // loop until the correct event was emitted by inotify
+}
+
+
+void Dispatcher::handle_inotify_event(struct inotify_event* evt)
+{
+   auto iter = pending_lookups_.equal_range(evt->name);
+   
+   if (iter.first != pending_lookups_.end())
+   {
+      std::string location("unix:");
+      location += iter.first->first;
+      
+      for(auto it = iter.first; it != iter.second; ++it)
+      {
+         connect(*std::get<0>(it->second), std::get<1>(it->second), location.c_str());
+      }
+   }
+}
+   
+
+uint32_t Dispatcher::send_resolve_interface(StubBase& stub)
+{
+   // don't cache anything here, a sessionid will be 
+   // created no the server for any resolve request
+   detail::InterfaceResolveFrame f(42);
+   char buf[128];
+   
+   assert(strlen(stub.iface_) + 2 + strlen(stub.role_) < sizeof(buf));
+   ::fullQualifiedName(buf, stub.iface_, stub.role_);
+                           
+   f.payloadsize_ = strlen(buf)+1;
+   f.sequence_nr_ = generateSequenceNr();
+
+   pending_interface_resolves_[f.sequence_nr_] = std::make_tuple(&stub, get_lookup_duetime());
+   genericSend(stub.fd_, f, buf);
+   
+   return f.sequence_nr_;
 }
 
 
@@ -733,6 +772,10 @@ Dispatcher::Dispatcher(const char* boundname)
    ::memset(fds_, 0, sizeof(fds_));
    ::memset(af_, 0, sizeof(af_));
    
+   inotify_fd_ = inotify_init();
+   inotify_add_watch(inotify_fd_, "/tmp/dispatcher", IN_CREATE);
+   // FIXME must add fd to poll list, need switch for different socket types...
+   
    if (boundname)
    {
       assert(attach(boundname));
@@ -768,7 +811,12 @@ int Dispatcher::run()
       if (strcmp(iter->second->boundname_, "auto:"))
       {
          if (iter->second->fd_ <= 0)
-            assert(connect(*iter->second));
+         {
+            bool rc = connect(*iter->second);
+            
+            if (!strncmp(iter->second->boundname_, "tcp:", 4))
+               assert(rc);
+         }
       }
    }
    
@@ -828,6 +876,7 @@ bool Dispatcher::attach(const char* endpoint)
       
    return rc;
 }
+
 
 void* Dispatcher::getSessionData(uint32_t sessionid)
 {
