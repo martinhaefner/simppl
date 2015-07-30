@@ -20,6 +20,9 @@
 #include "simppl/brokerclient.h"
 
 
+using namespace std::placeholders;
+
+
 namespace
 {
 
@@ -173,7 +176,6 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          sprintf(addr.sun_path, "/tmp/dispatcher/%s", the_location + 5);
          
          rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
-         
          if (rc < 0)
             add_inotify_location(stub, the_location + 5, blockUntilResponse);
       }
@@ -199,6 +201,8 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
       {
          fds_[stub.fd_].fd = stub.fd_;
          fds_[stub.fd_].events = POLLIN;
+         
+         fctn_[stub.fd_] = std::bind(&Dispatcher::handle_data, this, _1, _2, _3);
          
          socks_[the_location] = stub.fd_;
       }
@@ -233,16 +237,16 @@ void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath, bo
 
 void Dispatcher::handle_inotify_event(struct inotify_event* evt)
 {
-   auto iter = pending_lookups_.equal_range(evt->name);
+   auto pair = pending_lookups_.equal_range(evt->name);
    
-   if (iter.first != pending_lookups_.end())
+   if (pair.first != pending_lookups_.end())
    {
       std::string location("unix:");
-      location += iter.first->first;
+      location += pair.first->first;
       
-      for(auto it = iter.first; it != iter.second; ++it)
+      for(auto iter = pair.first; iter != pair.second; ++iter)
       {
-         connect(*std::get<0>(it->second), std::get<1>(it->second), location.c_str());
+         connect(*std::get<0>(iter->second), std::get<1>(iter->second), location.c_str());
       }
    }
 }
@@ -379,7 +383,7 @@ void Dispatcher::enableBrokerage()
 }
 
 
-int Dispatcher::accept_socket(int acceptor)
+int Dispatcher::accept_socket(int acceptor, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> /*rq_data*/)
 {
    // doesn't matter which type of socket here
    union
@@ -395,9 +399,291 @@ int Dispatcher::accept_socket(int acceptor)
    {
       fds_[fd].fd = fd;
       fds_[fd].events = POLLIN;
+      
+      fctn_[fd] = std::bind(&Dispatcher::handle_data, this, _1, _2, _3);
    }
+
+   if (fd >= 0)
+      socketConnected(fd);
    
    return fd;
+}
+
+
+int Dispatcher::handle_data(int fd, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> rq_data)
+{
+   // ordinary stream socket
+   detail::FrameHeader f;
+   uint32_t sequence_nr = std::get<0>(rq_data);
+      
+   ssize_t len = ::recv(fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
+   
+   if (len == sizeof(f) && f)
+   {
+      char** argData = std::get<1>(rq_data);
+      size_t* argLen = std::get<2>(rq_data);
+   
+      len = 0;
+      std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
+      
+      union Hdr 
+      {
+         Hdr()
+         {
+            // NOOP
+         }
+         
+         detail::RequestFrame rqf;
+         detail::ResponseFrame rf;
+         detail::InterfaceResolveFrame irf;
+         detail::InterfaceResolveResponseFrame irrf;
+         detail::RegisterSignalFrame rsf;
+         detail::UnregisterSignalFrame usf;
+         detail::SignalEmitFrame sef;
+         detail::SignalResponseFrame srf;
+         detail::TransportErrorFrame tef;
+      } hdr; 
+
+      struct msghdr msg;
+      memset(&msg, 0, sizeof(msg));
+      
+      struct iovec v[2] = { { &hdr, detail::headersize[f.type_] }, { 0, 0 } };
+      msg.msg_iov = v;
+      
+      if (f.payloadsize_ > 0)
+      {
+         msg.msg_iovlen = 2;
+         
+         buf.reset(new char[f.payloadsize_]);        
+         
+         v[1].iov_base = buf.get();
+         v[1].iov_len = f.payloadsize_;
+      }
+      else
+         msg.msg_iovlen = 1;
+                                 
+      len = ::recvmsg(fd, &msg, MSG_NOSIGNAL|MSG_WAITALL);
+
+      // all data read?
+      if (len == v[0].iov_len + v[1].iov_len)
+      {
+         switch(f.type_)
+         {
+         case FRAME_TYPE_REQUEST:
+            { 
+               auto iter = servers_by_id_.find(hdr.rqf.serverid_);
+               if (iter != servers_by_id_.end())
+               {
+                  iter->second->eval(hdr.rqf.func_, hdr.rqf.sequence_nr_, hdr.rqf.sessionid_, fd, buf.get(), hdr.rqf.payloadsize_);
+               }
+               else
+                  std::cerr << "No service with id=" << hdr.rqf.serverid_ << " found." << std::endl;
+            }
+            break;
+            
+         case FRAME_TYPE_TRANSPORT_ERROR:
+            if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != hdr.tef.sequence_nr_)
+            {
+               CallState cs((TransportError*)(hdr.tef.err_));
+               ((ClientResponseBase*)hdr.tef.handler_)->eval(cs, 0, 0);
+            }
+            else
+            {
+               std::unique_ptr<TransportError> var((TransportError*)(hdr.tef.err_));
+               throw *var;
+            }
+         
+            break;
+            
+         case FRAME_TYPE_RESPONSE:
+            {  
+               auto iter = pendings_.find(hdr.rf.sequence_nr_);
+               if (iter != pendings_.end())
+               {
+                  if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
+                  {
+                     if (hdr.rf.result_ == 0)   // normal response
+                     {
+                        CallState cs(hdr.rf.sequence_nr_);
+                        std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
+                     }
+                     else   // error response
+                     {
+                        CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
+                        std::get<1>(iter->second)->eval(cs, 0, 0);
+                     }
+                  }
+                  else
+                  {
+                     assert(argLen);
+                     running_.store(false);
+                     
+                     if (hdr.rf.result_ == 0)
+                     {
+                        if (buf.get() == 0)
+                        {
+                           // must copy payload in this case
+                           *argData = new char[hdr.rf.payloadsize_];
+                           ::memcpy(*argData, buf.get(), hdr.rf.payloadsize_);
+                        }
+                        else
+                           *argData = buf.release();
+                        
+                        *argLen = hdr.rf.payloadsize_;
+                     }
+                     else
+                        throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
+                  }
+                  
+                  pendings_.erase(iter);
+               }
+            }
+            break;
+         
+         case FRAME_TYPE_REGISTER_SIGNAL:
+            {
+               auto iter = servers_by_id_.find(hdr.rsf.serverid_);
+               if (iter != servers_by_id_.end())
+               {
+                  uint32_t registrationid = generateId();
+                  
+                  detail::ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fd, registrationid, hdr.rsf.id_);
+                  
+                  if (sig)
+                     server_sighandlers_[registrationid] = sig;
+                  
+                  // FIXME error handling, what if sig is 0???
+                  detail::SignalResponseFrame rf(registrationid, hdr.rsf.id_);
+                  rf.sequence_nr_ = hdr.rsf.sequence_nr_;
+                  
+                  genericSend(fd, rf, 0);
+                  
+                  if (sig)
+                     sig->onAttach(registrationid);
+               }
+               else
+                  std::cerr << "No server with id=" << hdr.rsf.serverid_ << " found." << std::endl;
+            }
+            break;
+            
+         case FRAME_TYPE_UNREGISTER_SIGNAL:
+            {
+               auto iter = server_sighandlers_.find(hdr.usf.registrationid_);
+               if (iter != server_sighandlers_.end())
+               {
+                  iter->second->removeRecipient(hdr.usf.registrationid_);
+               }
+               else
+                  std::cerr << "No registered signal '" << hdr.usf.registrationid_ << "' found." << std::endl;
+            }
+            break;
+         
+         case FRAME_TYPE_REGISTER_SIGNAL_RESPONSE:
+            {
+               auto iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
+               if (iter != outstanding_sig_registrs_.end())
+               {
+                  sighandlers_[hdr.srf.id_] = iter->second;
+                  outstanding_sig_registrs_.erase(iter);
+               }
+               else
+                  std::cerr << "No such signal registration found." << std::endl;
+               
+               if (sequence_nr == hdr.srf.sequence_nr_)
+                  running_.store(false);
+            }
+            break;
+
+         case FRAME_TYPE_SIGNAL:
+            {
+               auto iter = sighandlers_.find(hdr.sef.id_);
+               if (iter != sighandlers_.end())
+               {
+                  iter->second->eval(buf.get(), hdr.sef.payloadsize_);
+               }
+               else
+                  std::cerr << "No such signal handler found." << std::endl;
+            }
+            break;
+       
+         case FRAME_TYPE_RESOLVE_INTERFACE:
+            {
+               detail::InterfaceResolveResponseFrame rf(0, generateId());
+               rf.sequence_nr_ = hdr.irf.sequence_nr_;
+                  
+               auto iter = servers_.find(std::string((char*)buf.get()));
+               if (iter != servers_.end())
+               {
+                  for(auto iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
+                  {
+                     if (iter->second == iditer->second)
+                     {
+                        rf.id_ = iditer->first;
+                        break;
+                     }
+                  }
+               }
+               else
+                  std::cerr << "No such server found." << std::endl;
+               
+               genericSend(fd, rf, 0);
+            }
+            break;
+         
+         case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
+            {
+               auto iter = pending_interface_resolves_.find(hdr.irrf.sequence_nr_);
+               if (iter != pending_interface_resolves_.end())
+               {
+                  StubBase* stub = std::get<0>(iter->second);
+                  stub->id_ = hdr.irrf.id_;
+                  stub->current_sessionid_ = hdr.irrf.sessionid_;
+                  pending_interface_resolves_.erase(iter);
+                  
+                  if (sequence_nr == INVALID_SEQUENCE_NR)
+                  {
+                     // eventloop driven
+                     if (!stub->connected)
+                     {
+                         std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
+                     }
+                     else
+                         stub->connected();
+                  }
+                  else if (sequence_nr == hdr.irrf.sequence_nr_)
+                     running_.store(false);
+               }
+            }
+            break;
+         
+         default:
+            std::cerr << "Unimplemented frame type=" << f.type_ << std::endl;
+            break;
+         }
+      }
+      else
+         clearSlot(fd, sequence_nr);
+   }
+   else
+      clearSlot(fd, sequence_nr);                      
+   
+   return 0;
+}
+
+
+int Dispatcher::handle_inotify(int fd, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> rq_data)
+{
+   // TODO arbitrary size '64'
+   std::aligned_storage<sizeof(inotify_event) + 64, std::alignment_of<inotify_event>::value>::type buf;
+   
+   int rc = ::read(fd, &buf, sizeof(inotify_event) + 64);
+   if (rc > 0)
+   {   
+      struct inotify_event* evt = reinterpret_cast<inotify_event*>(&buf);
+      handle_inotify_event(evt);
+   }
+   
+   return -1;
 }
 
 
@@ -413,269 +699,8 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       {
          if (fds_[i].revents & POLLIN)
          {
-            if (af_[i] != 0)
-            {
-               // acceptor socket
-               int new_fd = (this->*af_[i])(fds_[i].fd);
-               
-               if (new_fd > 0)
-                  socketConnected(new_fd);
-            }
-            else
-            {
-               // ordinary stream socket
-               detail::FrameHeader f;
-                  
-               ssize_t len = ::recv(fds_[i].fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
-               
-               if (len == sizeof(f) && f)
-               {
-                  len = 0;
-                  std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
-                  
-                  union Hdr 
-                  {
-                     Hdr()
-                     {
-                        // NOOP
-                     }
-                     
-                     detail::RequestFrame rqf;
-                     detail::ResponseFrame rf;
-                     detail::InterfaceResolveFrame irf;
-                     detail::InterfaceResolveResponseFrame irrf;
-                     detail::RegisterSignalFrame rsf;
-                     detail::UnregisterSignalFrame usf;
-                     detail::SignalEmitFrame sef;
-                     detail::SignalResponseFrame srf;
-                     detail::TransportErrorFrame tef;
-                  } hdr; 
-
-                  struct msghdr msg;
-                  memset(&msg, 0, sizeof(msg));
-                  
-                  struct iovec v[2] = { { &hdr, detail::headersize[f.type_] }, { 0, 0 } };
-                  msg.msg_iov = v;
-                  
-                  if (f.payloadsize_ > 0)
-                  {
-                     msg.msg_iovlen = 2;
-                     
-                     buf.reset(new char[f.payloadsize_]);        
-                     
-                     v[1].iov_base = buf.get();
-                     v[1].iov_len = f.payloadsize_;
-                  }
-                  else
-                     msg.msg_iovlen = 1;
-                                             
-                  len = ::recvmsg(fds_[i].fd, &msg, MSG_NOSIGNAL|MSG_WAITALL);
-
-                  // all data read?
-                  if (len == v[0].iov_len + v[1].iov_len)
-                  {
-                     switch(f.type_)
-                     {
-                     case FRAME_TYPE_REQUEST:
-                        { 
-                           auto iter = servers_by_id_.find(hdr.rqf.serverid_);
-                           if (iter != servers_by_id_.end())
-                           {
-                              iter->second->eval(hdr.rqf.func_, hdr.rqf.sequence_nr_, hdr.rqf.sessionid_, fds_[i].fd, buf.get(), hdr.rqf.payloadsize_);
-                           }
-                           else
-                              std::cerr << "No service with id=" << hdr.rqf.serverid_ << " found." << std::endl;
-                        }
-                        break;
-                        
-                     case FRAME_TYPE_TRANSPORT_ERROR:
-                        if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != hdr.tef.sequence_nr_)
-                        {
-                           CallState cs((TransportError*)(hdr.tef.err_));
-                           ((ClientResponseBase*)hdr.tef.handler_)->eval(cs, 0, 0);
-                        }
-                        else
-                        {
-                           std::unique_ptr<TransportError> var((TransportError*)(hdr.tef.err_));
-                           throw *var;
-                        }
-                     
-                        break;
-                        
-                     case FRAME_TYPE_RESPONSE:
-                        {  
-                           auto iter = pendings_.find(hdr.rf.sequence_nr_);
-                           if (iter != pendings_.end())
-                           {
-                              if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
-                              {
-                                 if (hdr.rf.result_ == 0)   // normal response
-                                 {
-                                    CallState cs(hdr.rf.sequence_nr_);
-                                    std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
-                                 }
-                                 else   // error response
-                                 {
-                                    CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
-                                    std::get<1>(iter->second)->eval(cs, 0, 0);
-                                 }
-                              }
-                              else
-                              {
-                                 assert(argLen);
-                                 running_.store(false);
-                                 
-                                 if (hdr.rf.result_ == 0)
-                                 {
-                                    if (buf.get() == 0)
-                                    {
-                                       // must copy payload in this case
-                                       *argData = new char[hdr.rf.payloadsize_];
-                                       ::memcpy(*argData, buf.get(), hdr.rf.payloadsize_);
-                                    }
-                                    else
-                                       *argData = buf.release();
-                                    
-                                    *argLen = hdr.rf.payloadsize_;
-                                 }
-                                 else
-                                    throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
-                              }
-                              
-                              pendings_.erase(iter);
-                           }
-                        }
-                        break;
-                     
-                     case FRAME_TYPE_REGISTER_SIGNAL:
-                        {
-                           auto iter = servers_by_id_.find(hdr.rsf.serverid_);
-                           if (iter != servers_by_id_.end())
-                           {
-                              uint32_t registrationid = generateId();
-                              
-                              detail::ServerSignalBase* sig = iter->second->addSignalRecipient(hdr.rsf.sig_, fds_[i].fd, registrationid, hdr.rsf.id_);
-                              
-                              if (sig)
-                                 server_sighandlers_[registrationid] = sig;
-                              
-                              // FIXME error handling, what if sig is 0???
-                              detail::SignalResponseFrame rf(registrationid, hdr.rsf.id_);
-                              rf.sequence_nr_ = hdr.rsf.sequence_nr_;
-                              
-                              genericSend(fds_[i].fd, rf, 0);
-                              
-                              if (sig)
-                                 sig->onAttach(registrationid);
-                           }
-                           else
-                              std::cerr << "No server with id=" << hdr.rsf.serverid_ << " found." << std::endl;
-                        }
-                        break;
-                        
-                     case FRAME_TYPE_UNREGISTER_SIGNAL:
-                        {
-                           auto iter = server_sighandlers_.find(hdr.usf.registrationid_);
-                           if (iter != server_sighandlers_.end())
-                           {
-                              iter->second->removeRecipient(hdr.usf.registrationid_);
-                           }
-                           else
-                              std::cerr << "No registered signal '" << hdr.usf.registrationid_ << "' found." << std::endl;
-                        }
-                        break;
-                     
-                     case FRAME_TYPE_REGISTER_SIGNAL_RESPONSE:
-                        {
-                           auto iter = outstanding_sig_registrs_.find(hdr.srf.sequence_nr_);
-                           if (iter != outstanding_sig_registrs_.end())
-                           {
-                              sighandlers_[hdr.srf.id_] = iter->second;
-                              outstanding_sig_registrs_.erase(iter);
-                           }
-                           else
-                              std::cerr << "No such signal registration found." << std::endl;
-                           
-                           if (sequence_nr == hdr.srf.sequence_nr_)
-                              running_.store(false);
-                        }
-                        break;
-
-                     case FRAME_TYPE_SIGNAL:
-                        {
-                           auto iter = sighandlers_.find(hdr.sef.id_);
-                           if (iter != sighandlers_.end())
-                           {
-                              iter->second->eval(buf.get(), hdr.sef.payloadsize_);
-                           }
-                           else
-                              std::cerr << "No such signal handler found." << std::endl;
-                        }
-                        break;
-                   
-                     case FRAME_TYPE_RESOLVE_INTERFACE:
-                        {
-                           detail::InterfaceResolveResponseFrame rf(0, generateId());
-                           rf.sequence_nr_ = hdr.irf.sequence_nr_;
-                              
-                           auto iter = servers_.find(std::string((char*)buf.get()));
-                           if (iter != servers_.end())
-                           {
-                              for(auto iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
-                              {
-                                 if (iter->second == iditer->second)
-                                 {
-                                    rf.id_ = iditer->first;
-                                    break;
-                                 }
-                              }
-                           }
-                           else
-                              std::cerr << "No such server found." << std::endl;
-                           
-                           genericSend(fds_[i].fd, rf, 0);
-                        }
-                        break;
-                     
-                     case FRAME_TYPE_RESOLVE_RESPONSE_INTERFACE:
-                        {
-                           auto iter = pending_interface_resolves_.find(hdr.irrf.sequence_nr_);
-                           if (iter != pending_interface_resolves_.end())
-                           {
-                              StubBase* stub = std::get<0>(iter->second);
-                              stub->id_ = hdr.irrf.id_;
-                              stub->current_sessionid_ = hdr.irrf.sessionid_;
-                              pending_interface_resolves_.erase(iter);
-                              
-                              if (sequence_nr == INVALID_SEQUENCE_NR)
-                              {
-                                 // eventloop driven
-                                 if (!stub->connected)
-                                 {
-                                     std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
-                                 }
-                                 else
-                                     stub->connected();
-                              }
-                              else if (sequence_nr == hdr.irrf.sequence_nr_)
-                                 running_.store(false);
-                           }
-                        }
-                        break;
-                     
-                     default:
-                        std::cerr << "Unimplemented frame type=" << f.type_ << std::endl;
-                        break;
-                     }
-                  }
-                  else
-                     clearSlot(i, sequence_nr);
-               }
-               else
-                  clearSlot(i, sequence_nr);                      
-               
-               break;
-            }
+            fctn_[fds_[i].fd](fds_[i].fd, fds_[i].revents, std::make_tuple(sequence_nr, argData, argLen));
+            break;  // TODO need better eventloop handling here 
          }                  
       }
    }
@@ -770,17 +795,18 @@ Dispatcher::Dispatcher(const char* boundname)
  , request_timeout_(std::chrono::milliseconds::max())    // FIXME move this to a config header, also other timeout defaults
 {
    ::memset(fds_, 0, sizeof(fds_));
-   ::memset(af_, 0, sizeof(af_));
+   
+   if (boundname)
+      assert(attach(boundname));
    
    inotify_fd_ = inotify_init();
    inotify_add_watch(inotify_fd_, "/tmp/dispatcher", IN_CREATE);
-   // FIXME must add fd to poll list, need switch for different socket types...
    
-   if (boundname)
-   {
-      assert(attach(boundname));
-   }
+   fds_[inotify_fd_].fd = inotify_fd_;
+   fds_[inotify_fd_].events = POLLIN;
+   fctn_[inotify_fd_] = std::bind(&Dispatcher::handle_inotify, this, _1, _2, _3);
    
+   // FIXME what's this good for?   
    // can't use pipe since then the reading code would have to be changed...
    int rc = ::socketpair(PF_UNIX, SOCK_STREAM, 0, selfpipe_);
    assert(!rc);
@@ -815,7 +841,10 @@ int Dispatcher::run()
             bool rc = connect(*iter->second);
             
             if (!strncmp(iter->second->boundname_, "tcp:", 4))
+            {
                assert(rc);
+               return EXIT_FAILURE;
+            }
          }
       }
    }
@@ -823,7 +852,7 @@ int Dispatcher::run()
    // now enter infinite eventloop
    loopUntil();
    
-   return 0;
+   return EXIT_SUCCESS;
 }
 
 
@@ -850,7 +879,7 @@ bool Dispatcher::attach(const char* endpoint)
       fds_[acceptor].fd = acceptor;
       fds_[acceptor].events = POLLIN;
       
-      af_[acceptor] = &Dispatcher::accept_socket;
+      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2, _3);
       rc = true;
    }
    else if (!strncmp(endpoint, "tcp:", 4) && strlen(endpoint) > 4)
@@ -867,7 +896,7 @@ bool Dispatcher::attach(const char* endpoint)
       fds_[acceptor].fd = acceptor;
       fds_[acceptor].events = POLLIN;
       
-      af_[acceptor] = &Dispatcher::accept_socket;
+      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2, _3);
       rc = true;
    }
    
@@ -881,6 +910,7 @@ bool Dispatcher::attach(const char* endpoint)
 void* Dispatcher::getSessionData(uint32_t sessionid)
 {
    auto iter = sessions_.find(sessionid);
+   
    if (iter != sessions_.end())
       return iter->second.data_;
    

@@ -204,7 +204,9 @@ private:
    
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
    
-   int accept_socket(int acceptor);
+   int accept_socket(int acceptor, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
+   int handle_data(int fd, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
+   int handle_inotify(int fd, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
    
    int once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs);
    
@@ -260,8 +262,7 @@ private:
    
    pollfd fds_[32];
    
-   typedef int(Dispatcher::*acceptfunction_type)(int);
-   acceptfunction_type af_[32];   ///< may have different kind of sockets here (tcp or unix)
+   std::map<int, std::function<int(int, short, std::tuple<uint32_t, char**, size_t*>)>> fctn_;
    
    // registered clients
    clientmap_type clients_;
