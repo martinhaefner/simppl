@@ -204,9 +204,9 @@ private:
    
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
    
-   int accept_socket(int acceptor, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
-   int handle_data(int fd, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
-   int handle_inotify(int fd, short pollmask, std::tuple<uint32_t, char**, size_t*> rq_data);
+   int accept_socket(int acceptor, short pollmask);
+   int handle_data(int fd, short pollmask);
+   int handle_inotify(int fd, short pollmask);
    
    int once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs);
    
@@ -262,7 +262,7 @@ private:
    
    pollfd fds_[32];
    
-   std::map<int, std::function<int(int, short, std::tuple<uint32_t, char**, size_t*>)>> fctn_;
+   std::map<int, std::function<int(int, short)>> fctn_;
    
    // registered clients
    clientmap_type clients_;
@@ -287,6 +287,8 @@ private:
    std::vector<std::string> endpoints_;
    
    sessionmap_type sessions_;
+   
+   std::tuple<uint32_t/*=seqnr*/, char**, size_t*> current_;
    
    int selfpipe_[2];
    std::chrono::milliseconds request_timeout_;

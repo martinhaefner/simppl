@@ -101,6 +101,11 @@ Dispatcher::~Dispatcher()
       delete iter->second;
    }
    
+   std::for_each(endpoints_.begin(), endpoints_.end(), [this](const std::string& ep){
+      if (ep.find("unix:") == 0)
+         (void)::unlink(ep.c_str()+5);
+   });
+   
    if (broker_)
    {
       delete broker_;
@@ -202,7 +207,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          fds_[stub.fd_].fd = stub.fd_;
          fds_[stub.fd_].events = POLLIN;
          
-         fctn_[stub.fd_] = std::bind(&Dispatcher::handle_data, this, _1, _2, _3);
+         fctn_[stub.fd_] = std::bind(&Dispatcher::handle_data, this, _1, _2);
          
          socks_[the_location] = stub.fd_;
       }
@@ -289,7 +294,7 @@ void Dispatcher::addClient(StubBase& clnt)
    if (!strcmp(clnt.boundname_, "auto:"))
    {
       assert(broker_);
-      broker_->waitForService(::fullQualifiedName(clnt), std::bind(&Dispatcher::serviceReady, this, &clnt, std::placeholders::_1, std::placeholders::_2));
+      broker_->waitForService(::fullQualifiedName(clnt), std::bind(&Dispatcher::serviceReady, this, &clnt, _1, _2));
    }
    else
    {
@@ -316,15 +321,6 @@ bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr
       alreadyAttached = std::find_if(outstanding_sig_registrs_.begin(), outstanding_sig_registrs_.end(), [&s](decltype(*outstanding_sig_registrs_.begin())& e){
          return e.second == &s;
       }) != outstanding_sig_registrs_.end();
-      
-      /*for (auto iter = outstanding_sig_registrs_.begin(); iter != outstanding_sig_registrs_.end(); ++iter)
-      {
-         if (iter->second == &s)
-         {
-            alreadyAttached = true;
-            break;
-         }
-      }*/
       
       if (!alreadyAttached)
          outstanding_sig_registrs_[sequence_nr] = &s;
@@ -383,7 +379,7 @@ void Dispatcher::enableBrokerage()
 }
 
 
-int Dispatcher::accept_socket(int acceptor, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> /*rq_data*/)
+int Dispatcher::accept_socket(int acceptor, short /*pollmask*/)
 {
    // doesn't matter which type of socket here
    union
@@ -400,7 +396,7 @@ int Dispatcher::accept_socket(int acceptor, short /*pollmask*/, std::tuple<uint3
       fds_[fd].fd = fd;
       fds_[fd].events = POLLIN;
       
-      fctn_[fd] = std::bind(&Dispatcher::handle_data, this, _1, _2, _3);
+      fctn_[fd] = std::bind(&Dispatcher::handle_data, this, _1, _2);
    }
 
    if (fd >= 0)
@@ -410,19 +406,19 @@ int Dispatcher::accept_socket(int acceptor, short /*pollmask*/, std::tuple<uint3
 }
 
 
-int Dispatcher::handle_data(int fd, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> rq_data)
+int Dispatcher::handle_data(int fd, short /*pollmask*/)
 {
    // ordinary stream socket
    detail::FrameHeader f;
-   uint32_t sequence_nr = std::get<0>(rq_data);
-      
+   uint32_t sequence_nr = std::get<0>(current_);
+   
    ssize_t len = ::recv(fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
    
    if (len == sizeof(f) && f)
-   {
-      char** argData = std::get<1>(rq_data);
-      size_t* argLen = std::get<2>(rq_data);
-   
+   {  
+      char** argData = std::get<1>(current_);
+      size_t* argLen = std::get<2>(current_);
+      
       len = 0;
       std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
       
@@ -671,7 +667,7 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/, std::tuple<uint32_t, cha
 }
 
 
-int Dispatcher::handle_inotify(int fd, short /*pollmask*/, std::tuple<uint32_t, char**, size_t*> rq_data)
+int Dispatcher::handle_inotify(int fd, short /*pollmask*/)
 {
    // TODO arbitrary size '64'
    std::aligned_storage<sizeof(inotify_event) + 64, std::alignment_of<inotify_event>::value>::type buf;
@@ -699,7 +695,9 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       {
          if (fds_[i].revents & POLLIN)
          {
-            fctn_[fds_[i].fd](fds_[i].fd, fds_[i].revents, std::make_tuple(sequence_nr, argData, argLen));
+            current_ = std::make_tuple(sequence_nr, argData, argLen);
+            
+            fctn_[fds_[i].fd](fds_[i].fd, fds_[i].revents);
             break;  // TODO need better eventloop handling here 
          }                  
       }
@@ -804,7 +802,7 @@ Dispatcher::Dispatcher(const char* boundname)
    
    fds_[inotify_fd_].fd = inotify_fd_;
    fds_[inotify_fd_].events = POLLIN;
-   fctn_[inotify_fd_] = std::bind(&Dispatcher::handle_inotify, this, _1, _2, _3);
+   fctn_[inotify_fd_] = std::bind(&Dispatcher::handle_inotify, this, _1, _2);
    
    // FIXME what's this good for?   
    // can't use pipe since then the reading code would have to be changed...
@@ -879,7 +877,7 @@ bool Dispatcher::attach(const char* endpoint)
       fds_[acceptor].fd = acceptor;
       fds_[acceptor].events = POLLIN;
       
-      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2, _3);
+      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2);
       rc = true;
    }
    else if (!strncmp(endpoint, "tcp:", 4) && strlen(endpoint) > 4)
@@ -896,7 +894,7 @@ bool Dispatcher::attach(const char* endpoint)
       fds_[acceptor].fd = acceptor;
       fds_[acceptor].events = POLLIN;
       
-      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2, _3);
+      fctn_[acceptor] = std::bind(&Dispatcher::accept_socket, this, _1, _2);
       rc = true;
    }
    
