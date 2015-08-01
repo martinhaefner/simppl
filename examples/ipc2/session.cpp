@@ -94,11 +94,11 @@ struct Client : spl::Stub<::BankAccount>
     : spl::Stub<::BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
     , user_(user)
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       resultOfGetDeposit >> std::bind(&Client::handleGetDeposit, this, _1, _2);
    }
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState)
    {
       login(user_, "passwd");
       getDeposit();

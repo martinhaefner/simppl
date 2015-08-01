@@ -25,10 +25,10 @@ struct CalculatorClient : spl::Stub<::Calculator>
    CalculatorClient()
     : spl::Stub<::Calculator>(rolename, "auto:")
    {
-      connected >> std::bind(&CalculatorClient::handleConnected, this);
+      connected >> std::bind(&CalculatorClient::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       value.attach() >> std::bind(&CalculatorClient::valueChanged, this, _1);
       calc = this;

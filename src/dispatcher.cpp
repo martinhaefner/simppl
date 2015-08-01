@@ -782,7 +782,6 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
    {
       auto duetime = std::get<2>(iter->second);
       
-      // FIXME maybe have request specific timeouts, so there is no strict ordering
       if (duetime <= now)
       {
          if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
@@ -799,7 +798,7 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
          iter = pendings_.erase(iter);
       }
       else
-         break;
+         ++iter;
    }
    
    for(auto iter = pending_lookups_.begin(); iter != pending_lookups_.end(); /*NOOP*/)
