@@ -346,7 +346,6 @@ void Dispatcher::addServer(ServerT& serv)
    std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
    
    assert(servers_.find(name) == servers_.end());
-   std::cout << "Adding server for '" << name << "'" << std::endl;
    
    registerAtBroker(name, endpoints_.front());
    
@@ -361,6 +360,36 @@ void Dispatcher::addServer(ServerT& serv)
 }   // namespace ipc
    
 }   // namespace simppl
+
+
+/**
+ * Call semantics for blocking calls:
+ * 
+ * std::tuple<int> ret;
+ * bool rc = stub.func() >> ret;
+ */
+template<typename T>
+inline
+bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
+{
+   return holder.dispatcher_.waitForResponse(holder, rArg);
+}
+
+
+template<typename T1, typename T2>
+inline
+bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T1, T2>& rArgs)
+{
+   return holder.dispatcher_.waitForResponse(holder, std::get<0>(rArgs), std::get<1>(rArgs));
+}
+
+
+template<typename T1, typename T2, typename T3>
+inline
+bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T1, T2, T3>& rArgs)
+{
+   return holder.dispatcher_.waitForResponse(holder, std::get<1>(rArgs), std::get<2>(rArgs), std::get<3>(rArgs));
+}
 
 
 #endif   // SIMPPL_DISPATCHER_H

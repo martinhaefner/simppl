@@ -316,7 +316,9 @@ struct ClientRequest : detail::Parented
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
       detail::Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
-      return detail::ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
+      return detail::ClientResponseHolder(handler_, 
+         parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)), 
+         parent<StubBase>()->disp());
    }
 
    ClientResponseBase* handler_;

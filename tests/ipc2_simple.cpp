@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+// for new call semantic on blocking functions
+#define SIMPPL_HAVE_BOOST_FUSION 1
+
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
@@ -261,13 +264,9 @@ TEST(Simple, blocking)
    stub.oneway(102);
    stub.oneway(103);
 
-   //
-   // FIXME add following syntax:
-   //
-   // stub.add(42, 0.5) => result;
-   //
    double result;
-   d.waitForResponse(stub.add(42, 0.5), result);
+   stub.add(42, 0.5) >> result;
+   
    EXPECT_GT(21.01, result);
    EXPECT_LT(20.99, result);
    

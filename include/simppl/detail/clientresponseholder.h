@@ -3,6 +3,7 @@
 
 
 #include <cstdint>
+#include <tuple>
 
 
 // forward decl
@@ -14,6 +15,10 @@ namespace simppl
    
 namespace ipc
 {
+
+// forward decl
+struct Dispatcher;
+
    
 namespace detail
 {
@@ -21,15 +26,26 @@ namespace detail
 struct ClientResponseHolder
 {
    inline
-   ClientResponseHolder(ClientResponseBase* r, uint32_t sequence_nr)
+   ClientResponseHolder(ClientResponseBase* r, uint32_t sequence_nr, simppl::ipc::Dispatcher& dispatcher)
     : r_(r)
     , sequence_nr_(sequence_nr)
+    , dispatcher_(dispatcher)
    {
       // NOOP
    }
    
+   /** 
+    * Blocking call semantic:
+    *  
+    * bool rc = (bool)stub.func(42);
+    */
+   explicit
+   operator bool();
+
    ClientResponseBase* r_;
    uint32_t sequence_nr_;
+   
+   simppl::ipc::Dispatcher& dispatcher_;
 };
 
 } // namespace detail

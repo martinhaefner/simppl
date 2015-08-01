@@ -196,9 +196,6 @@ TEST(Timeout, method)
 {
    std::thread serverthread(&runServer);
    
-   // FIXME must make sure we don't need this wait here! -> inotify or anything else...
-   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-   
    simppl::ipc::Dispatcher d;
    Client c;
    
@@ -230,7 +227,6 @@ TEST(Timeout, oneway)
 TEST(Timeout, no_timeout) 
 {
    std::thread serverthread(&runServer);
-   
    std::thread clientthread(&runClient);
    
    std::this_thread::sleep_for(std::chrono::milliseconds(700));
