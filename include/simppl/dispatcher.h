@@ -45,22 +45,6 @@ namespace detail
 };
 
 
-template<int N, typename TupleT>
-inline
-void assign(const TupleT& tuple)
-{
-   // NOOP - end condition
-}
-
-template<int N, typename TupleT, typename T1, typename... T>
-inline
-void assign(const TupleT& tuple, T1& t1, T&... t)
-{
-   t1 = std::move(std::get<N>(tuple));
-   assign<N+1>(tuple, t...);
-}
-
-
 // --------------------------------------------------------------------------------------
 
 
@@ -160,8 +144,8 @@ struct Dispatcher
    bool waitForResponse(const detail::ClientResponseHolder& resp);
    
    /// at least one argument version - will throw exception on error
-   template<typename T1, typename... T>
-   bool waitForResponse(const detail::ClientResponseHolder& resp, T1& t1, T&... t)
+   template<typename T>
+   bool waitForResponse(const detail::ClientResponseHolder& resp, T& t)
    {
       assert(resp.r_);
       assert(!running_.load());
@@ -174,19 +158,41 @@ struct Dispatcher
       
       if (rc == 0)
       {
-         ClientResponse<T1, T...>* r = safe_cast<ClientResponse<T1, T...>*>(resp.r_);
+         ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
          assert(r);
          
          detail::Deserializer d(data, len);
-         std::tuple<T1, T...> tup;
-         d >> tup;
-         
-         assign<0>(tup, t1, t...);
+         d >> t;
       }
       
       return rc == 0;
    }
 
+   template<typename... T>
+   bool waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t)
+   {
+      assert(resp.r_);
+      assert(!running_.load());
+      
+      char* data = nullptr;
+      size_t len = 0;
+      
+      int rc = loopUntil(resp.sequence_nr_, &data, &len);
+      std::unique_ptr<char> raii(data);
+      
+      if (rc == 0)
+      {
+         ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
+         assert(r);
+         
+         detail::Deserializer d(data, len);
+         std::tuple<T...> tup;
+         d >> tup;
+      }
+      
+      return rc == 0;
+   }
+   
    int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
    
    inline
@@ -365,7 +371,7 @@ void Dispatcher::addServer(ServerT& serv)
 /**
  * Call semantics for blocking calls:
  * 
- * std::tuple<int> ret;
+ * int ret;
  * bool rc = stub.func() >> ret;
  */
 template<typename T>
@@ -376,19 +382,17 @@ bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
 }
 
 
-template<typename T1, typename T2>
+/**
+ * Call semantics for blocking calls:
+ * 
+ * std::tuple<int> ret;
+ * bool rc = stub.func() >> ret;
+ */
+template<typename... T>
 inline
-bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T1, T2>& rArgs)
+bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
 {
-   return holder.dispatcher_.waitForResponse(holder, std::get<0>(rArgs), std::get<1>(rArgs));
-}
-
-
-template<typename T1, typename T2, typename T3>
-inline
-bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T1, T2, T3>& rArgs)
-{
-   return holder.dispatcher_.waitForResponse(holder, std::get<1>(rArgs), std::get<2>(rArgs), std::get<3>(rArgs));
+   return holder.dispatcher_.waitForResponse(holder, rArgs);
 }
 
 
