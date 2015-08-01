@@ -149,7 +149,12 @@ struct Dispatcher
       return sequence_ == INVALID_SEQUENCE_NR ? ++sequence_ : sequence_;
    }
    
+   /// Add a client to the dispatcher. This is also necessary if blocking
+   /// should be used.
    void addClient(StubBase& clnt);
+   
+   /// Remove the client.
+   void removeClient(StubBase& clnt);
    
    /// no arguments version - will throw exception or error
    bool waitForResponse(const detail::ClientResponseHolder& resp);
@@ -238,6 +243,12 @@ public:
       sessions_[sessionid] = SessionData(fd, data, destructor);
    }
    
+   /// register arbitrary file descriptors, e.g. timers
+   void register_fd(int fd, short pollmask, std::function<int(int, short)> cb);
+   
+   /// user-specific fd
+   void unregister_fd(int fd);
+   
    
 private:
 
@@ -250,7 +261,7 @@ private:
    void add_inotify_location(StubBase& stub, const char* socketpath, bool block);
    
    int inotify_fd_;
-   std::multimap<std::string, std::tuple<StubBase*, bool>> pending_lookups_;
+   std::multimap<std::string, std::tuple<StubBase*, bool, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
    
    //registered servers
    servermap_type servers_;
@@ -262,6 +273,7 @@ private:
    
    pollfd fds_[32];
    
+   // iohandler callback functions
    std::map<int, std::function<int(int, short)>> fctn_;
    
    // registered clients

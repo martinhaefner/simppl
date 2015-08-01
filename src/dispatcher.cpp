@@ -233,7 +233,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
 
 void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath, bool block)
 {
-   pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, block)));
+   pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, block, get_lookup_duetime())));
    
    if (block)
       loopUntil(1, 0, 0 /*FIXME*/);   // loop until the correct event was emitted by inotify
@@ -619,8 +619,6 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                      }
                   }
                }
-               else
-                  std::cerr << "No such server found." << std::endl;
                
                genericSend(fd, rf, 0);
             }
@@ -644,7 +642,8 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                          std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
                      }
                      else
-                         stub->connected();
+                         stub->connected(hdr.irrf.id_ == INVALID_SERVER_ID ? 
+                           ConnectionState::NotAvailable : ConnectionState::Connected);
                   }
                   else if (sequence_nr == hdr.irrf.sequence_nr_)
                      running_.store(false);
@@ -680,6 +679,55 @@ int Dispatcher::handle_inotify(int fd, short /*pollmask*/)
    }
    
    return -1;
+}
+
+
+void Dispatcher::register_fd(int fd, short pollmask, std::function<int(int, short)> cb)
+{
+   fds_[fd].fd = fd;
+   fds_[fd].events = pollmask;
+      
+   fctn_[fd] = cb;
+}
+
+
+void Dispatcher::unregister_fd(int fd)
+{
+   fds_[fd].fd = -1;
+   fds_[fd].events = 0;
+   
+   fctn_.erase(fd);
+}
+
+
+void Dispatcher::removeClient(StubBase& clnt)
+{
+   for(auto iter = clients_.begin(); iter != clients_.end(); ++iter)
+   {
+      if (&clnt == iter->second)
+      {
+         clients_.erase(iter);
+         break;
+      } 
+   }
+      
+   for (auto iter = pending_lookups_.begin(); iter != pending_lookups_.end(); ++iter)
+   {
+      if (&clnt == std::get<0>(iter->second))
+      {
+         pending_lookups_.erase(iter);
+         break;
+      } 
+   }
+   
+   for (auto iter = pending_interface_resolves_.begin(); iter != pending_interface_resolves_.end(); ++iter)
+   {
+      if (&clnt == std::get<0>(iter->second))
+      {
+         pending_interface_resolves_.erase(iter);
+         break;
+      } 
+   }
 }
 
 
@@ -752,6 +800,45 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
       }
       else
          break;
+   }
+   
+   for(auto iter = pending_lookups_.begin(); iter != pending_lookups_.end(); /*NOOP*/)
+   {
+      if (std::get<2>(iter->second) <= now)
+      {
+         // blocking connect?
+         if (std::get<1>(iter->second) == true)
+         {
+            throw;   // FIXME implement this, how?
+         }
+         else
+         {
+            auto stub = std::get<0>(iter->second);
+            
+            if (stub->connected)
+               stub->connected(ConnectionState::Timeout);
+         }
+         
+         iter = pending_lookups_.erase(iter);
+      }
+      else
+         ++iter;
+   }
+   
+   for (auto iter = pending_interface_resolves_.begin(); iter != pending_interface_resolves_.end(); /*NOOP*/)
+   {
+      if (std::get<1>(iter->second) <= now)
+      {
+         // FIXME what about blocking here?
+         auto stub = std::get<0>(iter->second);
+            
+         if (stub->connected)
+               stub->connected(ConnectionState::Timeout);
+               
+         iter = pending_interface_resolves_.erase(iter);
+      }
+      else
+         ++iter;
    }
 }
 

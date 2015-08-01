@@ -48,13 +48,14 @@ struct Client : simppl::ipc::Stub<Simple>
    Client()   
     : simppl::ipc::Stub<Simple>("s", "unix:SimpleTest")    
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       world >> std::bind(&Client::handleWorld, this, _1);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
       hello();
    }
    
@@ -78,12 +79,14 @@ struct AttributeClient : simppl::ipc::Stub<Simple>
    AttributeClient()   
     : simppl::ipc::Stub<Simple>("sa", "unix:SimpleTest")
    {
-      connected >> std::bind(&AttributeClient::handleConnected, this);
+      connected >> std::bind(&AttributeClient::handleConnected, this, _1);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      
       // like for signals, attributes must be attached when the client is connected
       data.attach() >> std::bind(&AttributeClient::attributeChanged, this, _1);
    }
@@ -120,12 +123,14 @@ struct SignalClient : simppl::ipc::Stub<Simple>
    SignalClient()   
     : simppl::ipc::Stub<Simple>("ss", "unix:SimpleTest")    
    {
-      connected >> std::bind(&SignalClient::handleConnected, this);
+      connected >> std::bind(&SignalClient::handleConnected, this, _1);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      
       // like for attributes, attributes must be attached when the client is connected
       sig.attach() >> std::bind(&SignalClient::handleSignal, this, _1);
       oneway(100);

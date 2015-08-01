@@ -68,7 +68,7 @@ public:
 /// for storing a function in the connected function object
 template<typename CallableT>
 inline
-void operator>> (std::function<void()>& func, const CallableT& callable)
+void operator>> (std::function<void(simppl::ipc::ConnectionState)>& func, const CallableT& callable)
 {
    func = callable;
 }

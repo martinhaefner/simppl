@@ -8,6 +8,8 @@
 #include "simppl/detail/constants.h"
 #include "simppl/detail/parented.h"
 
+#include "simppl/ConnectionState.h"
+
 
 namespace simppl
 {
@@ -51,7 +53,7 @@ protected:
    
 public:
    
-   std::function<void()> connected;
+   std::function<void(ConnectionState)> connected;
    
    StubBase(const char* iface, const char* role, const char* boundname);
    

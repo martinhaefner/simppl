@@ -39,13 +39,15 @@ struct Client : simppl::ipc::Stub<Timeout>
    Client()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       rEval >> std::bind(&Client::handleEval, this, _1, _2);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      
       eval(42);
    }
    
@@ -69,13 +71,15 @@ struct DisconnectClient : simppl::ipc::Stub<Timeout>
    DisconnectClient()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&DisconnectClient::handleConnected, this);
+      connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
       rEval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      
       eval(777);
    }
    
@@ -98,15 +102,36 @@ struct OnewayClient : simppl::ipc::Stub<Timeout>
    OnewayClient()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&OnewayClient::handleConnected, this);
+      connected >> std::bind(&OnewayClient::handleConnected, this, _1);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
+      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      
       gbl_disp = &disp();
       oneway(42);
    }
+};
+
+
+struct NeverConnectedClient : simppl::ipc::Stub<Timeout>
+{
+   NeverConnectedClient(simppl::ipc::ConnectionState expected = simppl::ipc::ConnectionState::Timeout)   
+    : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")   
+    , expected_(expected) 
+   {
+      connected >> std::bind(&NeverConnectedClient::handleConnected, this, _1);
+   }
+   
+   void handleConnected(simppl::ipc::ConnectionState s)
+   {
+      EXPECT_EQ(expected_, s);
+      disp().stop();
+   }
+   
+   simppl::ipc::ConnectionState expected_;
 };
 
 
@@ -230,13 +255,33 @@ TEST(Timeout, blocking_api)
 }
 
 
+TEST(Timeout, interface_attach_invalid_server)
+{
+   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   NeverConnectedClient c(simppl::ipc::ConnectionState::NotAvailable);
+   
+   d.addClient(c);
+   d.run();
+}
+
+
 TEST(Timeout, interface_attach)
 {
-   // FIXME needs implementation
+   // server dispatcher not running ant therefore never returning response frame
+   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   simppl::ipc::Dispatcher d_client;
+   NeverConnectedClient c;
+   
+   d_client.addClient(c);
+   d_client.run();
 }
 
 
 TEST(Timeout, inotify)
 {
-   // FIXME needs implementation
+   simppl::ipc::Dispatcher d;
+   NeverConnectedClient c;
+   
+   d.addClient(c);
+   d.run();
 }

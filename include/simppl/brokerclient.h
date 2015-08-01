@@ -105,23 +105,28 @@ private:
        : Stub< ::Broker>("broker", "unix:the_broker")
       {
          serviceReady >> std::bind(&BrokerStub::handleServiceReady, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-         connected >> std::bind(&BrokerStub::handleConnected, this);
+         connected >> std::bind(&BrokerStub::handleConnected, this, std::placeholders::_1);
       }
       
-      void handleConnected()
+      
+      void handleConnected(simppl::ipc::ConnectionState s)
       {
-         if (!cache_.empty())
+         if (s == simppl::ipc::ConnectionState::Connected)
          {
-            std::for_each(cache_.begin(), cache_.end(), Register(*this));
-            cache_.clear();
-         }
-         
-         if (!waitersCache_.empty())
-         {
-            std::for_each(waitersCache_.begin(), waitersCache_.end(), WaitFor(*this));
-            waitersCache_.clear();
+            if (!cache_.empty())
+            {
+               std::for_each(cache_.begin(), cache_.end(), Register(*this));
+               cache_.clear();
+            }
+            
+            if (!waitersCache_.empty())
+            {
+               std::for_each(waitersCache_.begin(), waitersCache_.end(), WaitFor(*this));
+               waitersCache_.clear();
+            }
          }
       }
+      
       
       void handleServiceReady(const CallState& state, const std::string& fullName, const std::string& location)
       {
