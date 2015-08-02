@@ -43,17 +43,12 @@ public:
       ((interface_type*)this)->container_.clear();
    }
    
-   /// blocking connect to server
-   bool connect()
+   /// Blocking connect to server.
+   /// Note that even in blocking mode the stub needs to be added 
+   /// to the dispatcher.
+   void connect()
    {
-      assert(!dispatcherIsRunning());
-      
-      bool rc = true;
-      
-      if (fd_ <= 0)
-         rc = StubBase::connect(true);   // inherited friendship
-      
-      return rc;
+      StubBase::connect();
    }
 };
 

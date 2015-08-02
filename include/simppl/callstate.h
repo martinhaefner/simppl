@@ -36,7 +36,7 @@ struct CallState
    explicit inline
    operator bool() const
    {
-	   return ex_.get() ? false : true;
+      return ex_.get() ? false : true;
    } 
    
    
@@ -68,6 +68,21 @@ struct CallState
    const Error& exception() const
    {
       return *ex_;
+   }
+   
+   /// FIXME not inline
+   inline
+   void throw_exception() const
+   {
+      const TransportError* te = dynamic_cast<const TransportError*>(ex_.get());
+      if (te)
+         throw *te;
+         
+      const RuntimeError* re = dynamic_cast<const RuntimeError*>(ex_.get());
+      if (te)
+         throw *te;   
+         
+      abort();
    }
    
    

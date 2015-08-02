@@ -135,28 +135,19 @@ void Dispatcher::registerAtBroker(const std::string& service, const std::string&
 }
 
 
-bool Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
+void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
 {
    assert(resp.r_);
    assert(!running_.load());
    
-   char* data = nullptr;
-   size_t len = 0;
+   ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
+   assert(r);
    
-   int rc = loopUntil(resp.sequence_nr_, &data, &len);
-   std::unique_ptr<char> raii(data);
-   
-   if (rc == 0)
-   {
-      ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
-      assert(r);
-   }
-   
-   return rc == 0;
+   // FIXME not finished
 }
 
 
-bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* location)
+void Dispatcher::connect(StubBase& stub, const char* location)
 {
    const char* the_location = location ? location : stub.boundname_;
    
@@ -171,7 +162,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
    else
    {
       int rc = -1;
-      
+
       if (!strncmp(the_location, "unix:", 5))
       {
          stub.fd_ = ::socket(PF_UNIX, SOCK_STREAM, 0);
@@ -182,7 +173,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          
          rc = ::connect(stub.fd_, (struct sockaddr*)&addr, sizeof(addr));
          if (rc < 0)
-            add_inotify_location(stub, the_location + 5, blockUntilResponse);
+            add_inotify_location(stub, the_location + 5);
       }
       else if (!strncmp(the_location, "tcp:", 4))
       {
@@ -200,7 +191,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          }
       }
       else
-         return false;
+         return;
    
       if (rc == 0)
       {
@@ -211,27 +202,40 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          
          socks_[the_location] = stub.fd_;
       }
+      else
+      {
+         while(::close(stub.fd_) < 0 && errno == EINTR);
+         stub.fd_ = -1;
+      }
    }
    
+   uint32_t seqnr;
+   
    // 2. initialize interface resolution
-   if (stub.fd_ > 0)
+   if (stub.fd_ >= 0)
+       seqnr = send_resolve_interface(stub);
+   
+   if (!isRunning())
    {
-      uint32_t seq = send_resolve_interface(stub);
-     
-      // note that this function will be stacked two times in case a 
-      // client may not be connected. this is a bit horrible but 
-      // currently there is no other solution...
-      if (blockUntilResponse)
-         loopUntil(seq);
+      stub.connected >> std::bind(&Dispatcher::handle_blocking_connect, this, _1, &stub, seqnr);
+      loop();
    }
-      
-   return stub.fd_ > 0;
 }
 
 
-void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath, bool block)
+void Dispatcher::handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr)
 {
-   pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, block, get_lookup_duetime())));
+   stop();
+   // FIXME reset connected handler of stub
+   
+   if (s == ConnectionState::Timeout)
+      throw TransportError(ETIMEDOUT, seqNr);
+}
+
+
+void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath)
+{
+   pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, get_lookup_duetime())));
 }
 
 
@@ -246,7 +250,7 @@ void Dispatcher::handle_inotify_event(struct inotify_event* evt)
       
       for(auto iter = pair.first; iter != pair.second; ++iter)
       {
-         (void)connect(*std::get<0>(iter->second), std::get<1>(iter->second), location.c_str());
+         (void)connect(*std::get<0>(iter->second), location.c_str());
       }
    }
 }
@@ -275,7 +279,7 @@ uint32_t Dispatcher::send_resolve_interface(StubBase& stub)
 void Dispatcher::serviceReady(StubBase* stub, const std::string& fullName, const std::string& location)
 {
    assert(::fullQualifiedName(*stub) == fullName);
-   connect(*stub, false, location.c_str());
+   connect(*stub, location.c_str());
 }
 
 
@@ -325,14 +329,14 @@ bool Dispatcher::addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr
 }
 
 
-int Dispatcher::loopUntil(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs)
+int Dispatcher::loop(unsigned int timeoutMs)
 {
    int retval = 0;
    running_.store(true);
    
    do
    {
-      retval = once_(sequence_nr, argData, argLen, timeoutMs);
+      retval = once(timeoutMs);
    }
    while(running_.load());
    
@@ -405,15 +409,11 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
 {
    // ordinary stream socket
    detail::FrameHeader f;
-   uint32_t sequence_nr = std::get<0>(current_);
    
    ssize_t len = ::recv(fd, &f, sizeof(f), MSG_NOSIGNAL|MSG_WAITALL|MSG_PEEK);
    
    if (len == sizeof(f) && f)
    {  
-      char** argData = std::get<1>(current_);
-      size_t* argLen = std::get<2>(current_);
-      
       len = 0;
       std::unique_ptr<char> buf;   // it's safe since POD array though scoped_array would be better here!
       
@@ -473,16 +473,8 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
             break;
             
          case FRAME_TYPE_TRANSPORT_ERROR:
-            if (sequence_nr == INVALID_SEQUENCE_NR || sequence_nr != hdr.tef.sequence_nr_)
-            {
-               CallState cs((TransportError*)(hdr.tef.err_));
-               ((ClientResponseBase*)hdr.tef.handler_)->eval(cs, 0, 0);
-            }
-            else
-            {
-               std::unique_ptr<TransportError> var((TransportError*)(hdr.tef.err_));
-               throw *var;
-            }
+         
+            ((ClientResponseBase*)hdr.tef.handler_)->eval(CallState((TransportError*)(hdr.tef.err_)), 0, 0);
          
             break;
             
@@ -491,39 +483,15 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                auto iter = pendings_.find(hdr.rf.sequence_nr_);
                if (iter != pendings_.end())
                {
-                  if (sequence_nr == INVALID_SEQUENCE_NR || hdr.rf.sequence_nr_ != sequence_nr)
+                  if (hdr.rf.result_ == 0)   // normal response
                   {
-                     if (hdr.rf.result_ == 0)   // normal response
-                     {
-                        CallState cs(hdr.rf.sequence_nr_);
-                        std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
-                     }
-                     else   // error response
-                     {
-                        CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
-                        std::get<1>(iter->second)->eval(cs, 0, 0);
-                     }
+                     CallState cs(hdr.rf.sequence_nr_);
+                     std::get<1>(iter->second)->eval(cs, buf.get(), hdr.rf.payloadsize_);
                   }
-                  else
+                  else   // error response
                   {
-                     assert(argLen);
-                     running_.store(false);
-                     
-                     if (hdr.rf.result_ == 0)
-                     {
-                        if (buf.get() == 0)
-                        {
-                           // must copy payload in this case
-                           *argData = new char[hdr.rf.payloadsize_];
-                           ::memcpy(*argData, buf.get(), hdr.rf.payloadsize_);
-                        }
-                        else
-                           *argData = buf.release();
-                        
-                        *argLen = hdr.rf.payloadsize_;
-                     }
-                     else
-                        throw RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_);
+                     CallState cs(new RuntimeError(hdr.rf.result_, (const char*)buf.get(), hdr.rf.sequence_nr_));
+                     std::get<1>(iter->second)->eval(cs, 0, 0);
                   }
                   
                   pendings_.erase(iter);
@@ -579,9 +547,6 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                }
                else
                   std::cerr << "No such signal registration found." << std::endl;
-               
-               if (sequence_nr == hdr.srf.sequence_nr_)
-                  running_.store(false);
             }
             break;
 
@@ -629,22 +594,13 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                   stub->current_sessionid_ = hdr.irrf.sessionid_;
                   pending_interface_resolves_.erase(iter);
                   
-                  if (sequence_nr == INVALID_SEQUENCE_NR)
+                  if (!stub->connected)
                   {
-                     // eventloop driven
-                     if (!stub->connected)
-                     {
-                         std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
-                     }
-                     else
-                         stub->connected(hdr.irrf.id_ == INVALID_SERVER_ID ? 
-                           ConnectionState::NotAvailable : ConnectionState::Connected);
+                      std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
                   }
-                  else if (sequence_nr == hdr.irrf.sequence_nr_)
-                     running_.store(false);
-                  
-                  if (stub->id_ == INVALID_SERVER_ID)
-                     stub->fd_ = -1;   // FIXME release socket correctly
+                  else
+                      stub->connected(hdr.irrf.id_ == INVALID_SERVER_ID ? 
+                        ConnectionState::NotAvailable : ConnectionState::Connected);
                }
             }
             break;
@@ -655,10 +611,10 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
          }
       }
       else
-         clearSlot(fd, sequence_nr);
+         clearSlot(fd);
    }
    else
-      clearSlot(fd, sequence_nr);                      
+      clearSlot(fd);                      
    
    return 0;
 }
@@ -729,7 +685,7 @@ void Dispatcher::removeClient(StubBase& clnt)
 }
 
 
-int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs)
+int Dispatcher::once(unsigned int timeoutMs)
 {
    int retval = 0;
    
@@ -741,8 +697,6 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       {
          if (fds_[i].revents & POLLIN)
          {
-            current_ = std::make_tuple(sequence_nr, argData, argLen);
-            
             fctn_[fds_[i].fd](fds_[i].fd, fds_[i].revents);
             break;  // TODO need better eventloop handling here 
          }                  
@@ -757,7 +711,7 @@ int Dispatcher::once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsi
       }
    }
    
-   checkPendings(sequence_nr);
+   checkPendings();
    
    return retval;
 }
@@ -772,7 +726,7 @@ std::chrono::steady_clock::time_point Dispatcher::dueTime() const
 }
 
 
-void Dispatcher::checkPendings(uint32_t current_sequence_number)
+void Dispatcher::checkPendings()
 {
    auto now = std::chrono::steady_clock::now();
       
@@ -782,17 +736,7 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
       
       if (duetime <= now)
       {
-         if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
-         {
-            CallState cs(new TransportError(ETIMEDOUT, iter->first));
-            std::get<1>(iter->second)->eval(cs, 0, 0);
-         }
-         else
-         {
-            running_.store(false);   
-            throw TransportError(ETIMEDOUT, iter->first);
-         }
-         
+         std::get<1>(iter->second)->eval(CallState(new TransportError(ETIMEDOUT, iter->first)), 0, 0);
          iter = pendings_.erase(iter);
       }
       else
@@ -801,20 +745,12 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
    
    for(auto iter = pending_lookups_.begin(); iter != pending_lookups_.end(); /*NOOP*/)
    {
-      if (std::get<2>(iter->second) <= now)
+      if (std::get<1>(iter->second) <= now)
       {
-         // blocking connect?
-         if (std::get<1>(iter->second) == true)
-         {
-            throw;   // FIXME implement this, how?
-         }
-         else
-         {
-            auto stub = std::get<0>(iter->second);
+         auto stub = std::get<0>(iter->second);
             
-            if (stub->connected)
-               stub->connected(ConnectionState::Timeout);
-         }
+         if (stub->connected)
+            stub->connected(ConnectionState::Timeout);
          
          iter = pending_lookups_.erase(iter);
       }
@@ -840,7 +776,7 @@ void Dispatcher::checkPendings(uint32_t current_sequence_number)
 }
 
 
-void Dispatcher::removePendingsForFd(int fd, uint32_t current_sequence_number)
+void Dispatcher::removePendingsForFd(int fd)
 {
    auto iter = pendings_.begin();
    
@@ -848,18 +784,7 @@ void Dispatcher::removePendingsForFd(int fd, uint32_t current_sequence_number)
    {
       if (std::get<3>(iter->second) == fd)
       {
-         // FIXME bring this sequence together into one function (normal response, checkPendings, ...)
-         if (current_sequence_number == INVALID_SEQUENCE_NR || iter->first != current_sequence_number)
-         {
-            CallState cs(new TransportError(ECONNABORTED, iter->first));
-            std::get<1>(iter->second)->eval(cs, 0, 0);
-         }
-         else
-         {
-            running_.store(false);   
-            throw TransportError(ECONNABORTED, iter->first);
-         }
-         
+         std::get<1>(iter->second)->eval(CallState(new TransportError(ECONNABORTED, iter->first)), 0, 0);
          iter = pendings_.erase(iter);
       }
       else
@@ -920,19 +845,17 @@ int Dispatcher::run()
       {
          if (iter->second->fd_ <= 0)
          {
-            bool rc = connect(*iter->second);
+            connect(*iter->second);
             
-            if (!strncmp(iter->second->boundname_, "tcp:", 4))
-            {
-               assert(rc);
-               return EXIT_FAILURE;
-            }
+            // FIXME handle connect errors
+            //if (!strncmp(iter->second->boundname_, "tcp:", 4))
+              // return EXIT_FAILURE;
          }
       }
    }
    
    // now enter infinite eventloop
-   loopUntil();
+   loop();
    
    return EXIT_SUCCESS;
 }
@@ -1000,9 +923,9 @@ void* Dispatcher::getSessionData(uint32_t sessionid)
 }
 
 
-void Dispatcher::clearSlot(int idx, uint32_t current_sequence_number)
+void Dispatcher::clearSlot(int idx)
 {
-   removePendingsForFd(fds_[idx].fd, current_sequence_number);
+   removePendingsForFd(fds_[idx].fd);
    
    while(::close(fds_[idx].fd) && errno == EINTR);
    

@@ -48,6 +48,7 @@ struct Client : simppl::ipc::Stub<Timeout>
    {
       EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
       
+      start_ = std::chrono::steady_clock::now();
       eval(42);
    }
    
@@ -60,9 +61,15 @@ struct Client : simppl::ipc::Stub<Timeout>
       EXPECT_FALSE(state.isRuntimeError());
       EXPECT_EQ(ETIMEDOUT, static_cast<const simppl::ipc::TransportError&>(state.exception()).getErrno());
       
+      int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
+      EXPECT_GT(millis, 500);
+      EXPECT_LT(millis, 600);
+      
       gbl_disp->stop();   // servers dispatcher
       disp().stop();
    }
+   
+   std::chrono::steady_clock::time_point start_;
 };
 
 
@@ -245,6 +252,28 @@ TEST(Timeout, request_specific)
 }
 
 
+TEST(Timeout, blocking_connect)
+{
+   simppl::ipc::Dispatcher d;
+   simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   
+   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.addClient(stub);
+   
+   try
+   {
+      stub.connect();
+      
+      // never arrive here!
+      EXPECT_FALSE(true);    
+   }
+   catch(const simppl::ipc::TransportError& err)
+   {
+      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+   }
+}
+
+
 TEST(Timeout, blocking_api)
 {
    std::thread serverthread(&runServer);
@@ -255,17 +284,17 @@ TEST(Timeout, blocking_api)
    d.setRequestTimeout(std::chrono::milliseconds(500));
    d.addClient(stub);
    
-   ASSERT_TRUE(stub.connect());
+   stub.connect();
    
    try
    {
       double rc;
-      EXPECT_TRUE(stub.eval(42) >> rc);
+      stub.eval(42) >> rc;
       
       // never arrive here!
       EXPECT_FALSE(true);    
    }
-   catch(simppl::ipc::TransportError& err)
+   catch(const simppl::ipc::TransportError& err)
    {
       EXPECT_EQ(ETIMEDOUT, err.getErrno());
    }

@@ -4,5 +4,6 @@
 
 simppl::ipc::detail::ClientResponseHolder::operator bool()
 {
-   return dispatcher_.waitForResponse(*this);
+   dispatcher_.waitForResponse(*this);
+   return true;   // FIXME remove the bool return value
 }

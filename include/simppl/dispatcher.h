@@ -141,74 +141,76 @@ struct Dispatcher
    void removeClient(StubBase& clnt);
    
    /// no arguments version - will throw exception or error
-   bool waitForResponse(const detail::ClientResponseHolder& resp);
+   void waitForResponse(const detail::ClientResponseHolder& resp);
+   
+   template<typename T>
+   struct BlockingResponseHandler
+   {
+      BlockingResponseHandler(Dispatcher& disp, T& t)
+       : t_(t)
+       , disp_(disp)
+      {
+         // NOOP
+      }
+      
+      // FIXME Calltraits here
+      void operator()(const CallState& state, const T& t)
+      {
+         disp_.stop();
+         
+         if (state)
+         {
+            t_ = t;
+         }
+         else
+            state.throw_exception();
+      }
+      
+      T& t_;
+      Dispatcher& disp_;
+   };
    
    /// at least one argument version - will throw exception on error
    template<typename T>
-   bool waitForResponse(const detail::ClientResponseHolder& resp, T& t)
+   void waitForResponse(const detail::ClientResponseHolder& resp, T& t)
    {
       assert(resp.r_);
       assert(!running_.load());
       
-      char* data = nullptr;
-      size_t len = 0;
+      ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
+      assert(r);
       
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
-      std::unique_ptr<char> raii(data);
+      BlockingResponseHandler<T> handler(*this, t);
+      r->handledBy(handler);
+      // FIXME reset handler in response
       
-      if (rc == 0)
-      {
-         ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
-         assert(r);
-         
-         detail::Deserializer d(data, len);
-         d >> t;
-      }
-      
-      return rc == 0;
+      loop();
    }
 
    template<typename... T>
-   bool waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t)
+   void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t)
    {
       assert(resp.r_);
       assert(!running_.load());
       
-      char* data = nullptr;
-      size_t len = 0;
+      ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
+      assert(r);
       
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
-      std::unique_ptr<char> raii(data);
-      
-      if (rc == 0)
-      {
-         ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
-         assert(r);
-         
-         detail::Deserializer d(data, len);
-         std::tuple<T...> tup;
-         d >> tup;
-      }
-      
-      return rc == 0;
+      // FIXME not finished
    }
    
-   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
-   
-   inline
-   int once(unsigned int timeoutMs = 500)
-   {
-      char* data = nullptr;
-      return once_(INVALID_SEQUENCE_NR, &data, 0, timeoutMs);
-   }
-
    std::string fullQualifiedName(const char* ifname, const char* rolename);
    
    
 private:
 
-   void checkPendings(uint32_t current_sequence_number);
-   void removePendingsForFd(int fd, uint32_t current_sequence_number);
+   int loop(unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
+   int once(unsigned int timeoutMs = 500);
+
+   void handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr);
+
+   void checkPendings();
+   void removePendingsForFd(int fd);
    
    /// calculate duetime for request
    std::chrono::steady_clock::time_point dueTime() const;
@@ -219,15 +221,14 @@ private:
    int handle_data(int fd, short pollmask);
    int handle_inotify(int fd, short pollmask);
    
-   int once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs);
-   
+
 public:
    
    int run();
    
    bool isSignalRegistered(ClientSignalBase& sigbase) const;
    
-   void clearSlot(int idx, uint32_t current_sequence_nr);
+   void clearSlot(int idx);
    
    inline
    void stop()
@@ -260,14 +261,14 @@ private:
 
    void registerAtBroker(const std::string& service, const std::string& endpoint);
 
-   bool connect(StubBase& stub, bool blockUntilResponse = false, const char* location = 0);
+   void connect(StubBase& stub, const char* location = 0);
 
    uint32_t send_resolve_interface(StubBase& stub);
    void handle_inotify_event(struct inotify_event* evt);
-   void add_inotify_location(StubBase& stub, const char* socketpath, bool block);
+   void add_inotify_location(StubBase& stub, const char* socketpath);
    
    int inotify_fd_;
-   std::multimap<std::string, std::tuple<StubBase*, bool, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
+   std::multimap<std::string, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
    
    //registered servers
    servermap_type servers_;
@@ -305,8 +306,6 @@ private:
    std::vector<std::string> endpoints_;
    
    sessionmap_type sessions_;
-   
-   std::tuple<uint32_t/*=seqnr*/, char**, size_t*> current_;
    
    int selfpipe_[2];
    std::chrono::milliseconds request_timeout_;
@@ -376,9 +375,9 @@ void Dispatcher::addServer(ServerT& serv)
  */
 template<typename T>
 inline
-bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
+void operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
 {
-   return holder.dispatcher_.waitForResponse(holder, rArg);
+   holder.dispatcher_.waitForResponse(holder, rArg);
 }
 
 
@@ -390,9 +389,9 @@ bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
  */
 template<typename... T>
 inline
-bool operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
+void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
 {
-   return holder.dispatcher_.waitForResponse(holder, rArgs);
+   holder.dispatcher_.waitForResponse(holder, rArgs);
 }
 
 

@@ -36,8 +36,8 @@ struct StubBase
    
 protected:
    
-   // friendship inheritence
-   bool connect(bool block);
+   // friendship inheritence, blocking connect
+   void connect();
    
    inline
    ~StubBase()

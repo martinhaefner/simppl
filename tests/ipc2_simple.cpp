@@ -250,15 +250,14 @@ TEST(Simple, attribute)
 TEST(Simple, blocking) 
 {
    simppl::ipc::Dispatcher d("unix:SimpleTest");
+   
    Server s("sb");
    d.addServer(s);
    
    simppl::ipc::Stub<Simple> stub("sb", "unix:SimpleTest");
-   
-   // FIXME if not added we get a segmentation fault -> add an assertion somewhere...
    d.addClient(stub);
    
-   EXPECT_EQ(true, stub.connect());
+   stub.connect();
    
    stub.oneway(101);
    stub.oneway(102);

@@ -90,20 +90,14 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
    f.sequence_nr_ = disp_->generateSequenceNr();
    
    if (disp_->addSignalRegistration(sigbase, f.sequence_nr_))
-   {
-      if (genericSend(fd(), f, 0))
-      {
-         if (!disp_->isRunning())
-            disp_->loopUntil(f.sequence_nr_);
-      }
-      //else FIXME remove signal registration again
-   }
+      genericSend(fd(), f, 0);
 }
 
 
-bool StubBase::connect(bool block)
+void StubBase::connect()
 {
-   return disp_->connect(*this, block);
+   assert(disp_);
+   disp_->connect(*this);
 }
 
 
