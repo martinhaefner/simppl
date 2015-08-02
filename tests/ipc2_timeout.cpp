@@ -247,7 +247,32 @@ TEST(Timeout, request_specific)
 
 TEST(Timeout, blocking_api)
 {
-   // FIXME
+   std::thread serverthread(&runServer);
+   
+   simppl::ipc::Dispatcher d;
+   simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   
+   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.addClient(stub);
+   
+   ASSERT_TRUE(stub.connect());
+   
+   try
+   {
+      double rc;
+      EXPECT_TRUE(stub.eval(42) >> rc);
+      
+      // never arrive here!
+      EXPECT_FALSE(true);    
+   }
+   catch(simppl::ipc::TransportError& err)
+   {
+      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+   }
+   
+   // cleanup server
+   gbl_disp->stop();
+   serverthread.join();
 }
 
 

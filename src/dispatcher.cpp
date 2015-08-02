@@ -44,7 +44,7 @@ void makeInetAddress(struct sockaddr_in& addr, const char* endpoint)
    while(*++port != ':');
    *port = '\0';
    ++port;
-   //std::cout << "'" << tmp << " : '" << port << "'" << std::endl;
+
    addr.sin_family = AF_INET;
    addr.sin_port = htons(::atoi(port));
    addr.sin_addr.s_addr = ::inet_addr(tmp + 4);
@@ -161,7 +161,7 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
    const char* the_location = location ? location : stub.boundname_;
    
    assert(strcmp(the_location, "auto:"));
-   
+
    // 1. connect the socket physically - if not yet done
    auto iter = socks_.find(the_location);
    if (iter != socks_.end())
@@ -211,18 +211,16 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
          
          socks_[the_location] = stub.fd_;
       }
-      else
-      {
-         while(::close(stub.fd_) < 0 && errno == EINTR);
-         stub.fd_ = -1;
-      }
    }
    
    // 2. initialize interface resolution
    if (stub.fd_ > 0)
    {
-      int seq = send_resolve_interface(stub);
-      
+      uint32_t seq = send_resolve_interface(stub);
+     
+      // note that this function will be stacked two times in case a 
+      // client may not be connected. this is a bit horrible but 
+      // currently there is no other solution...
       if (blockUntilResponse)
          loopUntil(seq);
    }
@@ -234,9 +232,6 @@ bool Dispatcher::connect(StubBase& stub, bool blockUntilResponse, const char* lo
 void Dispatcher::add_inotify_location(StubBase& stub, const char* socketpath, bool block)
 {
    pending_lookups_.insert(std::make_pair(socketpath, std::make_tuple(&stub, block, get_lookup_duetime())));
-   
-   if (block)
-      loopUntil(1, 0, 0 /*FIXME*/);   // loop until the correct event was emitted by inotify
 }
 
 
@@ -251,7 +246,7 @@ void Dispatcher::handle_inotify_event(struct inotify_event* evt)
       
       for(auto iter = pair.first; iter != pair.second; ++iter)
       {
-         connect(*std::get<0>(iter->second), std::get<1>(iter->second), location.c_str());
+         (void)connect(*std::get<0>(iter->second), std::get<1>(iter->second), location.c_str());
       }
    }
 }
@@ -647,6 +642,9 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                   }
                   else if (sequence_nr == hdr.irrf.sequence_nr_)
                      running_.store(false);
+                  
+                  if (stub->id_ == INVALID_SERVER_ID)
+                     stub->fd_ = -1;   // FIXME release socket correctly
                }
             }
             break;
