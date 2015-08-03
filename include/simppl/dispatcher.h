@@ -23,6 +23,10 @@
 #endif
 
 
+// forward decl
+struct inotify_event;
+
+
 namespace simppl
 {
    
@@ -39,22 +43,6 @@ namespace detail
 {
    struct Parented;
 };
-
-
-template<int N, typename TupleT>
-inline
-void assign(const TupleT& tuple)
-{
-   // NOOP - end condition
-}
-
-template<int N, typename TupleT, typename T1, typename... T>
-inline
-void assign(const TupleT& tuple, T1& t1, T&... t)
-{
-   t1 = std::move(std::get<N>(tuple));
-   assign<N+1>(tuple, t...);
-}
 
 
 // --------------------------------------------------------------------------------------
@@ -145,72 +133,53 @@ struct Dispatcher
       return sequence_ == INVALID_SEQUENCE_NR ? ++sequence_ : sequence_;
    }
    
+   /// Add a client to the dispatcher. This is also necessary if blocking
+   /// should be used.
    void addClient(StubBase& clnt);
    
+   /// Remove the client.
+   void removeClient(StubBase& clnt);
+   
    /// no arguments version - will throw exception or error
-   bool waitForResponse(const detail::ClientResponseHolder& resp);
+   void waitForResponse(const detail::ClientResponseHolder& resp);
    
    /// at least one argument version - will throw exception on error
-   template<typename T1, typename... T>
-   bool waitForResponse(const detail::ClientResponseHolder& resp, T1& t1, T&... t)
-   {
-      assert(resp.r_);
-      assert(!running_.load());
-      
-      char* data = nullptr;
-      size_t len = 0;
-      
-      int rc = loopUntil(resp.sequence_nr_, &data, &len);
-      std::unique_ptr<char> raii(data);
-      
-      if (rc == 0)
-      {
-         ClientResponse<T1, T...>* r = safe_cast<ClientResponse<T1, T...>*>(resp.r_);
-         assert(r);
-         
-         detail::Deserializer d(data, len);
-         std::tuple<T1, T...> tup;
-         d >> tup;
-         
-         assign<0>(tup, t1, t...);
-      }
-      
-      return rc == 0;
-   }
+   template<typename T>
+   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);
 
-   int loopUntil(uint32_t sequence_nr = INVALID_SEQUENCE_NR, char** argData = nullptr, size_t* argLen = 0, unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
+   template<typename... T>
+   void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t);
    
-   inline
-   int once(unsigned int timeoutMs = 500)
-   {
-      char* data = nullptr;
-      return once_(INVALID_SEQUENCE_NR, &data, 0, timeoutMs);
-   }
-
    std::string fullQualifiedName(const char* ifname, const char* rolename);
    
    
 private:
 
-   void checkPendings(uint32_t current_sequence_number);
-   void removePendingsForFd(int fd, uint32_t current_sequence_number);
+   int loop(unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
+   int once(unsigned int timeoutMs = 500);
+
+   void handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr);
+
+   void checkPendings();
+   void removePendingsForFd(int fd);
    
    /// calculate duetime for request
    std::chrono::steady_clock::time_point dueTime() const;
    
    void serviceReady(StubBase* stub, const std::string& fullName, const std::string& location);
    
-   int accept_socket(int acceptor);
+   int accept_socket(int acceptor, short pollmask);
+   int handle_data(int fd, short pollmask);
+   int handle_inotify(int fd, short pollmask);
    
-   int once_(uint32_t sequence_nr, char** argData, size_t* argLen, unsigned int timeoutMs);
-   
+
 public:
    
    int run();
    
    bool isSignalRegistered(ClientSignalBase& sigbase) const;
    
-   void clearSlot(int idx, uint32_t current_sequence_nr);
+   void clearSlot(int idx);
    
    inline
    void stop()
@@ -232,15 +201,29 @@ public:
       sessions_[sessionid] = SessionData(fd, data, destructor);
    }
    
+   /// register arbitrary file descriptors, e.g. timers
+   void register_fd(int fd, short pollmask, std::function<int(int, short)> cb);
+   
+   /// user-specific fd
+   void unregister_fd(int fd);
+   
    
 private:
 
    void registerAtBroker(const std::string& service, const std::string& endpoint);
 
-   bool connect(StubBase& stub, bool blockUntilResponse = false, const char* location = 0);
+   void connect(StubBase& stub, const char* location = 0);
 
+   uint32_t send_resolve_interface(StubBase& stub);
+   void handle_inotify_event(struct inotify_event* evt);
+   void add_inotify_location(StubBase& stub, const char* socketpath);
    
-   //registered servers
+   // inotify based lookups for handling startup race conditions. This
+   // only works for unix: based services. 
+   int inotify_fd_;
+   std::multimap<std::string, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
+   
+   // registered servers
    servermap_type servers_;
    servermapid_type servers_by_id_;
    std::map<uint32_t/*=sequencenr*/, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_interface_resolves_;
@@ -250,8 +233,8 @@ private:
    
    pollfd fds_[32];
    
-   typedef int(Dispatcher::*acceptfunction_type)(int);
-   acceptfunction_type af_[32];   ///< may have different kind of sockets here (tcp or unix)
+   // iohandler callback functions
+   std::map<int, std::function<int(int, short)>> fctn_;
    
    // registered clients
    clientmap_type clients_;
@@ -270,6 +253,7 @@ private:
    sighandlers_type sighandlers_;   
    serversignalers_type server_sighandlers_;
    
+   /// FIXME need refcounting here!
    socketsmap_type socks_;
    
    BrokerClient* broker_;
@@ -277,7 +261,6 @@ private:
    
    sessionmap_type sessions_;
    
-   int selfpipe_[2];
    std::chrono::milliseconds request_timeout_;
 };
 
@@ -321,7 +304,6 @@ void Dispatcher::addServer(ServerT& serv)
    std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
    
    assert(servers_.find(name) == servers_.end());
-   std::cout << "Adding server for '" << name << "'" << std::endl;
    
    registerAtBroker(name, endpoints_.front());
    

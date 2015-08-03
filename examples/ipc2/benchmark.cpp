@@ -94,10 +94,10 @@ struct Client : simppl::ipc::Stub<DSIBenchmark>
       mPodStruct.anotherDouble = 3;
       mPodStruct.aString = "01234567890123456789";   
       
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState)
    {
       rCallNoArg.attach();     
       

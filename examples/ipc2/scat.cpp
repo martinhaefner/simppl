@@ -4,6 +4,8 @@
 #include "simppl/dispatcher.h"
 #include "simppl/stub.h"
 #include "simppl/sbroker.h"
+#include "simppl/blocking.h"
+
 
 namespace spl = simppl::ipc;
 
@@ -29,26 +31,29 @@ int main()
    spl::Stub<::Broker> broker("broker", "unix:the_broker");
    disp.addClient(broker);
    
-   if (broker.connect())
+   try
    {
+      broker.connect();
+      
       std::vector<spl::ServiceInfo> services;
-      if (disp.waitForResponse(broker.listServices(), services))
-      {
-         std::cout << "Available services: " << std::endl;
-         std::for_each(services.begin(), services.end(), printServiceInfo);
-         std::cout << std::endl;
-         
-         std::vector<std::string> waiters;
-         if (disp.waitForResponse(broker.listWaiters(), waiters))
-         {
-            std::cout << "Waiters waiting for: " << std::endl;
-            std::for_each(waiters.begin(), waiters.end(), printWaiterInfo);
-            std::cout << std::endl;
-            
-            return EXIT_SUCCESS;
-         }
-      }
+      broker.listServices() >> services;
+      
+      std::cout << "Available services: " << std::endl;
+      std::for_each(services.begin(), services.end(), printServiceInfo);
+      std::cout << std::endl;
+      
+      std::vector<std::string> waiters;
+      broker.listWaiters() >> waiters;
+      
+      std::cout << "Waiters waiting for: " << std::endl;
+      std::for_each(waiters.begin(), waiters.end(), printWaiterInfo);
+      std::cout << std::endl;
+   }
+   catch(const std::exception& ex)
+   {
+      std::cerr << "Exception occured: " << ex.what() << std::endl;
+      return EXIT_FAILURE;
    }
    
-   return EXIT_FAILURE;
+   return EXIT_SUCCESS;
 }

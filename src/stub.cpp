@@ -29,6 +29,13 @@ StubBase::StubBase(const char* iface, const char* role, const char* boundname)
 }
 
 
+StubBase::~StubBase()
+{
+   if (disp_)
+      disp_->removeClient(*this);
+}
+
+
 Dispatcher& StubBase::disp()
 {
    assert(disp_);
@@ -55,20 +62,7 @@ uint32_t StubBase::sendRequest(detail::Parented& requestor, ClientResponseBase* 
       if (handler)
          disp_->addRequest(requestor, *handler, f.sequence_nr_, fd());
    }
-   else
-   {
-      // no fire-and-forget?
-      if (handler)
-      {
-         errno = EINVAL;
-         TransportError* err = new TransportError(errno, f.sequence_nr_);
-         
-         detail::TransportErrorFrame ef(handler, err);
-         ef.sequence_nr_ = f.sequence_nr_;
-         
-         (void)::write(disp_->selfpipe_[1], &ef, sizeof(ef));
-      }
-   }
+   // else FIXME asynchronous send needed here
    
    return f.sequence_nr_;
 }
@@ -90,20 +84,14 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
    f.sequence_nr_ = disp_->generateSequenceNr();
    
    if (disp_->addSignalRegistration(sigbase, f.sequence_nr_))
-   {
-      if (genericSend(fd(), f, 0))
-      {
-         if (!disp_->isRunning())
-            disp_->loopUntil(f.sequence_nr_);
-      }
-      //else FIXME remove signal registration again
-   }
+      genericSend(fd(), f, 0);
 }
 
 
-bool StubBase::connect(bool block)
+void StubBase::connect()
 {
-   return disp_->connect(*this, block);
+   assert(disp_);
+   disp_->connect(*this);
 }
 
 

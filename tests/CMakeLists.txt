@@ -12,6 +12,8 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 add_executable(unittests 
    ipc2_timeout.cpp 
+   ipc2_simple.cpp
+   ipc2_errors.cpp
 )
 
 target_link_libraries(unittests gtest gtest_main simppl rt)

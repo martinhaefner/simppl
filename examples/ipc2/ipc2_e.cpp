@@ -91,7 +91,7 @@ struct InterfaceClient : spl::Stub<::Interface>
       resultOfAdd >> std::bind(&InterfaceClient::handleResultAdd, this, _1, _2);
       resultOfSub >> std::bind(&InterfaceClient::handleResultSub, this, _1, _2);
       
-      connected >> std::bind(&InterfaceClient::handleConnected, this);
+      connected >> std::bind(&InterfaceClient::handleConnected, this, _1);
    }
    
    void handleCleared()
@@ -99,7 +99,7 @@ struct InterfaceClient : spl::Stub<::Interface>
       std::cout << "CPU was cleared..." << std::endl;
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       // attach to all wanted signals here
       sig1.attach() >> std::bind(&InterfaceClient::handleSig1, this, _1);
@@ -130,10 +130,10 @@ struct InterfaceClient2 : spl::Stub<::Interface>
    InterfaceClient2(const char* role)
     : spl::Stub<::Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
-      connected >> std::bind(&InterfaceClient2::handleConnected, this);
+      connected >> std::bind(&InterfaceClient2::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       sig1.attach() >> std::bind(&InterfaceClient2::handleSig1, this, _1);
    }
@@ -151,10 +151,10 @@ struct InterfaceClient3 : spl::Stub<::Interface>
    InterfaceClient3(const char* role)
     : spl::Stub<::Interface>(role, "tcp:127.0.0.1:9978")   // connect the client to 'myserver'
    {
-      connected >> std::bind(&InterfaceClient3::handleConnected, this);
+      connected >> std::bind(&InterfaceClient3::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       cleared.attach() >> std::bind(&InterfaceClient3::handleCleared, this);
    }

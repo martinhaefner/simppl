@@ -101,14 +101,14 @@ struct Client : spl::Stub<::Interface>
    Client(const char* role)
     : Stub<::Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       
       std::cout << "Initial attribute myStruct is [" << myStruct.value().i << ", '" << myStruct.value().str << "']" << std::endl;
       
       resultOfDoSomething >> std::bind(&Client::handleResultDoSomething, this, _1, _2);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       myInt.attach() >> std::bind(&Client::attributeChanged, this, _1);
       myStruct.attach();   // here receive status updates, but no direct change notification

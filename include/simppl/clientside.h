@@ -91,7 +91,6 @@ struct ClientSignal : ClientSignalBase
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    
@@ -200,7 +199,6 @@ struct ClientAttribute
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    
@@ -316,7 +314,9 @@ struct ClientRequest : detail::Parented
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
       detail::Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
-      return detail::ClientResponseHolder(handler_, parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)));
+      return detail::ClientResponseHolder(handler_, 
+         parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)), 
+         parent<StubBase>()->disp());
    }
 
    ClientResponseBase* handler_;
@@ -344,7 +344,6 @@ struct ClientResponse : ClientResponseBase
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    

@@ -4,6 +4,7 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/blocking.h"
 
 #include <thread>
 
@@ -39,14 +40,22 @@ struct Client : simppl::ipc::Stub<Timeout>
    Client()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       rEval >> std::bind(&Client::handleEval, this, _1, _2);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
-      eval(42);
+      EXPECT_EQ(expect_, s);
+      
+      if (s == simppl::ipc::ConnectionState::Connected)
+      {
+         start_ = std::chrono::steady_clock::now();
+         eval(42);
+      }
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
    
    
@@ -58,9 +67,17 @@ struct Client : simppl::ipc::Stub<Timeout>
       EXPECT_FALSE(state.isRuntimeError());
       EXPECT_EQ(ETIMEDOUT, static_cast<const simppl::ipc::TransportError&>(state.exception()).getErrno());
       
+      int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
+      EXPECT_GT(millis, 500);
+      EXPECT_LT(millis, 600);
+      
       gbl_disp->stop();   // servers dispatcher
       disp().stop();
    }
+   
+   std::chrono::steady_clock::time_point start_;
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
 };
 
 
@@ -69,14 +86,19 @@ struct DisconnectClient : simppl::ipc::Stub<Timeout>
    DisconnectClient()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&DisconnectClient::handleConnected, this);
+      connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
       rEval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
-      eval(777);
+      EXPECT_EQ(expect_, s);
+      
+      if (s == simppl::ipc::ConnectionState::Connected)
+         eval(777);
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
    
    
@@ -90,6 +112,8 @@ struct DisconnectClient : simppl::ipc::Stub<Timeout>
       
       disp().stop();
    }
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
 };
 
 
@@ -98,15 +122,43 @@ struct OnewayClient : simppl::ipc::Stub<Timeout>
    OnewayClient()   
     : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")    
    {
-      connected >> std::bind(&OnewayClient::handleConnected, this);
+      connected >> std::bind(&OnewayClient::handleConnected, this, _1);
    }
    
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState s)
    {
-      gbl_disp = &disp();
-      oneway(42);
+      EXPECT_EQ(expect_, s);
+      
+      if (s == simppl::ipc::ConnectionState::Connected)
+      {
+         gbl_disp = &disp();
+         oneway(42);
+      }
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
+};
+
+
+struct NeverConnectedClient : simppl::ipc::Stub<Timeout>
+{
+   NeverConnectedClient(simppl::ipc::ConnectionState expected = simppl::ipc::ConnectionState::Timeout)   
+    : simppl::ipc::Stub<Timeout>("tm", "unix:TimeoutTest")   
+    , expected_(expected) 
+   {
+      connected >> std::bind(&NeverConnectedClient::handleConnected, this, _1);
+   }
+   
+   void handleConnected(simppl::ipc::ConnectionState s)
+   {
+      EXPECT_EQ(expected_, s);
+      disp().stop();
+   }
+   
+   simppl::ipc::ConnectionState expected_;
 };
 
 
@@ -171,9 +223,6 @@ TEST(Timeout, method)
 {
    std::thread serverthread(&runServer);
    
-   // FIXME must make sure we don't need this wait here! -> inotify or anything else...
-   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-   
    simppl::ipc::Dispatcher d;
    Client c;
    
@@ -190,9 +239,6 @@ TEST(Timeout, oneway)
 {
    std::thread serverthread(&runServer);
    
-   // FIXME must make sure we don't need this wait here! -> inotify or anything else...
-   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-   
    simppl::ipc::Dispatcher d;
    OnewayClient c;
    
@@ -208,10 +254,6 @@ TEST(Timeout, oneway)
 TEST(Timeout, no_timeout) 
 {
    std::thread serverthread(&runServer);
-   
-   // FIXME must make sure we don't need this wait here! -> inotify or anything else...
-   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-   
    std::thread clientthread(&runClient);
    
    std::this_thread::sleep_for(std::chrono::milliseconds(700));
@@ -226,5 +268,91 @@ TEST(Timeout, no_timeout)
 
 TEST(Timeout, request_specific) 
 {
-   // FIXME
+   // TODO implement request specific timeout with some kind of
+   // IDL, e.g. hello[timeout=400ms](42);
+}
+
+
+TEST(Timeout, blocking_connect)
+{
+   simppl::ipc::Dispatcher d;
+   simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   
+   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.addClient(stub);
+   
+   try
+   {
+      stub.connect();
+      
+      // never arrive here!
+      EXPECT_FALSE(true);    
+   }
+   catch(const simppl::ipc::TransportError& err)
+   {
+      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+   }
+}
+
+
+TEST(Timeout, blocking_api)
+{
+   std::thread serverthread(&runServer);
+   
+   simppl::ipc::Dispatcher d;
+   simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   
+   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.addClient(stub);
+   
+   stub.connect();
+   
+   try
+   {
+      double rc;
+      stub.eval(42) >> rc;
+      
+      // never arrive here!
+      EXPECT_FALSE(true);    
+   }
+   catch(const simppl::ipc::TransportError& err)
+   {
+      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+   }
+   
+   // cleanup server
+   gbl_disp->stop();
+   serverthread.join();
+}
+
+
+TEST(Timeout, interface_attach_invalid_server)
+{
+   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   NeverConnectedClient c(simppl::ipc::ConnectionState::NotAvailable);
+   
+   d.addClient(c);
+   d.run();
+}
+
+
+TEST(Timeout, interface_attach)
+{
+   // server dispatcher not running ant therefore never returning response frame
+   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   simppl::ipc::Dispatcher d_client;
+   NeverConnectedClient c;
+   
+   d_client.addClient(c);
+   d_client.run();
+}
+
+
+TEST(Timeout, inotify)
+{
+   simppl::ipc::Dispatcher d;
+   NeverConnectedClient c;
+   
+   d.addClient(c);
+   d.run();
 }

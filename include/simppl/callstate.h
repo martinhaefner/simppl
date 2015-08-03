@@ -36,7 +36,7 @@ struct CallState
    explicit inline
    operator bool() const
    {
-	   return ex_.get() ? false : true;
+      return ex_.get() ? false : true;
    } 
    
    
@@ -68,6 +68,13 @@ struct CallState
    const Error& exception() const
    {
       return *ex_;
+   }
+   
+   /// FIXME not inline
+   inline
+   void throw_exception() const
+   {
+      ex_->_throw();
    }
    
    

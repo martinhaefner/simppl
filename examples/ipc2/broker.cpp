@@ -114,10 +114,10 @@ struct HelloWorldClient : Stub<HelloWorld>
    HelloWorldClient(const char* loc)
     : Stub<HelloWorld>("helloworld", loc)
    {
-      connected >> std::bind(&HelloWorldClient::handleConnected, this);
+      connected >> std::bind(&HelloWorldClient::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(ConnectionState)
    {
       sayHello("Hello World!");
    }
@@ -129,10 +129,10 @@ struct BrokerClientOnServerSide : Stub<Broker>
    BrokerClientOnServerSide()
     : Stub<Broker>("broker", "unix:the_broker")
    {
-      connected >> std::bind(&BrokerClientOnServerSide::handleConnected, this);
+      connected >> std::bind(&BrokerClientOnServerSide::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(ConnectionState)
    {
       std::cout << "Got connected to broker, registering..." << std::endl;
       registerService("HelloWorld::helloworld", "unix:the_server");
@@ -146,10 +146,10 @@ struct BrokerClientOnClientSide : Stub<Broker>
     : Stub<Broker>("broker", "unix:the_broker")
    {
       serviceReady >> std::bind(&BrokerClientOnClientSide::handleServiceReady, this, _1, _2);
-      connected >> std::bind(&BrokerClientOnClientSide::handleConnected, this);
+      connected >> std::bind(&BrokerClientOnClientSide::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(ConnectionState)
    {
       std::cout << "Got connected to broker, waiting..." << std::endl;
       

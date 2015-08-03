@@ -58,7 +58,7 @@ struct Client : spl::Stub<::Interface>
    Client(const char* role)
     : spl::Stub<::Interface>(role, "unix:myserver")   // connect the client to 'myserver'
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       
       // must distinuish between normal response and error handler
       // another possible solution would be to wrap the binder in an OnError(...) Function
@@ -67,7 +67,7 @@ struct Client : spl::Stub<::Interface>
       resultOfDoSomething >> std::bind(&Client::handleResultDoSomething, this, _1, _2);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       doSomething(42);
    }

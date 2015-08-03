@@ -8,6 +8,8 @@
 #include "simppl/detail/constants.h"
 #include "simppl/detail/parented.h"
 
+#include "simppl/ConnectionState.h"
+
 
 namespace simppl
 {
@@ -34,15 +36,11 @@ struct StubBase
    
 protected:
    
-   // friendship inheritence
-   bool connect(bool block);
+   // friendship inheritence, blocking connect
+   void connect();
    
-   inline
-   ~StubBase()
-   {
-      // NOOP
-   }
-
+   ~StubBase();
+   
    inline   
    void reparent(detail::Parented* child)
    {
@@ -51,7 +49,7 @@ protected:
    
 public:
    
-   std::function<void()> connected;
+   std::function<void(ConnectionState)> connected;
    
    StubBase(const char* iface, const char* role, const char* boundname);
    

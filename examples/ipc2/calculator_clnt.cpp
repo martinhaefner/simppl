@@ -26,10 +26,10 @@ struct CalculatorClient : spl::Stub<::Calculator>
    CalculatorClient(const char* location)
     : spl::Stub<::Calculator>(rolename, location)
    {
-      connected >> std::bind(&CalculatorClient::handleConnected, this);
+      connected >> std::bind(&CalculatorClient::handleConnected, this, _1);
    }
    
-   void handleConnected()
+   void handleConnected(spl::ConnectionState)
    {
       value.attach() >> std::bind(&CalculatorClient::valueChanged, this, _1);
    }

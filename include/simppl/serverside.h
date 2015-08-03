@@ -143,7 +143,7 @@ struct ServerRequest : ServerRequestBase
          detail::GetCaller<T...>::type::template eval(d, f_);
       }
       else
-         std::cerr << "No appropriate handler registered for request with payload size=" << length << std::endl;
+         assert(false);    // no response handler registered
    }
    
    function_type f_;

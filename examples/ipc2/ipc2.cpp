@@ -2,6 +2,7 @@
 #include "simppl/skeleton.h"
 #include "simppl/stub.h"
 #include "simppl/dispatcher.h"
+#include "simppl/blocking.h"
 
 #include <pthread.h>
 
@@ -191,53 +192,45 @@ int main()
    InterfaceClient c1("myrole1");
    d.addClient(c1);
    
-   if (c1.connect())
-   {
-      // FIXME must spool all requests until the eventloop is running 
-      //c1.cleared.attach() >> std::bind(&InterfaceClient::handleCleared, &c1);
-try
-{
+   c1.connect();
    
-      int result;
-      d.waitForResponse(c1.add(42), result);
-      std::cout << "Result of add is " << result << std::endl;
+   int result;
+   c1.add(42) >> result;
+   std::cout << "Result of add is " << result << std::endl;
 
-      c1.cleared.attach() >> cleared;
-      c1.clear();
+   c1.cleared.attach() >> cleared;
+   c1.clear();
 
-      d.waitForResponse(c1.sub(21), result);
-      std::cout << "Result of sub is " << result << std::endl;
- 
-      c1.reqt(std::make_tuple(42, 3.1415, std::string("Hallo Welt")));
-         
-      try
-      {
-         d.waitForResponse(c1.sub(-1), result);
-      }
-      catch(const spl::RuntimeError& err)
-      {
-         std::cout << "Result of sub is invalid: " << err.what() << std::endl;
-      }
-}
-catch(const simppl::ipc::TransportError& ex)
-{
-   std::cout << "ooh: " << ex.what() << std::endl;
-}     
-catch(const std::exception& ex)
-{
-   std::cout << "ooh: " << ex.what() << std::endl;
-}     
-catch(...)
-{ 
-   std::cout << "Hey" << std::endl;
-}
-}
+   c1.sub(21) >> result;
+   std::cout << "Result of sub is " << result << std::endl;
 
-sleep(1);
+   c1.reqt(std::make_tuple(42, 3.1415, std::string("Hallo Welt")));
+      
+   try
+   {
+      d.waitForResponse(c1.sub(-1), result);
+   }
+   catch(const spl::RuntimeError& err)
+   {
+      std::cout << "Result of sub is invalid: " << err.what() << std::endl;
+   }
+   catch(const simppl::ipc::TransportError& ex)
+   {
+      std::cout << "ooh: " << ex.what() << std::endl;
+   }     
+   catch(const std::exception& ex)
+   {
+      std::cout << "ooh: " << ex.what() << std::endl;
+   }     
+   catch(...)
+   { 
+      std::cout << "Hey" << std::endl;
+   }
+
+   sleep(1);
    
    server_dispatcher.stop();
    pthread_join(tid, 0);
-
    
    return 0;
 }

@@ -3,6 +3,9 @@
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
+#include <thread>
+
+
 using namespace std::placeholders;
 
 namespace spl = simppl::ipc;
@@ -83,7 +86,7 @@ struct Server : spl::Skeleton<::BankAccount>
          respondWith(resultOfGetDeposit(session->returnvalue_));
       }
       else
-         respondWith(spl::RuntimeError(-1, "login invalid"));
+         respondWith(spl::RuntimeError(-1, "invalid session"));
    }
 };
 
@@ -94,11 +97,11 @@ struct Client : spl::Stub<::BankAccount>
     : spl::Stub<::BankAccount>(role, "unix:myserver")   // connect the client to 'myserver'
     , user_(user)
    {
-      connected >> std::bind(&Client::handleConnected, this);
+      connected >> std::bind(&Client::handleConnected, this, _1);
       resultOfGetDeposit >> std::bind(&Client::handleGetDeposit, this, _1, _2);
    }
    
-   void handleConnected()
+   void handleConnected(simppl::ipc::ConnectionState)
    {
       login(user_, "passwd");
       getDeposit();
@@ -118,25 +121,17 @@ struct Client : spl::Stub<::BankAccount>
 };
 
 
-void* server(void* dispatcher)
-{
-   spl::Dispatcher& d = *(spl::Dispatcher*)dispatcher;
-   
-   Server s1("myrole");
-   d.addServer(s1);
-   
-   d.run();
-   return 0;
-}
-
-
 int main()
 {
    // start server dispatcher thread on unix path 'myserver'
    spl::Dispatcher server_dispatcher("unix:myserver");
    
-   pthread_t tid;
-   pthread_create(&tid, 0, server, &server_dispatcher);
+   std::thread server_thread([&server_dispatcher](){
+      Server s1("myrole");
+      server_dispatcher.addServer(s1);
+      server_dispatcher.run();
+   });
+
    while(!server_dispatcher.isRunning());   // wait for other thread
    
    // run client in separate thread (not really necessary, just for blocking interfaces)
@@ -154,7 +149,7 @@ int main()
    d.run();
    
    server_dispatcher.stop();
-   pthread_join(tid, 0);
+   server_thread.join();
    
    return 0;
 

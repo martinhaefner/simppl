@@ -43,17 +43,12 @@ public:
       ((interface_type*)this)->container_.clear();
    }
    
-   /// blocking connect to server
-   bool connect()
+   /// Blocking connect to server.
+   /// Note that even in blocking mode the stub needs to be added 
+   /// to the dispatcher.
+   void connect()
    {
-      assert(!dispatcherIsRunning());
-      
-      bool rc = true;
-      
-      if (fd_ <= 0)
-         rc = StubBase::connect(true);   // inherited friendship
-      
-      return rc;
+      StubBase::connect();
    }
 };
 
@@ -68,7 +63,7 @@ public:
 /// for storing a function in the connected function object
 template<typename CallableT>
 inline
-void operator>> (std::function<void()>& func, const CallableT& callable)
+void operator>> (std::function<void(simppl::ipc::ConnectionState)>& func, const CallableT& callable)
 {
    func = callable;
 }
