@@ -248,7 +248,8 @@ TEST(Timeout, no_timeout)
 
 TEST(Timeout, request_specific) 
 {
-   // FIXME
+   // TODO implement request specific timeout with some kind of
+   // IDL, e.g. hello[timeout=400ms](42);
 }
 
 

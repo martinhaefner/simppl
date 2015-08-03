@@ -37,6 +37,9 @@ struct Error : std::exception
       return sequence_nr_;
    }
    
+   virtual void _throw() = 0;
+   
+   
 private:
    
    uint32_t sequence_nr_;
@@ -65,9 +68,14 @@ struct RuntimeError : Error
    }
    
    inline
-   int error() const
+   int error() const throw()
    {
       return error_;
+   }
+   
+   void _throw()
+   {
+      throw *this;
    }
    
 private:
@@ -89,13 +97,20 @@ struct TransportError : Error
    TransportError(int errno__, uint32_t sequence_nr);
    
    inline
-   int getErrno() const
+   int getErrno() const throw()
    {
       return errno_;
    }
    
-   const char* what() const throw();
+   void _throw()
+   {
+      throw *this;
+   }
    
+   const char* what() const throw();
+
+private:
+
    int errno_;
    mutable char buf_[128];
 };

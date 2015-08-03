@@ -146,28 +146,34 @@ struct Dispatcher
    template<typename T>
    struct BlockingResponseHandler
    {
-      BlockingResponseHandler(Dispatcher& disp, T& t)
+      BlockingResponseHandler(Dispatcher& disp, ClientResponse<T>& r, T& t)
        : t_(t)
        , disp_(disp)
+       , r_(r)
       {
-         // NOOP
+         r_.handledBy(*this);
       }
       
-      // FIXME Calltraits here
-      void operator()(const CallState& state, const T& t)
+      
+      ~BlockingResponseHandler()
+      {
+         // FIXME r_.f_ = decltype(r_.f_)();
+      }
+      
+      
+      void operator()(const CallState& state, typename CallTraits<T>::param_type t)
       {
          disp_.stop();
          
-         if (state)
-         {
-            t_ = t;
-         }
-         else
+         if (!state)
             state.throw_exception();
+         
+         t_ = t;
       }
       
       T& t_;
       Dispatcher& disp_;
+      ClientResponse<T>& r_;
    };
    
    /// at least one argument version - will throw exception on error
@@ -180,10 +186,7 @@ struct Dispatcher
       ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
       assert(r);
       
-      BlockingResponseHandler<T> handler(*this, t);
-      r->handledBy(handler);
-      // FIXME reset handler in response
-      
+      BlockingResponseHandler<T> handler(*this, *r, t);
       loop();
    }
 

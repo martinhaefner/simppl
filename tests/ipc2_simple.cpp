@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-// for new call semantic on blocking functions
-#define SIMPPL_HAVE_BOOST_FUSION 1
-
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
@@ -271,6 +268,3 @@ TEST(Simple, blocking)
    
    EXPECT_EQ(3, s.count_oneway_);
 }
-
-
-// FIXME add exceptions tests, event-driven and blocking

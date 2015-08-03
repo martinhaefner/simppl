@@ -68,6 +68,31 @@ const char* fullQualifiedName(char* buf, const char* ifname, const char* rolenam
    return buf;
 }
 
+
+struct BlockingResponseHandler0
+{
+   inline
+   BlockingResponseHandler0(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<>& r)
+    : disp_(disp)
+    , r_(r)
+   {
+      // NOOP
+   }
+   
+   inline
+   void operator()(const simppl::ipc::CallState& state)
+   {
+      disp_.stop();
+      // FIXME r_.f_ = decltype(r_.f_)();
+            
+      if (!state)
+         state.throw_exception();
+   }
+   
+   simppl::ipc::Dispatcher& disp_;
+   simppl::ipc::ClientResponse<>& r_;
+};
+
 }   // namespace
 
 
@@ -143,7 +168,10 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
    ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
    assert(r);
    
-   // FIXME not finished
+   BlockingResponseHandler0 handler(*this, *r);
+   r->handledBy(handler);
+   
+   loop();
 }
 
 
@@ -226,7 +254,7 @@ void Dispatcher::connect(StubBase& stub, const char* location)
 void Dispatcher::handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr)
 {
    stop();
-   // FIXME reset connected handler of stub
+   //FIXME stub->connected = decltype(stub->connected)();
    
    if (s == ConnectionState::Timeout)
       throw TransportError(ETIMEDOUT, seqNr);
@@ -762,7 +790,6 @@ void Dispatcher::checkPendings()
    {
       if (std::get<1>(iter->second) <= now)
       {
-         // FIXME what about blocking here?
          auto stub = std::get<0>(iter->second);
             
          if (stub->connected)
