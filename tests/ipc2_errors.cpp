@@ -4,6 +4,7 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/blocking.h"
 
 #include <thread>
 

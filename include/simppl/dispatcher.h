@@ -143,60 +143,12 @@ struct Dispatcher
    /// no arguments version - will throw exception or error
    void waitForResponse(const detail::ClientResponseHolder& resp);
    
-   template<typename T>
-   struct BlockingResponseHandler
-   {
-      inline
-      BlockingResponseHandler(Dispatcher& disp, ClientResponse<T>& r, T& t)
-       : t_(t)
-       , disp_(disp)
-       , r_(r)
-      {
-         r_.handledBy(std::ref(*this));
-      }
-      
-      
-      void operator()(const CallState& state, typename CallTraits<T>::param_type t)
-      {
-         disp_.stop();
-         r_.handledBy(std::nullptr_t());
-         
-         if (!state)
-            state.throw_exception();
-         
-         t_ = t;
-      }
-      
-      T& t_;
-      Dispatcher& disp_;
-      ClientResponse<T>& r_;
-   };
-   
    /// at least one argument version - will throw exception on error
    template<typename T>
-   void waitForResponse(const detail::ClientResponseHolder& resp, T& t)
-   {
-      assert(resp.r_);
-      assert(!isRunning());
-      
-      ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
-      assert(r);
-      
-      BlockingResponseHandler<T> handler(*this, *r, t);
-      loop();
-   }
+   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);
 
    template<typename... T>
-   void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t)
-   {
-      assert(resp.r_);
-      assert(!running_.load());
-      
-      ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
-      assert(r);
-      
-      // FIXME not finished
-   }
+   void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t);
    
    std::string fullQualifiedName(const char* ifname, const char* rolename);
    
@@ -364,47 +316,6 @@ void Dispatcher::addServer(ServerT& serv)
 }   // namespace ipc
    
 }   // namespace simppl
-
-
-/**
- * Call semantics for blocking calls:
- * 
- * int ret;
- * bool rc = stub.func() >> ret;
- */
-inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::nullptr_t)
-{
-   holder.dispatcher_.waitForResponse(holder);
-}
-
-
-/**
- * Call semantics for blocking calls:
- * 
- * int ret;
- * bool rc = stub.func() >> ret;
- */
-template<typename T>
-inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
-{
-   holder.dispatcher_.waitForResponse(holder, rArg);
-}
-
-
-/**
- * Call semantics for blocking calls:
- * 
- * std::tuple<int> ret;
- * bool rc = stub.func() >> ret;
- */
-template<typename... T>
-inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
-{
-   holder.dispatcher_.waitForResponse(holder, rArgs);
-}
 
 
 #endif   // SIMPPL_DISPATCHER_H

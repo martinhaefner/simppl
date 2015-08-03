@@ -4,6 +4,7 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/blocking.h"
 
 #include <thread>
 
@@ -16,9 +17,11 @@ INTERFACE(Simple)
    Request<> hello;
    Request<int> oneway;
    Request<int, double> add;
+   Request<int, double> echo;
    
    Response<> world;
    Response<double> result;
+   Response<int, double> rEcho;
    
    Attribute<int> data;
    
@@ -29,13 +32,16 @@ INTERFACE(Simple)
     : INIT_REQUEST(hello)
     , INIT_REQUEST(oneway)
     , INIT_REQUEST(add)
+    , INIT_REQUEST(echo)
     , INIT_RESPONSE(world)
     , INIT_RESPONSE(result)
+    , INIT_RESPONSE(rEcho)
     , INIT_ATTRIBUTE(data)
     , INIT_SIGNAL(sig)
    {
       hello >> world;
       add >> result;
+      echo >> rEcho;
    }
 };
 
@@ -164,6 +170,7 @@ struct Server : simppl::ipc::Skeleton<Simple>
       hello >> std::bind(&Server::handleHello, this);
       oneway >> std::bind(&Server::handleOneway, this, _1);
       add >> std::bind(&Server::handleAdd, this, _1, _2);
+      echo >> std::bind(&Server::handleEcho, this, _1, _2);
       
       // initialize attribute
       data = 4711;
@@ -194,6 +201,11 @@ struct Server : simppl::ipc::Skeleton<Simple>
    void handleAdd(int i, double d)
    {
       respondWith(result(i*d));
+   }
+   
+   void handleEcho(int i, double d)
+   {
+      respondWith(rEcho(i, d));
    }
    
    int count_oneway_ = 0;
@@ -265,6 +277,21 @@ TEST(Simple, blocking)
    
    EXPECT_GT(21.01, result);
    EXPECT_LT(20.99, result);
+   
+   int i;
+   double x;
+   stub.echo(42, 0.5) >> std::tie(i, x);
+   
+   EXPECT_EQ(42, i);
+   EXPECT_GT(0.51, x);
+   EXPECT_LT(0.49, x);
+   
+   std::tuple<int, double> rslt;
+   stub.echo(42, 0.5) >> rslt;
+   
+   EXPECT_EQ(42, std::get<0>(rslt));
+   EXPECT_GT(0.51, std::get<1>(rslt));
+   EXPECT_LT(0.49, std::get<1>(rslt));
    
    EXPECT_EQ(3, s.count_oneway_);
 }
