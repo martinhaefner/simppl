@@ -39,12 +39,8 @@ protected:
    // friendship inheritence, blocking connect
    void connect();
    
-   inline
-   ~StubBase()
-   {
-      // NOOP
-   }
-
+   ~StubBase();
+   
    inline   
    void reparent(detail::Parented* child)
    {

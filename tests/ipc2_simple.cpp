@@ -80,6 +80,33 @@ struct Client : simppl::ipc::Stub<Simple>
 };
 
 
+struct DisconnectClient : simppl::ipc::Stub<Simple>
+{
+   DisconnectClient()   
+    : simppl::ipc::Stub<Simple>("s", "unix:SimpleTest")    
+   {
+      connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
+   }
+   
+   
+   void handleConnected(simppl::ipc::ConnectionState s)
+   {
+      EXPECT_EQ(expected_, s);
+      
+      if (s == simppl::ipc::ConnectionState::Connected)
+      {
+         oneway(7777);
+      }
+      else
+         disp().stop();
+         
+      expected_ = simppl::ipc::ConnectionState::Disconnected;
+   }
+   
+   simppl::ipc::ConnectionState expected_ = simppl::ipc::ConnectionState::Connected;
+};
+
+
 struct AttributeClient : simppl::ipc::Stub<Simple>
 {
    AttributeClient()   
@@ -294,4 +321,29 @@ TEST(Simple, blocking)
    EXPECT_LT(0.49, std::get<1>(rslt));
    
    EXPECT_EQ(3, s.count_oneway_);
+}
+
+
+TEST(Simple, disconnect)
+{
+   simppl::ipc::Dispatcher clientd;
+   
+   DisconnectClient c;
+   clientd.addClient(c);
+   
+   {
+      simppl::ipc::Dispatcher* serverd = new simppl::ipc::Dispatcher("unix:SimpleTest");
+      Server* s = new Server("s");
+      serverd->addServer(*s);
+      
+      std::thread serverthread([serverd, s](){
+         serverd->run();
+         delete s;
+         delete serverd;
+      });
+
+      clientd.run();
+      
+      serverthread.join();
+   }
 }

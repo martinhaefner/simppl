@@ -218,10 +218,12 @@ private:
    void handle_inotify_event(struct inotify_event* evt);
    void add_inotify_location(StubBase& stub, const char* socketpath);
    
+   // inotify based lookups for handling startup race conditions. This
+   // only works for unix: based services. 
    int inotify_fd_;
    std::multimap<std::string, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
    
-   //registered servers
+   // registered servers
    servermap_type servers_;
    servermapid_type servers_by_id_;
    std::map<uint32_t/*=sequencenr*/, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_interface_resolves_;
@@ -251,6 +253,7 @@ private:
    sighandlers_type sighandlers_;   
    serversignalers_type server_sighandlers_;
    
+   /// FIXME need refcounting here!
    socketsmap_type socks_;
    
    BrokerClient* broker_;
@@ -258,7 +261,6 @@ private:
    
    sessionmap_type sessions_;
    
-   int selfpipe_[2];
    std::chrono::milliseconds request_timeout_;
 };
 

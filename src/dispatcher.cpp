@@ -139,13 +139,11 @@ Dispatcher::~Dispatcher()
 
    for(unsigned int i=0; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
    {
-      // FIXME what's about fd == 0? Should better be -1 !
+      // FIXME can't check against >= 0 because then there are undesired blockings
+      //       so change it all over the software before changing one position only 
       if (fds_[i].fd > 0)
          while(::close(fds_[i].fd) && errno == EINTR);
-   }
-   
-   while(::close(selfpipe_[0]) && errno == EINTR);
-   while(::close(selfpipe_[1]) && errno == EINTR);
+   }   
 }
 
 
@@ -838,14 +836,6 @@ Dispatcher::Dispatcher(const char* boundname)
    fds_[inotify_fd_].fd = inotify_fd_;
    fds_[inotify_fd_].events = POLLIN;
    fctn_[inotify_fd_] = std::bind(&Dispatcher::handle_inotify, this, _1, _2);
-   
-   // FIXME what's this good for?   
-   // can't use pipe since then the reading code would have to be changed...
-   int rc = ::socketpair(PF_UNIX, SOCK_STREAM, 0, selfpipe_);
-   assert(!rc);
-   
-   fds_[selfpipe_[0]].fd = selfpipe_[0];
-   fds_[selfpipe_[0]].events = POLLIN;
 }
 
 
@@ -972,8 +962,21 @@ void Dispatcher::clearSlot(int idx)
          ++iter;
    }
    
+   // disconnect stubs
+   for (auto iter = clients_.begin(); iter != clients_.end(); ++iter)
+   {
+      if (iter->second->fd_ == fds_[idx].fd)
+      {
+         if (iter->second->connected)
+            iter->second->connected(ConnectionState::Disconnected);
+         
+         iter->second->fd_ = -1;
+      }
+   }
+   
    socketDisconnected(fds_[idx].fd);
-                     
+                 
+   // FIXME 0 is no good value here
    fds_[idx].fd = 0;
    fds_[idx].events = 0;
 }

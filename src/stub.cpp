@@ -29,6 +29,13 @@ StubBase::StubBase(const char* iface, const char* role, const char* boundname)
 }
 
 
+StubBase::~StubBase()
+{
+   if (disp_)
+      disp_->removeClient(*this);
+}
+
+
 Dispatcher& StubBase::disp()
 {
    assert(disp_);
@@ -55,20 +62,7 @@ uint32_t StubBase::sendRequest(detail::Parented& requestor, ClientResponseBase* 
       if (handler)
          disp_->addRequest(requestor, *handler, f.sequence_nr_, fd());
    }
-   else
-   {
-      // no fire-and-forget?
-      if (handler)
-      {
-         errno = EINVAL;
-         TransportError* err = new TransportError(errno, f.sequence_nr_);
-         
-         detail::TransportErrorFrame ef(handler, err);
-         ef.sequence_nr_ = f.sequence_nr_;
-         
-         (void)::write(disp_->selfpipe_[1], &ef, sizeof(ef));
-      }
-   }
+   // else FIXME asynchronous send needed here
    
    return f.sequence_nr_;
 }

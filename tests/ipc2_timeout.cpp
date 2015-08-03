@@ -47,10 +47,15 @@ struct Client : simppl::ipc::Stub<Timeout>
    
    void handleConnected(simppl::ipc::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(expect_, s);
       
-      start_ = std::chrono::steady_clock::now();
-      eval(42);
+      if (s == simppl::ipc::ConnectionState::Connected)
+      {
+         start_ = std::chrono::steady_clock::now();
+         eval(42);
+      }
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
    
    
@@ -71,6 +76,8 @@ struct Client : simppl::ipc::Stub<Timeout>
    }
    
    std::chrono::steady_clock::time_point start_;
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
 };
 
 
@@ -86,9 +93,12 @@ struct DisconnectClient : simppl::ipc::Stub<Timeout>
    
    void handleConnected(simppl::ipc::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(expect_, s);
       
-      eval(777);
+      if (s == simppl::ipc::ConnectionState::Connected)
+         eval(777);
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
    
    
@@ -102,6 +112,8 @@ struct DisconnectClient : simppl::ipc::Stub<Timeout>
       
       disp().stop();
    }
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
 };
 
 
@@ -116,11 +128,18 @@ struct OnewayClient : simppl::ipc::Stub<Timeout>
    
    void handleConnected(simppl::ipc::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(expect_, s);
       
-      gbl_disp = &disp();
-      oneway(42);
+      if (s == simppl::ipc::ConnectionState::Connected)
+      {
+         gbl_disp = &disp();
+         oneway(42);
+      }
+      
+      expect_ = simppl::ipc::ConnectionState::Disconnected;
    }
+   
+   simppl::ipc::ConnectionState expect_ = simppl::ipc::ConnectionState::Connected;
 };
 
 
