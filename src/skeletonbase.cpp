@@ -161,12 +161,12 @@ void SkeletonBase::handleRequest(uint32_t funcid, uint32_t sequence_nr, uint32_t
       std::cerr << "Unknown request '" << funcid << "' with payload size=" << length << std::endl;
 }
 
-
+/*
 std::tuple<void*,void(*)(void*)> SkeletonBase::clientAttached()
 {
    return std::tuple<void*,void(*)(void*)>(nullptr, nullptr);   // the default does not create any session data
 }
-
+*/
 }   // namespace ipc
 
 }   // namespace simppl

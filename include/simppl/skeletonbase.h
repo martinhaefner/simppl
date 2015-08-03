@@ -55,7 +55,7 @@ protected:
    void handleRequest(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t length);
    
    /// return a session pointer and destruction function if adequate
-   virtual std::tuple<void*,void(*)(void*)> clientAttached();
+   ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
    
    
    const char* role_;
