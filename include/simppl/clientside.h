@@ -91,7 +91,6 @@ struct ClientSignal : ClientSignalBase
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    
@@ -200,7 +199,6 @@ struct ClientAttribute
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    
@@ -346,7 +344,6 @@ struct ClientResponse : ClientResponseBase
    inline
    void handledBy(FunctorT func)
    {
-      assert(!f_);
       f_ = func;
    }
    

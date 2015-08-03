@@ -146,24 +146,20 @@ struct Dispatcher
    template<typename T>
    struct BlockingResponseHandler
    {
+      inline
       BlockingResponseHandler(Dispatcher& disp, ClientResponse<T>& r, T& t)
        : t_(t)
        , disp_(disp)
        , r_(r)
       {
-         r_.handledBy(*this);
-      }
-      
-      
-      ~BlockingResponseHandler()
-      {
-         // FIXME r_.f_ = decltype(r_.f_)();
+         r_.handledBy(std::ref(*this));
       }
       
       
       void operator()(const CallState& state, typename CallTraits<T>::param_type t)
       {
          disp_.stop();
+         r_.handledBy(std::nullptr_t());
          
          if (!state)
             state.throw_exception();
@@ -181,7 +177,7 @@ struct Dispatcher
    void waitForResponse(const detail::ClientResponseHolder& resp, T& t)
    {
       assert(resp.r_);
-      assert(!running_.load());
+      assert(!isRunning());
       
       ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
       assert(r);
@@ -368,6 +364,19 @@ void Dispatcher::addServer(ServerT& serv)
 }   // namespace ipc
    
 }   // namespace simppl
+
+
+/**
+ * Call semantics for blocking calls:
+ * 
+ * int ret;
+ * bool rc = stub.func() >> ret;
+ */
+inline
+void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::nullptr_t)
+{
+   holder.dispatcher_.waitForResponse(holder);
+}
 
 
 /**

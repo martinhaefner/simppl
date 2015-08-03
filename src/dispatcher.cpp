@@ -76,14 +76,14 @@ struct BlockingResponseHandler0
     : disp_(disp)
     , r_(r)
    {
-      // NOOP
+      r_.handledBy(std::ref(*this));
    }
    
    inline
    void operator()(const simppl::ipc::CallState& state)
    {
       disp_.stop();
-      // FIXME r_.f_ = decltype(r_.f_)();
+      r_.handledBy(std::nullptr_t());
             
       if (!state)
          state.throw_exception();
@@ -163,13 +163,12 @@ void Dispatcher::registerAtBroker(const std::string& service, const std::string&
 void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
 {
    assert(resp.r_);
-   assert(!running_.load());
+   assert(!isRunning());
    
    ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
    assert(r);
    
    BlockingResponseHandler0 handler(*this, *r);
-   r->handledBy(handler);
    
    loop();
 }
@@ -254,7 +253,7 @@ void Dispatcher::connect(StubBase& stub, const char* location)
 void Dispatcher::handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr)
 {
    stop();
-   //FIXME stub->connected = decltype(stub->connected)();
+   stub->connected = std::nullptr_t();
    
    if (s == ConnectionState::Timeout)
       throw TransportError(ETIMEDOUT, seqNr);

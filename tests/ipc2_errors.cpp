@@ -128,7 +128,7 @@ TEST(Errors, blocking)
    
    try
    {
-      d.waitForResponse(stub.hello());
+      stub.hello() >> std::nullptr_t();
       
       // never reach
       ASSERT_FALSE(true);
