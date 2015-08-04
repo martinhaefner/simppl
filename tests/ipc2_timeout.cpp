@@ -259,8 +259,6 @@ TEST(Timeout, no_timeout)
    std::this_thread::sleep_for(std::chrono::milliseconds(700));
    gbl_disp->stop();
    
-   // FIXME client must get a wakeup that it will never be answered
-   
    serverthread.join();
    clientthread.join();
 }
