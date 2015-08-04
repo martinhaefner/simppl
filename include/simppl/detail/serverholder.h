@@ -21,6 +21,8 @@ struct ServerHolderBase
       // NOOP
    }
    
+   virtual std::string fqn() const = 0;
+   
    /// handle request
    virtual void eval(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t len) = 0;
    
@@ -44,6 +46,11 @@ struct ServerHolder : ServerHolderBase
     : handler_(&skel)
    {
       // NOOP
+   }
+   
+   std::string fqn() const
+   {
+      return handler_->fqn();
    }
    
    /*virtual*/

@@ -51,46 +51,20 @@ namespace detail
 extern std::unique_ptr<char> NullUniquePtr;
 
 
+// TODO use pimpl for this...
 struct Dispatcher
 {
    friend struct StubBase;
    
-   // resolve server name to id
-   typedef std::map<std::string/*=server::role*/, detail::ServerHolderBase*> servermap_type;  
-   
-   // signal registration and request resolution
-   typedef std::map<uint32_t/*=serverid*/, detail::ServerHolderBase*> servermapid_type;
-   
-   // all registered clients
-   typedef std::multimap<std::string/*=server::role the client is connected to*/, StubBase*> clientmap_type;
-   
-   // all client side socket connections (good for multiplexing) FIXME need refcounting and reconnect strategy
-   typedef std::map<std::string/*boundname*/, int/*=fd*/> socketsmap_type;
-   
-   // temporary maps, should always shrink again, maybe could drop entries on certain timeouts
-   typedef std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_signalregistrations_type;
-   
-   // signal handling client- and server-side
-   typedef std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_type;
-   typedef std::map<uint32_t/*=serverside_id*/, detail::ServerSignalBase*> serversignalers_type;
-   
-   typedef std::map<uint32_t/*=sessionid*/, SessionData> sessionmap_type;
-   
-   
    /// boundname may be 0 for handling clients without any servers
    Dispatcher(const char* boundname = nullptr);
-   
-   /// allow clients to send requests from threads other the dispatcher is running in
-   void enableThreadedClient()
-   {
-      // FIXME
-   }
    
    /// allow dispatcher to talk to broker for registering new services and to
    /// wait for clients to attach services
    void enableBrokerage();
    
    template<typename RepT, typename PeriodT>
+   inline
    void setRequestTimeout(std::chrono::duration<RepT, PeriodT> duration)
    {
       request_timeout_ = duration;
@@ -127,6 +101,8 @@ struct Dispatcher
    /// @return 0 if signal is not registered, the id otherwise
    uint32_t removeSignalRegistration(ClientSignalBase& s);
    
+   /// this function is !not! thread-safe
+   inline
    uint32_t generateSequenceNr() 
    {
       ++sequence_;
@@ -150,13 +126,13 @@ struct Dispatcher
    template<typename... T>
    void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t);
    
-   std::string fullQualifiedName(const char* ifname, const char* rolename);
+   static std::string fullQualifiedName(const char* ifname, const char* rolename);
    
    
 private:
 
    int loop(unsigned int timeoutMs = 100);  ///< FIXME timeout must be somehow dynamic -> til next time_point 
-   int once(unsigned int timeoutMs = 500);
+   int once(unsigned int timeoutMs);
 
    void handle_blocking_connect(ConnectionState s, StubBase* stub, uint32_t seqNr);
 
@@ -181,25 +157,13 @@ public:
    
    void clearSlot(int idx);
    
-   inline
-   void stop()
-   {
-      running_.store(false);
-   }
+   void stop();
    
-   inline
-   bool isRunning() const
-   {
-      return running_.load();
-   }
+   bool isRunning() const;
    
    void* getSessionData(uint32_t sessionid);
    
-   inline
-   void registerSession(uint32_t fd, uint32_t sessionid, void* data, void(*destructor)(void*))
-   {
-      sessions_[sessionid] = SessionData(fd, data, destructor);
-   }
+   void registerSession(uint32_t fd, uint32_t sessionid, void* data, void(*destructor)(void*));
    
    /// register arbitrary file descriptors, e.g. timers
    void register_fd(int fd, short pollmask, std::function<int(int, short)> cb);
@@ -218,14 +182,13 @@ private:
    void handle_inotify_event(struct inotify_event* evt);
    void add_inotify_location(StubBase& stub, const char* socketpath);
    
-   // inotify based lookups for handling startup race conditions. This
-   // only works for unix: based services. 
+   /// inotify based lookups for handling startup race conditions. This
+   /// only works for unix: based services. 
    int inotify_fd_;
    std::multimap<std::string, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_lookups_;
    
-   // registered servers
-   servermap_type servers_;
-   servermapid_type servers_by_id_;
+   std::map<uint32_t/*=serverid*/, detail::ServerHolderBase*> servers_by_id_;
+   
    std::map<uint32_t/*=sequencenr*/, std::tuple<StubBase*, std::chrono::steady_clock::time_point/*=duetime*/>> pending_interface_resolves_;
    
    uint32_t nextid_;
@@ -233,11 +196,11 @@ private:
    
    pollfd fds_[32];
    
-   // iohandler callback functions
+   /// iohandler callback functions
    std::map<int, std::function<int(int, short)>> fctn_;
    
-   // registered clients
-   clientmap_type clients_;
+   /// registered clients
+   std::multimap<std::string/*=server::role the client is connected to*/, StubBase*> clients_;
    
    uint32_t sequence_;
    
@@ -249,17 +212,21 @@ private:
                 int/*outfd*/>
       > pendings_;
    
-   outstanding_signalregistrations_type outstanding_sig_registrs_;
-   sighandlers_type sighandlers_;   
-   serversignalers_type server_sighandlers_;
+   /// temporary maps, should always shrink again, maybe could drop entries on certain timeouts
+   std::map<uint32_t/*=sequencenr*/, ClientSignalBase*> outstanding_sig_registrs_;
+   
+   /// signal handling client- and server-side   
+   std::map<uint32_t/*=clientside_id*/, ClientSignalBase*> sighandlers_;   
+   std::map<uint32_t/*=serverside_id*/, detail::ServerSignalBase*> server_sighandlers_;
    
    /// FIXME need refcounting here!
-   socketsmap_type socks_;
+   /// all client side socket connections (good for multiplexing) FIXME need refcounting and reconnect strategy
+   std::map<std::string/*boundname*/, int/*=fd*/> socks_;
    
    BrokerClient* broker_;
    std::vector<std::string> endpoints_;
    
-   sessionmap_type sessions_;
+   std::map<uint32_t/*=sessionid*/, SessionData> sessions_;
    
    std::chrono::milliseconds request_timeout_;
 };
@@ -301,14 +268,15 @@ void Dispatcher::addServer(ServerT& serv)
    static_assert(isServer<ServerT>::value, "only_add_servers_here");
    assert(!endpoints_.empty());
    
-   std::string name = fullQualifiedName(InterfaceNamer<typename ServerT::interface_type>::name(), serv.role_);
+   std::string name = serv.fqn();
    
-   assert(servers_.find(name) == servers_.end());
+   assert(std::find_if(servers_by_id_.begin(), servers_by_id_.end(), [&name](decltype(*servers_by_id_.begin())& iter){
+      return name == iter.second->fqn();
+      }) == servers_by_id_.end());
    
    registerAtBroker(name, endpoints_.front());
    
    detail::ServerHolder<ServerT>* holder = new detail::ServerHolder<ServerT>(serv);
-   servers_[name] = holder;
    servers_by_id_[generateId()] = holder;
    
    serv.disp_ = this;

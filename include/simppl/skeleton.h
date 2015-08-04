@@ -3,6 +3,7 @@
 
 
 #include "simppl/skeletonbase.h"
+#include "simppl/dispatcher.h"
 
 
 namespace simppl
@@ -33,6 +34,12 @@ struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSign
     : SkeletonBase(role)
    {
       // NOOP
+   }
+   
+   inline
+   std::string fqn() const
+   {
+      return Dispatcher::fullQualifiedName(InterfaceNamer<interface_type>::name(), role_);
    }
    
 protected:

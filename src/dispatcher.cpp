@@ -105,9 +105,6 @@ namespace simppl
 namespace ipc
 {
 
-// global
-std::unique_ptr<char> NullUniquePtr;
-
 
 std::string Dispatcher::fullQualifiedName(const char* ifname, const char* rolename)
 {
@@ -121,7 +118,7 @@ std::string Dispatcher::fullQualifiedName(const char* ifname, const char* rolena
 
 Dispatcher::~Dispatcher()
 {
-   for(auto iter = servers_.begin(); iter != servers_.end(); ++iter)
+   for(auto iter = servers_by_id_.begin(); iter != servers_by_id_.end(); ++iter)
    {
       delete iter->second;
    }
@@ -169,6 +166,24 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
    BlockingResponseHandler0 handler(*this, *r);
    
    loop();
+}
+
+
+void Dispatcher::stop()
+{
+   running_.store(false);
+}
+
+
+bool Dispatcher::isRunning() const
+{
+   return running_.load();
+}
+
+
+void Dispatcher::registerSession(uint32_t fd, uint32_t sessionid, void* data, void(*destructor)(void*))
+{
+   sessions_[sessionid] = SessionData(fd, data, destructor);
 }
 
 
@@ -331,7 +346,7 @@ void Dispatcher::addClient(StubBase& clnt)
 bool Dispatcher::isSignalRegistered(ClientSignalBase& s) const
 {
    return std::find_if(sighandlers_.begin(), sighandlers_.end(), 
-         [&s](const sighandlers_type::value_type& v){ return v.second == &s; 
+         [&s](decltype(*sighandlers_.begin())& v){ return v.second == &s; 
       }) != sighandlers_.end();
 }
    
@@ -592,8 +607,10 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                detail::InterfaceResolveResponseFrame rf(0, generateId());
                rf.sequence_nr_ = hdr.irf.sequence_nr_;
                   
-               auto iter = servers_.find(std::string((char*)buf.get()));
-               if (iter != servers_.end())
+               auto iter = std::find_if(servers_by_id_.begin(), servers_by_id_.end(), [&buf](decltype(*servers_by_id_.begin())& val){
+                  return val.second->fqn() == std::string((char*)buf.get());
+               });
+               if (iter != servers_by_id_.end())
                {
                   for(auto iditer = servers_by_id_.begin(); iditer != servers_by_id_.end(); ++iditer)
                   {
