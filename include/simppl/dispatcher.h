@@ -48,9 +48,6 @@ namespace detail
 // --------------------------------------------------------------------------------------
 
 
-extern std::unique_ptr<char> NullUniquePtr;
-
-
 // TODO use pimpl for this...
 struct Dispatcher
 {

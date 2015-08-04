@@ -8,7 +8,7 @@
 #include "simppl/detail/constants.h"
 #include "simppl/detail/parented.h"
 
-#include "simppl/ConnectionState.h"
+#include "simppl/connectionstate.h"
 
 
 namespace simppl
