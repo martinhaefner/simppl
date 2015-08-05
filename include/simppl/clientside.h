@@ -346,12 +346,6 @@ struct ClientResponse : ClientResponseBase
    
    typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
-   inline
-   ClientResponse()
-   {
-      // NOOP
-   }
-   
    template<typename FunctorT>
    inline
    void handledBy(FunctorT func)
