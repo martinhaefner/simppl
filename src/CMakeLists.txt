@@ -8,4 +8,5 @@ add_library(simppl dispatcher.cpp
    stub.cpp
    serialization.cpp
    clientresponseholder.cpp
-   timeout.cpp)
+   timeout.cpp
+   brokerclient.cpp)
