@@ -9,6 +9,7 @@
 #include <thread>
 
 
+using namespace std::literals::chrono_literals;
 using namespace std::placeholders;
 
 
@@ -174,7 +175,7 @@ struct Server : simppl::ipc::Skeleton<Timeout>
    void handleEval(int i)
    {
       // generate timeout on client side
-      std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::this_thread::sleep_for(1s);
    
       if (i == 42)
       {
@@ -187,7 +188,7 @@ struct Server : simppl::ipc::Skeleton<Timeout>
    void handleOneway(int i)
    {
       // generate timeout on client side
-      std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::this_thread::sleep_for(1s);
       
       disp().stop();
       gbl_disp->stop();    // clients dispatcher
@@ -226,7 +227,7 @@ TEST(Timeout, method)
    simppl::ipc::Dispatcher d;
    Client c;
    
-   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.setRequestTimeout(500ms);
    
    d.addClient(c);
    d.run();
@@ -242,7 +243,7 @@ TEST(Timeout, oneway)
    simppl::ipc::Dispatcher d;
    OnewayClient c;
    
-   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.setRequestTimeout(500ms);
    
    d.addClient(c);
    d.run();
@@ -256,7 +257,7 @@ TEST(Timeout, no_timeout)
    std::thread serverthread(&runServer);
    std::thread clientthread(&runClient);
    
-   std::this_thread::sleep_for(std::chrono::milliseconds(700));
+   std::this_thread::sleep_for(700ms);
    gbl_disp->stop();
    
    serverthread.join();
@@ -266,8 +267,41 @@ TEST(Timeout, no_timeout)
 
 TEST(Timeout, request_specific) 
 {
-   // TODO implement request specific timeout with some kind of
-   // IDL, e.g. hello[timeout=400ms](42);
+   std::thread serverthread(&runServer);
+   
+   simppl::ipc::Dispatcher d;
+   simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   
+   // default timeout
+   d.setRequestTimeout(500ms);
+   d.addClient(stub);
+   
+   stub.connect();
+   
+   auto start = std::chrono::steady_clock::now();
+      
+   try
+   {
+      double rc;
+      
+      // request specific timeout -> overrides default
+      stub.eval[simppl::ipc::timeout = 700ms](42) >> rc;
+            
+      // never arrive here!
+      EXPECT_FALSE(true);    
+   }
+   catch(const simppl::ipc::TransportError& err)
+   {
+      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+   }
+   
+   int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+   EXPECT_GT(millis, 700);
+   EXPECT_LT(millis, 750);
+   
+   // cleanup server
+   gbl_disp->stop();
+   serverthread.join();
 }
 
 
@@ -276,7 +310,7 @@ TEST(Timeout, blocking_connect)
    simppl::ipc::Dispatcher d;
    simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
    
-   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.setRequestTimeout(500ms);
    d.addClient(stub);
    
    try
@@ -300,7 +334,7 @@ TEST(Timeout, blocking_api)
    simppl::ipc::Dispatcher d;
    simppl::ipc::Stub<Timeout> stub("tm", "unix:TimeoutTest");
    
-   d.setRequestTimeout(std::chrono::milliseconds(500));
+   d.setRequestTimeout(500ms);
    d.addClient(stub);
    
    stub.connect();

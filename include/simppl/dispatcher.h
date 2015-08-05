@@ -87,11 +87,7 @@ struct Dispatcher
       return ++nextid_;
    }
    
-   inline
-   void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr, int outfd)
-   {
-      pendings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime(), outfd);
-   }
+   void addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr, int outfd);
    
    bool addSignalRegistration(ClientSignalBase& s, uint32_t sequence_nr);
 

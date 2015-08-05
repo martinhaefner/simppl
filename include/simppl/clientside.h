@@ -10,6 +10,7 @@
 #include "simppl/attribute.h"
 #include "simppl/serialization.h"
 #include "simppl/stubbase.h"
+#include "simppl/timeout.h"
 
 #include "simppl/detail/validation.h"
 #include "simppl/detail/parented.h"
@@ -318,6 +319,17 @@ struct ClientRequest : detail::Parented
          parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)), 
          parent<StubBase>()->disp());
    }
+   
+   inline
+   ClientRequest& operator[](int flags)
+   {
+      assert(handler_);   // no oneway requests
+      
+      if (flags & (1<<0))
+         detail::request_specific_timeout = timeout.timeout_;
+      
+      return *this;
+   }
 
    ClientResponseBase* handler_;
    uint32_t id_;
@@ -360,6 +372,7 @@ struct ClientResponse : ClientResponseBase
    
    function_type f_;
 };
+
 
 }   // namespace ipc
 

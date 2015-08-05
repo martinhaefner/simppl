@@ -12,6 +12,7 @@
 
 #include "simppl/detail/frames.h"
 #include "simppl/detail/util.h"
+#include "simppl/timeout.h"
 
 #define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
@@ -21,6 +22,7 @@
 
 
 using namespace std::placeholders;
+using namespace std::literals::chrono_literals;
 
 
 namespace
@@ -30,7 +32,7 @@ inline
 std::chrono::steady_clock::time_point
 get_lookup_duetime()
 {
-   return std::chrono::steady_clock::now() + std::chrono::seconds(5);
+   return std::chrono::steady_clock::now() + 5s;
 }   
 
    
@@ -104,7 +106,6 @@ namespace simppl
 
 namespace ipc
 {
-
 
 std::string Dispatcher::fullQualifiedName(const char* ifname, const char* rolename)
 {
@@ -759,8 +760,18 @@ int Dispatcher::once(unsigned int timeoutMs)
 }
 
 
+void Dispatcher::addRequest(detail::Parented& req, ClientResponseBase& resp, uint32_t sequence_nr, int outfd)
+{
+   pendings_[sequence_nr] = std::make_tuple(&req, &resp, dueTime(), outfd);
+   detail::request_specific_timeout = 0ms;     // reset to 'unused'
+}
+
+
 std::chrono::steady_clock::time_point Dispatcher::dueTime() const
 {
+   if (detail::request_specific_timeout != 0ms)
+      return std::chrono::steady_clock::now() + detail::request_specific_timeout;
+   
    if (request_timeout_ == std::chrono::milliseconds::max())
       return std::chrono::steady_clock::time_point::max(); 
       

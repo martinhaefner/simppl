@@ -7,4 +7,5 @@ add_library(simppl dispatcher.cpp
    skeletonbase.cpp 
    stub.cpp
    serialization.cpp
-   clientresponseholder.cpp)
+   clientresponseholder.cpp
+   timeout.cpp)

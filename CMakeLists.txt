@@ -3,7 +3,7 @@ project (simppl)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_FLAGS "-std=c++0x -g -pthread")
+set(CMAKE_CXX_FLAGS "-std=c++1y -g -pthread")
 include_directories(include)
 
 add_subdirectory(src)
