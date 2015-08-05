@@ -440,7 +440,7 @@ int Dispatcher::accept_socket(int acceptor, short /*pollmask*/)
    }
 
    if (fd >= 0)
-      socketConnected(fd);
+      socketStateChanged(fd, true);
    
    return fd;
 }
@@ -867,22 +867,11 @@ Dispatcher::Dispatcher(const char* boundname)
 }
 
 
-void Dispatcher::socketConnected(int /*fd*/)
-{
-   // NOOP
-}
-
-
-void Dispatcher::socketDisconnected(int /*fd*/)
-{
-   // NOOP
-}
-
-
 int Dispatcher::run()
 {
    running_.store(true);
    
+   // start connection handshake for local and tcp sockets
    for(auto iter = clients_.begin(); iter != clients_.end(); ++iter)
    {
       if (strcmp(iter->second->boundname_, "auto:"))
@@ -1002,7 +991,7 @@ void Dispatcher::clearSlot(int idx)
       }
    }
    
-   socketDisconnected(fds_[idx].fd);
+   socketStateChanged(fds_[idx].fd, false);
                  
    // FIXME 0 is no good value here
    fds_[idx].fd = 0;

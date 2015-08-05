@@ -67,11 +67,15 @@ struct Dispatcher
       request_timeout_ = duration;
    }
    
-   virtual ~Dispatcher();
+   ~Dispatcher();
    
-   virtual void socketConnected(int /*fd*/);
-   
-   virtual void socketDisconnected(int /*fd*/);
+   /**
+    * Callback function which is called whenever a socket state changes.
+    * The function will be called with the fd of the socket and the bool
+    * flag which indicates if the state change was a connect (true) or 
+    * a disconnect (false).
+    */
+   std::function<void(int /*fd*/, bool)> socketStateChanged;
    
    /// attach multiple transport endpoints (e.g. tcp socket or datagram transport endpoint)
    /// e.g.   attach("unix:/server1")

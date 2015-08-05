@@ -10,7 +10,7 @@ in the following functional domains:
 
 Compilers:
 
-Well, I only developed on GCC >4.6 and clang/LLVM 3.4. Due to the heavy 
+Well, I only developed on GCC >=4.9 and clang/LLVM 3.4. Due to the heavy 
 usage of templating techniques and C++11 language features I cannot 
 guarantee that any of the code fragments will work with other compilers 
 (especially VS compiler).
@@ -26,9 +26,15 @@ containing multiple inheritence.
 
 Status:
 
-Most of the source is rapid prototyping. It may work or it may not. Feel 
-free to make a real good project from any of the parts. I plan to make 
-all parts of simppl fully operable but I can't tell you when this happens.
+The parser frameworks should do their work. I use it sucessfully in my own 
+projects.
+
+The IPC library is feature complete and works as far as I already have
+written tests for it. There are certainly some problems with resource 
+cleanup and services shutdown but if you have a project that need IPC 
+and you just once connect your binaries through the simppl library you 
+should get a system that is doing well. I plan to spend some time in 
+resource tracking so one day, it should really become 'production ready'.
 
 
 CopyLeft:

@@ -8,71 +8,8 @@ using namespace std::placeholders;
 namespace spl = simppl::ipc;
 
 
-struct ServiceHandle
-{
-   ServiceHandle()
-    : registrationfd_(0)
-   {
-      // NOOP
-   }
-   
-   ServiceHandle(const std::string& location, int fd)
-    : registrationfd_(fd)
-    , location_(location)
-   {
-      // NOOP
-   }
-   
-   int registrationfd_;
-   std::string location_;
-};
-
-
-struct PushBackService
-{
-   inline
-   PushBackService(std::vector<spl::ServiceInfo>& v)
-    : v_(v)
-   {
-      // NOOP
-   }
-   
-   inline
-   void operator()(const std::pair<std::string, ServiceHandle>& entry) const
-   {
-      v_.push_back(spl::ServiceInfo(entry.first, entry.second.location_));
-   }
-   
-   std::vector<spl::ServiceInfo>& v_;
-};
-
-
-struct PushBackWaiter
-{
-   inline
-   PushBackWaiter(std::vector<std::string>& v)
-    : v_(v)
-   {
-      // NOOP
-   }
-   
-   template<typename T>
-   inline
-   void operator()(const T& entry) const
-   {
-      v_.push_back(entry.first);
-   }
-   
-   std::vector<std::string>& v_;
-};
-
-
 struct BrokerImpl : spl::Skeleton<::Broker>
 {
-   typedef std::map<std::string, ServiceHandle> servicemap_type;
-   typedef std::multimap<std::string, spl::ServerRequestDescriptor> waitersmap_type;
-   
-   inline
    BrokerImpl()
     : spl::Skeleton<::Broker>("broker")
    {
@@ -85,7 +22,10 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    void handleListServices()
    {
       std::vector<spl::ServiceInfo> rc;
-      std::for_each(services_.begin(), services_.end(), PushBackService(rc));
+      
+      std::for_each(services_.begin(), services_.end(), [&rc](decltype(*services_.begin())& entry){
+         rc.push_back(spl::ServiceInfo(entry.first, std::get<0>(entry.second)));
+      });
       
       respondWith(serviceList(rc));
    }
@@ -93,7 +33,9 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    void handleListWaiters()
    {
       std::vector<std::string> rc;
-      std::for_each(waiters_.begin(), waiters_.end(), PushBackWaiter(rc));
+      std::for_each(waiters_.begin(), waiters_.end(), [&rc](decltype(*waiters_.begin())& entry){
+         rc.push_back(entry.first);
+      });
       
       respondWith(waitersList(rc));
    }
@@ -102,11 +44,11 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    {
       std::cout << "Registering " << serv << " at location " << loc << std::endl;
       
-      services_[serv] = ServiceHandle(loc, currentRequest().fd_);
+      services_[serv] = std::make_tuple(loc, currentRequest().fd_);
     
-      std::pair<waitersmap_type::iterator, waitersmap_type::iterator> p = waiters_.equal_range(serv);
+      auto p = waiters_.equal_range(serv);
       
-      for(waitersmap_type::iterator iter = p.first; iter != p.second; ++iter)
+      for(auto iter = p.first; iter != p.second; ++iter)
       {
          respondOn(iter->second, serviceReady(serv, loc));
       }
@@ -118,10 +60,10 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    {
       std::cout << "Client waits for " << serv << std::endl;
       
-      servicemap_type::iterator iter = services_.find(serv);
+      auto iter = services_.find(serv);
       if (iter != services_.end())
       {
-         respondWith(serviceReady(serv, iter->second.location_));
+         respondWith(serviceReady(serv, std::get<0>(iter->second)));
       }
       else
          waiters_.insert(make_pair(serv, deferResponse()));
@@ -129,23 +71,21 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    
    void removeAllFrom(int fd)
    {
-      for (servicemap_type::iterator iter = services_.begin(); iter != services_.end(); )
+      for (auto iter = services_.begin(); iter != services_.end(); )
       {
-         if (iter->second.registrationfd_ == fd)
+         if (std::get<1>(iter->second) == fd)
          {
-            services_.erase(iter);
-            iter = services_.begin();   // not the very best algorithm
+            iter = services_.erase(iter);
          }
          else
             ++iter;
       }
    
-      for (waitersmap_type::iterator iter = waiters_.begin(); iter != waiters_.end(); )
+      for (auto iter = waiters_.begin(); iter != waiters_.end(); )
       {
          if (iter->second.fd_ == fd)
          {
-            waiters_.erase(iter);
-            iter = waiters_.begin();   // not the very best algorithm
+            iter = waiters_.erase(iter);
          }
          else
             ++iter;
@@ -154,33 +94,24 @@ struct BrokerImpl : spl::Skeleton<::Broker>
    
 private:
    
-   servicemap_type services_;
-   waitersmap_type waiters_;
+   std::map<std::string, std::tuple<std::string/*location*/, int/*fd*/>> services_;
+   std::multimap<std::string, spl::ServerRequestDescriptor> waiters_;
 };
 
 
-struct BrokerDispatcher : spl::Dispatcher
+void socketStateChange(BrokerImpl& impl, int fd, bool connected)
 {
-   BrokerDispatcher(BrokerImpl& impl)
-    : spl::Dispatcher("unix:the_broker")
-    , impl_(impl)
-   {
-      addServer(impl);
-   }
-   
-   void socketDisconnected(int fd)
-   {
-      impl_.removeAllFrom(fd);
-   }
-
-   BrokerImpl& impl_;
-};
+   if (!connected)
+      impl.removeAllFrom(fd);
+} 
 
 
 int main()
 {
+   spl::Dispatcher disp("unix:the_broker");
+   
    BrokerImpl impl;
-   BrokerDispatcher disp(impl);
+   disp.socketStateChanged = std::bind(&socketStateChange, std::ref(impl), _1, _2);
    
    return disp.run();
 }

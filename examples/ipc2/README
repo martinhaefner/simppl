@@ -15,11 +15,12 @@ Interface level
  * event driven interface
  * blocking (RPC) call interface
  * session handling
+ * request timeouts
  
 
 Transport level
 
- * Unix domain socket transport
+ * Unix domain socket transport, including inotify notifications
  * TCP/IP transport
  * service broker for automatic service resolution
 
