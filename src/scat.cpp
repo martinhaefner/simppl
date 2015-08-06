@@ -10,20 +10,6 @@
 namespace spl = simppl::ipc;
 
 
-inline
-void printServiceInfo(const spl::ServiceInfo& info)
-{
-   std::cout << "   " << info.name_ << " at " << info.location_ << std::endl;
-}
-
-
-inline
-void printWaiterInfo(const std::string& info)
-{
-   std::cout << "   " << info << std::endl;
-}
-
-
 int main()
 {
    spl::Dispatcher disp;
@@ -39,14 +25,20 @@ int main()
       broker.listServices() >> services;
       
       std::cout << "Available services: " << std::endl;
-      std::for_each(services.begin(), services.end(), printServiceInfo);
+      
+      std::for_each(services.begin(), services.end(), [](const spl::ServiceInfo& info){
+         std::cout << "   " << info.name_ << " at " << info.location_ << std::endl;
+      });
       std::cout << std::endl;
       
       std::vector<std::string> waiters;
       broker.listWaiters() >> waiters;
       
       std::cout << "Waiters waiting for: " << std::endl;
-      std::for_each(waiters.begin(), waiters.end(), printWaiterInfo);
+      
+      std::for_each(waiters.begin(), waiters.end(), [](const std::string& info){
+         std::cout << "   " << info << std::endl;
+      });
       std::cout << std::endl;
    }
    catch(const std::exception& ex)

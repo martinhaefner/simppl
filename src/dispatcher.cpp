@@ -640,7 +640,7 @@ int Dispatcher::handle_data(int fd, short /*pollmask*/)
                       std::cerr << "'connected' hook not implemented. Client will probably hang..." << std::endl;
                   }
                   else
-                      stub->connected(hdr.irrf.id_ == INVALID_SERVER_ID ? 
+                     stub->connected(hdr.irrf.id_ == INVALID_SERVER_ID ? 
                         ConnectionState::NotAvailable : ConnectionState::Connected);
                }
             }
