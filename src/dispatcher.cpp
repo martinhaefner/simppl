@@ -137,9 +137,7 @@ Dispatcher::~Dispatcher()
 
    for(unsigned int i=0; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
    {
-      // FIXME can't check against >= 0 because then there are undesired blockings
-      //       so change it all over the software before changing one position only 
-      if (fds_[i].fd > 0)
+      if (fds_[i].fd >= 0)
          while(::close(fds_[i].fd) && errno == EINTR);
    }   
 }
@@ -431,17 +429,17 @@ int Dispatcher::accept_socket(int acceptor, short /*pollmask*/)
    socklen_t len = sizeof(u);
 
    int fd = ::accept(acceptor, (struct sockaddr*)&u, &len);
-   if (fd > 0)
+   if (fd >= 0)
    {
       fds_[fd].fd = fd;
       fds_[fd].events = POLLIN;
       
       fctn_[fd] = std::bind(&Dispatcher::handle_data, this, _1, _2);
+      
+      if (socketStateChanged)
+         socketStateChanged(fd, true);
    }
-
-   if (fd >= 0)
-      socketStateChanged(fd, true);
-   
+      
    return fd;
 }
 
@@ -851,9 +849,13 @@ Dispatcher::Dispatcher(const char* boundname)
  , sequence_(0)
  , nextid_(0)
  , broker_(nullptr)
- , request_timeout_(std::chrono::milliseconds::max())    // FIXME move this to a config header, also other timeout defaults
+ , request_timeout_(std::chrono::milliseconds::max())    // TODO move this to a config header, also other timeout defaults
 {
-   ::memset(fds_, 0, sizeof(fds_));
+   for(unsigned int i=0; i<sizeof(fds_)/sizeof(fds_[0]); ++i)
+   {
+      fds_[i].fd = -1;
+      fds_[i].events = 0;
+   }
    
    if (boundname)
       assert(attach(boundname));
@@ -876,7 +878,7 @@ int Dispatcher::run()
    {
       if (strcmp(iter->second->boundname_, "auto:"))
       {
-         if (iter->second->fd_ <= 0)
+         if (iter->second->fd_ < 0)
          {
             connect(*iter->second);
             
@@ -901,7 +903,8 @@ bool Dispatcher::attach(const char* endpoint)
    if (!strncmp(endpoint, "unix:", 5) && strlen(endpoint) > 5)
    {
       // unix acceptor
-      ::mkdir("/tmp/dispatcher", 0777);
+      if (::mkdir("/tmp/dispatcher", 0777) < 0 && errno != EEXIST)
+         return false;
       
       int acceptor = ::socket(PF_UNIX, SOCK_STREAM, 0);
       
@@ -991,10 +994,10 @@ void Dispatcher::clearSlot(int idx)
       }
    }
    
-   socketStateChanged(fds_[idx].fd, false);
+   if (socketStateChanged)
+      socketStateChanged(fds_[idx].fd, false);
                  
-   // FIXME 0 is no good value here
-   fds_[idx].fd = 0;
+   fds_[idx].fd = -1;
    fds_[idx].events = 0;
 }
 
