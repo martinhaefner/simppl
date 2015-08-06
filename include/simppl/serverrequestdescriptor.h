@@ -15,13 +15,15 @@ namespace ipc
 struct ServerRequestBase;
 
 
-/// FIXME this class supports only move semantics!
 struct ServerRequestDescriptor
 {
    ServerRequestDescriptor();
    
-   ServerRequestDescriptor(const ServerRequestDescriptor& rhs);
-   ServerRequestDescriptor& operator=(const ServerRequestDescriptor& rhs);
+   ServerRequestDescriptor(const ServerRequestDescriptor& rhs) = delete;
+   ServerRequestDescriptor& operator=(const ServerRequestDescriptor& rhs) = delete;
+   
+   ServerRequestDescriptor(ServerRequestDescriptor&& rhs);
+   ServerRequestDescriptor& operator=(ServerRequestDescriptor&& rhs);
    
    ServerRequestDescriptor& set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr, uint32_t sessionid);
    

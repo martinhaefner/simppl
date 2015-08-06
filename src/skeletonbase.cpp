@@ -38,7 +38,7 @@ ServerRequestDescriptor SkeletonBase::deferResponse()
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());  
    
-   return current_request_;   // invalidates the current request!
+   return std::move(current_request_);
 }
 
 

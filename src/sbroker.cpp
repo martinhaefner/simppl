@@ -111,6 +111,8 @@ int main()
    spl::Dispatcher disp("unix:the_broker");
    
    BrokerImpl impl;
+   disp.addServer(impl);
+   
    disp.socketStateChanged = std::bind(&socketStateChange, std::ref(impl), _1, _2);
    
    return disp.run();

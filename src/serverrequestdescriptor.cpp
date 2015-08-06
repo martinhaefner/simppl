@@ -20,17 +20,17 @@ ServerRequestDescriptor::ServerRequestDescriptor()
 }
 
 
-ServerRequestDescriptor::ServerRequestDescriptor(const ServerRequestDescriptor& rhs)
+ServerRequestDescriptor::ServerRequestDescriptor(ServerRequestDescriptor&& rhs)
  : requestor_(rhs.requestor_)
  , fd_(rhs.fd_)
  , sequence_nr_(rhs.sequence_nr_)
  , sessionid_(rhs.sessionid_)
 {
-   const_cast<ServerRequestDescriptor&>(rhs).clear();
+   rhs.clear();
 }
 
 
-ServerRequestDescriptor& ServerRequestDescriptor::operator=(const ServerRequestDescriptor& rhs)
+ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescriptor&& rhs)
 {
    if (this != &rhs)
    {
@@ -39,11 +39,12 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(const ServerRequestD
       sequence_nr_ = rhs.sequence_nr_;
       sessionid_ = rhs.sessionid_;
       
-      const_cast<ServerRequestDescriptor&>(rhs).clear();
+      rhs.clear();
    }
    
    return *this;
 }
+
 
 ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr, uint32_t sessionid)
 {
