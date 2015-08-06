@@ -5,7 +5,7 @@ add_library(simppl dispatcher.cpp
    sessiondata.cpp 
    signalrecipient.cpp 
    skeletonbase.cpp 
-   stub.cpp
+   stubbase.cpp
    serialization.cpp
    clientresponseholder.cpp
    timeout.cpp
