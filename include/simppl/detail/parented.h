@@ -29,17 +29,10 @@ struct Parented
 protected:
  
    inline
-   Parented()
-    : parent_(0)
+   Parented(void* parent)
+    : parent_(parent)
    {
       // NOOP
-   }
-      
-   inline
-   void reparent(void* parent)
-   {
-      assert(parent_);
-      parent_ = parent;
    }
    
    template<typename ParentT>

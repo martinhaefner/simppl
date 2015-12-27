@@ -4,6 +4,6 @@
 
 simppl::ipc::detail::ClientResponseHolder::operator bool()
 {
-   dispatcher_.waitForResponse(*this);
-   return true;   // FIXME remove the bool return value
+   dbus_pending_call_block(pending_);
+   return true;
 }

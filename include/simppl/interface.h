@@ -32,39 +32,12 @@ struct ServerRequestBase;
 struct ServerRequestBaseSetter;
 
 
-struct AbsoluteInterfaceBase
-{    
-   inline
-   uint32_t nextId()
-   {
-      return ++id_;
-   }
-   
-protected:
-
-   inline
-   AbsoluteInterfaceBase()
-    : id_(0)
-   {
-      // NOOP
-   }
-
-   inline
-   ~AbsoluteInterfaceBase()
-   {
-      // NOOP
-   }
-   
-   uint32_t id_;   // mutable variable for request/signals id registration, after startup this var has an senseless value
-};
-
-
 template<template<typename...> class RequestT>
 struct InterfaceBase;
 
 
 template<>
-struct InterfaceBase<ClientRequest> : AbsoluteInterfaceBase
+struct InterfaceBase<ClientRequest>
 {
    inline
    InterfaceBase()
@@ -80,7 +53,7 @@ struct InterfaceBase<ClientRequest> : AbsoluteInterfaceBase
 
 
 template<>
-struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
+struct InterfaceBase<ServerRequest>
 {
    std::map<uint32_t, ServerRequestBase*> container_;
    std::map<uint32_t, detail::ServerSignalBase*> signals_;
@@ -111,17 +84,17 @@ struct InterfaceBase<ServerRequest> : AbsoluteInterfaceBase
       struct iface : public simppl::ipc::InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
-   request(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->container_)
+   request(# request, ((simppl::ipc::InterfaceBase<Request>*)this)->container_)
 
 #define INIT_RESPONSE(response) \
    response()
 
 #define INIT_SIGNAL(signal) \
-   signal(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
+   signal(# signal, ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
 
 // an attribute is nothing more that an encapsulated signal
-#define INIT_ATTRIBUTE(attr) \
-   attr(((simppl::ipc::AbsoluteInterfaceBase*)this)->nextId(), ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
+// #define INIT_ATTRIBUTE(attr) \
+//   attr(# name, ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
 
 
 template<typename... T, typename... T2>

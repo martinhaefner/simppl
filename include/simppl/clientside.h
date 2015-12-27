@@ -5,6 +5,8 @@
 #include <iostream>
 #include <functional>
 
+#include <dbus/dbus.h>
+
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
 #include "simppl/attribute.h"
@@ -30,7 +32,7 @@ template<typename> struct InterfaceNamer;
 // FIXME remove these types of interfaces in favour of std::function interface
 struct ClientResponseBase
 {
-   virtual void eval(const CallState& state, const void* payload, size_t len) = 0;
+   virtual void eval(DBusMessage* msg) = 0;
    
 protected:
 
@@ -50,17 +52,13 @@ struct ClientSignalBase : detail::Parented
    virtual void eval(const void* data, size_t len) = 0;
    
    inline
-   ClientSignalBase(uint32_t id)
-    : id_(id)
+   ClientSignalBase(const char* name, void* parent)
+    : detail::Parented(parent)
+    , name_(name)
    {
       // NOOP
    }
 
-   inline   
-   uint32_t id() const   // make this part of a generic Identifiable baseclass
-   {
-      return id_;
-   }
    
 protected:
    
@@ -70,7 +68,7 @@ protected:
       // NOOP
    }
    
-   uint32_t id_;   
+   const char* name_;   
 };
 
 
@@ -82,10 +80,10 @@ struct ClientSignal : ClientSignalBase
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
-   ClientSignal(uint32_t id, std::vector<detail::Parented*>& parent)
-    : ClientSignalBase(id)
+   ClientSignal(const char* name, void* parent)
+    : ClientSignalBase(name, parent)
    {
-      parent.push_back(this);
+      // NOOP
    }
       
    template<typename FunctorT>
@@ -111,11 +109,6 @@ struct ClientSignal : ClientSignalBase
       return *this;
    }
    
-   inline
-   bool isAttached() const
-   {
-      // FIXME 
-   }
    
    void eval(const void* payload, size_t length)
    {
@@ -125,7 +118,7 @@ struct ClientSignal : ClientSignalBase
          detail::GetCaller<T...>::type::template eval(d, f_);
       }
       else
-         std::cerr << "No appropriate handler registered for signal " << id_ << " with payload size=" << length << std::endl;
+         std::cerr << "No appropriate handler registered for signal " << name_ << " with payload size=" << length << std::endl;
    }
    
    function_type f_;
@@ -181,8 +174,8 @@ struct ClientAttribute
       std::function<void(arg_type)> >::type function_type;
    
    inline
-   ClientAttribute(uint32_t id, std::vector<detail::Parented*>& parent)
-    : signal_(id, parent)
+   ClientAttribute(const char* name, std::vector<detail::Parented*>& parent)
+    : signal_(name, parent)
     , data_()
     , last_update_(0)
    {
@@ -304,20 +297,33 @@ struct ClientRequest : detail::Parented
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
       
    inline
-   ClientRequest(uint32_t id, std::vector<detail::Parented*>& parent)
-    : id_(id)
+   ClientRequest(const char* method_name, void* parent)
+    : detail::Parented(parent)
+    , method_name_(method_name)
     , handler_(0)
    {
-      parent.push_back(this);
+      // NOOP
    }
       
    inline
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      detail::Serializer s; //FIXME (sizeof(typename remove_ref<T1>::type));
-      return detail::ClientResponseHolder(handler_, 
-         parent<StubBase>()->sendRequest(*this, handler_, id_, serialize(s, t...)), 
-         parent<StubBase>()->disp());
+      DBusMessage* msg = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
+      DBusPendingCall* pending = nullptr;
+      
+      detail::Serializer s(*msg);
+      serialize(s, t...);
+      
+      if (handler_)
+      {
+         dbus_connection_send_with_reply(this->conn_, msg, &pending, detail::request_specific_timeout);
+      }
+      else
+         dbus_connection_send(this->conn_, msg, nullptr);
+         
+      dbus_message_unref(msg);
+      
+      return detail::ClientResponseHolder(handler_, pending);
    }
    
    inline
@@ -332,7 +338,7 @@ struct ClientRequest : detail::Parented
    }
 
    ClientResponseBase* handler_;
-   uint32_t id_;
+   const char* method_name_;
 };
 
 
@@ -353,15 +359,13 @@ struct ClientResponse : ClientResponseBase
       f_ = func;
    }
    
-   void eval(const CallState& cs, const void* payload, size_t length)
+   void eval(DBusMessage* msg)
    {
       if (f_)
       {
-         detail::Deserializer d(payload, length);
-         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
+//FIXME         detail::Deserializer d(payload, length);
+//         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }
-      else
-         std::cerr << "No appropriate handler registered for response with payload size=" << length << std::endl;
    }
    
    function_type f_;

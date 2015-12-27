@@ -26,10 +26,9 @@ namespace detail
 struct ClientResponseHolder
 {
    inline
-   ClientResponseHolder(ClientResponseBase* r, uint32_t sequence_nr, simppl::ipc::Dispatcher& dispatcher)
+   ClientResponseHolder(ClientResponseBase* r, DBusPendingCall* pending)
     : r_(r)
-    , sequence_nr_(sequence_nr)
-    , dispatcher_(dispatcher)
+    , pending_(pending)
    {
       // NOOP
    }
@@ -43,9 +42,7 @@ struct ClientResponseHolder
    operator bool();
 
    ClientResponseBase* r_;
-   uint32_t sequence_nr_;
-   
-   simppl::ipc::Dispatcher& dispatcher_;
+   DBusPendingCall* pending_;
 };
 
 } // namespace detail

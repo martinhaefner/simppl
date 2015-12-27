@@ -36,16 +36,7 @@ struct StubBase
    
 protected:
    
-   // friendship inheritence, blocking connect
-   void connect();
-   
    ~StubBase();
-   
-   inline   
-   void reparent(detail::Parented* child)
-   {
-      child->parent_ = this;
-   }
    
 public:
    
@@ -67,35 +58,18 @@ public:
    
    Dispatcher& disp();
    
-   inline
-   bool isConnected() const
-   {
-      return id_ != INVALID_SERVER_ID && fd_ != -1;
-   }
-   
 protected:
-   
-   uint32_t sendRequest(detail::Parented& requestor, ClientResponseBase* handler, uint32_t requestid, const detail::Serializer& s);
    
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
    
-   bool isSignalRegistered(ClientSignalBase& sigbase) const;
-   
-   bool dispatcherIsRunning() const;
-   
-   inline
-   int fd()
-   {
-      assert(fd_ > 0);
-      return fd_;
-   }
+   void register_object_path();
+   DBusHandlerResult handleMessage(DBusMessage* msg);
    
    const char* iface_;
    const char* role_;
    
    char boundname_[24];     ///< where to find the server
-   uint32_t id_;            ///< as given from server
    
    Dispatcher* disp_;
    int fd_;                 ///< connected socket
