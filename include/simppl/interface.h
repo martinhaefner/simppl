@@ -7,6 +7,7 @@
 #include <map>
 
 #include "simppl/detail/parented.h"
+#include "simppl/detail/basicinterface.h"
 #include "simppl/detail/serversignalbase.h"
 #include "simppl/detail/serverrequestbasesetter.h"
 
@@ -37,23 +38,18 @@ struct InterfaceBase;
 
 
 template<>
-struct InterfaceBase<ClientRequest>
+struct InterfaceBase<ClientRequest> : detail::BasicInterface
 {
    inline
    InterfaceBase()
-    : signals_(container_)
    {
       // NOOP
    }
-   
-   // temporary lists
-   std::vector<detail::Parented*> container_;
-   std::vector<detail::Parented*>& signals_;
 };
 
 
 template<>
-struct InterfaceBase<ServerRequest>
+struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
    std::map<uint32_t, ServerRequestBase*> container_;
    std::map<uint32_t, detail::ServerSignalBase*> signals_;
@@ -84,13 +80,13 @@ struct InterfaceBase<ServerRequest>
       struct iface : public simppl::ipc::InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
-   request(# request, ((simppl::ipc::InterfaceBase<Request>*)this)->container_)
+   request(# request, this)
 
 #define INIT_RESPONSE(response) \
    response()
 
 #define INIT_SIGNAL(signal) \
-   signal(# signal, ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
+   signal(# signal, this)
 
 // an attribute is nothing more that an encapsulated signal
 // #define INIT_ATTRIBUTE(attr) \

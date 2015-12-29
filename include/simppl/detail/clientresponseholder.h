@@ -8,6 +8,7 @@
 
 // forward decl
 struct ClientResponseBase;
+struct DBusPendingCall;
 
 
 namespace simppl

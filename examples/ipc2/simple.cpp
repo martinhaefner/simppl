@@ -1,23 +1,29 @@
-#include <simppl/Stub.h>
+#include "simppl/stub.h"
+#include "simppl/interface.h"
+
+
+namespace spl = simppl::ipc;
 
 
 INTERFACE(Simple)
 {
    Request<int> echo;
-   //Response<int> rEcho;
+   Signal<double> sigUsr;
+   Response<int> rEcho;
    
    Simple()
     : INIT_REQUEST(echo)
-    //, INIT_RESPONSE(rEcho)
+    , INIT_SIGNAL(sigUsr)
+    , INIT_RESPONSE(rEcho)
    {
-      // echo >> rEcho;
+      echo >> rEcho;
    }
-}
+};
 
 
 int main()
 {
-   Stub<Simple> sst("my", "simppl.simple");
+   spl::Stub<Simple> sst("my", "simppl.simple");
    
    return 0;
 }

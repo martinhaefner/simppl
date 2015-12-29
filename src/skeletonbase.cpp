@@ -105,18 +105,6 @@ const ServerRequestDescriptor& SkeletonBase::currentRequest() const
 }
 
 
-void* SkeletonBase::currentSessionData()
-{
-   return disp().getSessionData(currentRequest().sessionid_);
-}
-
-
-void SkeletonBase::registerSession(void* data, void(*destructor)(void*))
-{
-   disp().registerSession(currentRequest().fd_, currentRequest().sessionid_, data, destructor);
-}
-
-
 void SkeletonBase::handleRequest(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t length)
 {
    //std::cout << "Skeleton::handleRequest '" << funcid << "'" << std::endl;

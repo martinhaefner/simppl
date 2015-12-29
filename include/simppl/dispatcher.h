@@ -86,6 +86,7 @@ struct Dispatcher
    
    bool isRunning() const;
    
+   DBusHandlerResult try_handle_signal(DBusMessage* msg);
    
 private:
    
@@ -94,6 +95,8 @@ private:
    DBusConnection* conn_;
    
    std::chrono::milliseconds request_timeout_;
+   
+   std::map<std::string, StubBase*> stubs_;
 };
 
 

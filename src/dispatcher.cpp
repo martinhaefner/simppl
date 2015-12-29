@@ -47,6 +47,13 @@ struct BlockingResponseHandler0
    simppl::ipc::ClientResponse<>& r_;
 };
 
+
+DBusHandlerResult signal_filter(DBusConnection* /*connection*/, DBusMessage* msg, void *user_data)
+{
+    simppl::ipc::Dispatcher* disp = (simppl::ipc::Dispatcher*)user_data;
+    return disp->try_handle_signal(msg);
+}
+
 }   // namespace
 
 
@@ -63,6 +70,20 @@ namespace ipc
 Dispatcher::~Dispatcher()
 {
    dbus_connection_close(conn_);
+}
+
+
+DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
+{
+    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
+    {
+        auto iter = stubs_.find(dbus_message_get_interface(msg));
+        
+        if (iter != stubs_.end())
+            return iter->second->try_handle_signal(msg);
+    }
+        
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
 
@@ -97,16 +118,11 @@ void Dispatcher::addClient(StubBase& clnt)
    assert(!clnt.disp_);   // don't add it twice
    
    clnt.disp_ = this;
-   /*FIXME clients_.insert(std::make_pair(::fullQualifiedName(clnt), &clnt)); 
    
-   if (!strcmp(clnt.boundname_, "auto:"))
-   {
-      assert(broker_);
-      broker_->waitForService(::fullQualifiedName(clnt), std::bind(&Dispatcher::serviceReady, this, &clnt, _1, _2));
-   }
-   else
-   {
-      if (isRunning())
+   // FIXME somehow integrate interface _and_ rolename
+   stubs_.insert(std::make_pair(clnt.iface(), &clnt));
+   
+   /* if (isRunning())
          connect(clnt);
    }*/
 }
@@ -114,14 +130,14 @@ void Dispatcher::addClient(StubBase& clnt)
 
 void Dispatcher::removeClient(StubBase& clnt)
 {
-/*   for(auto iter = clients_.begin(); iter != clients_.end(); ++iter)
+   for(auto iter = stubs_.begin(); iter != stubs_.end(); ++iter)
    {
       if (&clnt == iter->second)
       {
-         clients_.erase(iter);
+         stubs_.erase(iter);
          break;
       } 
-   }*/
+   }
 }
 
 
@@ -140,6 +156,8 @@ Dispatcher::Dispatcher(const char* bus_name)
    
    ret = dbus_bus_request_name(conn_, bus_name, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
    assert(!dbus_error_is_set(&err));
+   
+   dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 }
 
 

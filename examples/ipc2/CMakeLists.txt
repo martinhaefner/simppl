@@ -26,4 +26,4 @@
 #target_link_libraries(benchmark simppl)
 
 add_executable(simple simple.cpp)
-target_link_libraries(simple simppl)
+target_link_libraries(simple simppl dbus-1)

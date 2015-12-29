@@ -8,21 +8,6 @@
 #include <cstring>
 
 
-namespace {
-   
-   DBusHandlerResult stub_handle_message(DBusConnecion* conn, DBusMessage* msg, void* data)
-   {
-      return reinterpret_cast<StubBase*>(data)->handleMessage(msg);
-   }
-   
-   
-   DBusObjectPathVTable stub_table = {
-      .message_function = stub_handle_essage,
-      .unregister_function = nullptr   /* what's this good for? */
-   };
-}
-
-
 namespace simppl
 {
    
@@ -62,24 +47,28 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
  
    DBusError err;
    dbus_error_init(&err);
-      
-   dbus_bus_add_match(conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
+   
+   // FIXME do we really need dependency to dispatcher?
+   dbus_bus_add_match(disp_->conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
    assert(!dbus_error_is_set(&err));
+   
+   // FIXME handle double attach
+   signals_[sigbase.name()] = &sigbase;
 }
 
 
-DBusHandlerResult StubBase::handleMessage(DBusMessage* msg)
+DBusHandlerResult StubBase::try_handle_signal(DBusMessage* msg)
 {
    const char *method = dbus_message_get_member(msg);
-	const char *iface = dbus_message_get_interface(msg);
 
-   // TODO lookup map and delegate to appropriate ClientResponse
-}
-
-
-void StubBase::registerObjectPath()
-{
-    dbus_connection_register_object_path(conn, "role_", &stub_table, this);
+   auto iter = signals_.find(dbus_message_get_member(msg));
+   if (iter != signals_.end())
+   {
+       iter->second->eval(msg);
+       return DBUS_HANDLER_RESULT_HANDLED;
+   }
+   
+   return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
 
@@ -90,8 +79,10 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
    DBusError err;
    dbus_error_init(&err);
       
-   dbus_bus_remove_match(conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
+   dbus_bus_remove_match(disp_->conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
    assert(!dbus_error_is_set(&err));
+   
+   // FIXME remove signalbase handler again
 }
 
 

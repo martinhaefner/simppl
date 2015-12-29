@@ -4,6 +4,9 @@
 
 #include <cassert>
 #include <functional>
+#include <map>
+
+#include <dbus/dbus.h>
 
 #include "simppl/detail/constants.h"
 #include "simppl/detail/parented.h"
@@ -58,13 +61,13 @@ public:
    
    Dispatcher& disp();
    
+   /// FIXME protected?!
+   DBusHandlerResult try_handle_signal(DBusMessage* msg);
+   
 protected:
    
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
-   
-   void register_object_path();
-   DBusHandlerResult handleMessage(DBusMessage* msg);
    
    const char* iface_;
    const char* role_;
@@ -72,8 +75,7 @@ protected:
    char boundname_[24];     ///< where to find the server
    
    Dispatcher* disp_;
-   int fd_;                 ///< connected socket
-   uint32_t current_sessionid_;
+   std::map<std::string, ClientSignalBase*> signals_;
 };
 
 }   // namespace ipc

@@ -15,7 +15,7 @@
 #include "simppl/timeout.h"
 
 #include "simppl/detail/validation.h"
-#include "simppl/detail/parented.h"
+#include "simppl/detail/basicinterface.h"
 #include "simppl/detail/clientresponseholder.h"
 
 
@@ -32,7 +32,14 @@ template<typename> struct InterfaceNamer;
 // FIXME remove these types of interfaces in favour of std::function interface
 struct ClientResponseBase
 {
-   virtual void eval(DBusMessage* msg) = 0;
+    static
+    void pending_notify(DBusPendingCall* pending, void* user_data)
+    {
+        ClientResponseBase* handler = (ClientResponseBase*)user_data;
+        handler->eval(pending);
+    }
+
+   virtual void eval(DBusPendingCall* msg) = 0;
    
 protected:
 
@@ -47,20 +54,27 @@ protected:
 // ---------------------------------------------------------------------------------
 
 
-struct ClientSignalBase : detail::Parented
+struct ClientSignalBase
 {
-   virtual void eval(const void* data, size_t len) = 0;
+   virtual void eval(DBusMessage* msg) = 0;
    
    inline
-   ClientSignalBase(const char* name, void* parent)
-    : detail::Parented(parent)
+   ClientSignalBase(const char* name, StubBase* stub)
+    : stub_(stub)
     , name_(name)
    {
       // NOOP
    }
-
+   
+   
+   const char* name() const 
+   {
+       return name_;
+   }
+   
    
 protected:
+   
    
    inline
    ~ClientSignalBase()
@@ -68,6 +82,7 @@ protected:
       // NOOP
    }
    
+   StubBase* stub_;
    const char* name_;   
 };
 
@@ -80,8 +95,8 @@ struct ClientSignal : ClientSignalBase
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
       
    inline
-   ClientSignal(const char* name, void* parent)
-    : ClientSignalBase(name, parent)
+   ClientSignal(const char* name, detail::BasicInterface* iface)
+    : ClientSignalBase(name, dynamic_cast<StubBase*>(iface))
    {
       // NOOP
    }
@@ -97,7 +112,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& attach()
    {
-      parent<StubBase>()->sendSignalRegistration(*this);
+      stub_->sendSignalRegistration(*this);
       return *this;
    }
    
@@ -105,20 +120,19 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& detach()
    {
-      parent<StubBase>()->sendSignalUnregistration(*this);
+      stub_->sendSignalUnregistration(*this);
       return *this;
    }
    
    
-   void eval(const void* payload, size_t length)
+   void eval(DBusMessage* msg)
    {
       if (f_)
       {
-         detail::Deserializer d(payload, length);
-         detail::GetCaller<T...>::type::template eval(d, f_);
+          std::cout << "Calling signal function -> implement me!" << std::endl;
+         //detail::Deserializer d(payload, length);
+         //detail::GetCaller<T...>::type::template eval(d, f_);
       }
-      else
-         std::cerr << "No appropriate handler registered for signal " << name_ << " with payload size=" << length << std::endl;
    }
    
    function_type f_;
@@ -292,15 +306,15 @@ private:
 
 
 template<typename... T>
-struct ClientRequest : detail::Parented
+struct ClientRequest 
 {
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
       
    inline
-   ClientRequest(const char* method_name, void* parent)
-    : detail::Parented(parent)
-    , method_name_(method_name)
+   ClientRequest(const char* method_name, detail::BasicInterface* parent)
+    : method_name_(method_name)
     , handler_(0)
+    , parent_(parent)
    {
       // NOOP
    }
@@ -316,10 +330,11 @@ struct ClientRequest : detail::Parented
       
       if (handler_)
       {
-         dbus_connection_send_with_reply(this->conn_, msg, &pending, detail::request_specific_timeout);
+         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, detail::request_specific_timeout.count());
+         dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, handler_, 0);
       }
       else
-         dbus_connection_send(this->conn_, msg, nullptr);
+         dbus_connection_send(parent_->conn_, msg, nullptr);
          
       dbus_message_unref(msg);
       
@@ -339,6 +354,7 @@ struct ClientRequest : detail::Parented
 
    ClientResponseBase* handler_;
    const char* method_name_;
+   detail::BasicInterface* parent_;
 };
 
 
@@ -359,10 +375,11 @@ struct ClientResponse : ClientResponseBase
       f_ = func;
    }
    
-   void eval(DBusMessage* msg)
+   void eval(DBusPendingCall* msg)
    {
       if (f_)
       {
+          std::cout << "Calling response function -> implement me!" << std::endl;
 //FIXME         detail::Deserializer d(payload, length);
 //         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }

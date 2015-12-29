@@ -44,9 +44,6 @@ struct SkeletonBase
    
    const ServerRequestDescriptor& currentRequest() const;
    
-   void* currentSessionData();
-   void registerSession(void* data, void(*destructor)(void*));
-   
    
 protected:
    
