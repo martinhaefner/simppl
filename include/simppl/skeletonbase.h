@@ -3,8 +3,12 @@
 
 #include <tuple>
 
+#include <dbus/dbus.h>
+
 #include "simppl/error.h"
-#include "simppl/serverside.h"
+#include "simppl/serverrequestdescriptor.h"
+
+#include "simppl/detail/serverresponseholder.h"
 
 
 namespace simppl
@@ -23,7 +27,7 @@ struct SkeletonBase
  
    static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
  
-   SkeletonBase(const char* role);
+   SkeletonBase(const char* iface, const char* role);
    
    virtual ~SkeletonBase();
    
@@ -46,6 +50,18 @@ struct SkeletonBase
    
    const ServerRequestDescriptor& currentRequest() const;
    
+   inline
+   const char* iface() const
+   {
+      return iface_;
+   }
+   
+   inline
+   const char* role() const
+   {
+      return role_;
+   }
+
    
 protected:
    
@@ -56,8 +72,9 @@ protected:
    /// return a session pointer and destruction function if adequate
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
    
-   
+   char iface_[128];
    const char* role_;
+   
    Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
 };

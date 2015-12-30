@@ -78,12 +78,14 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
    // FIXME do we really need dependency to dispatcher?
    std::ostringstream match_string;
    match_string << "type='signal'";
-   match_string << ", sender='" << role() << "'";
-   match_string << ", interface='" << iface() << "'";
-   match_string << ", member='" << sigbase.name() << "'";
+   match_string << ",sender='" << boundname_ << "'";
+   match_string << ",interface='" << iface() << "'";
+   match_string << ",member='" << sigbase.name() << "'";
    
    dbus_bus_add_match(disp_->conn_, match_string.str().c_str(), &err);
-   assert(!dbus_error_is_set(&err));
+   //assert(!dbus_error_is_set(&err));
+   if (dbus_error_is_set(&err))
+       std::cerr << err.name << " " << err.message << std::endl;
    
    // FIXME handle double attach
    signals_[sigbase.name()] = &sigbase;

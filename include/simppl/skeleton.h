@@ -2,8 +2,12 @@
 #define SIMPPL_SKELETON_H
 
 
+#include <typeinfo>
+#include <cxxabi.h>
+
 #include "simppl/skeletonbase.h"
 #include "simppl/dispatcher.h"
+#include "simppl/serverside.h"
 
 
 namespace simppl
@@ -31,7 +35,7 @@ struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSign
    
    inline
    Skeleton(const char* role)
-    : SkeletonBase(role)
+    : SkeletonBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)
    {
       // NOOP
    }

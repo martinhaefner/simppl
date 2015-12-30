@@ -100,6 +100,8 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
     {
+        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "'" << std::endl;
+        
         auto iter = stubs_.find(dbus_message_get_interface(msg));
         
         if (iter != stubs_.end())

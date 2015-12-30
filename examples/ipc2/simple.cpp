@@ -31,14 +31,21 @@ INTERFACE(Simple)
 }   // namespace
 
 
+void sig_callback(double d)
+{
+    std::cout << "Having signal " << d << std::endl;
+}
+
+
 int client()
 {
-   spl::Stub<test::Simple> sst("/path", "org.simppl.simple_server");
+   spl::Stub<test::Simple> sst("/my_simple", "org.simppl.simple_server");
    
    // FIXME client also possible without bus name?
    spl::Dispatcher disp("org.simppl.simple_client");
    disp.addClient(sst);
    
+   sst.sigUsr.attach() >> sig_callback;
    sst.echo(42);
    
    return disp.run();
@@ -48,7 +55,7 @@ int client()
 struct SimpleServer : spl::Skeleton<test::Simple>
 {
     SimpleServer()
-     : spl::Skeleton<test::Simple>("/path")
+     : spl::Skeleton<test::Simple>("/my_simple")
     {
         echo >> std::bind(&SimpleServer::handleEcho, this, _1);
     }
@@ -56,6 +63,7 @@ struct SimpleServer : spl::Skeleton<test::Simple>
     void handleEcho(int i)
     {
         std::cout << "Client saying '" << i << "'" << std::endl;
+        sigUsr.emit(3.1415);
     }
 };
 

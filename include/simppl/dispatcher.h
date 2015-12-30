@@ -139,6 +139,11 @@ void Dispatcher::addServer(ServerT& serv)
 {
    static_assert(isServer<ServerT>::value, "only_add_servers_here");
    
+   serv.disp_ = this;
+   
+   // isn't this double the information?
+   dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
+   
    dbus_connection_register_object_path(conn_, serv.role_, &stub_v_table, &serv);
    
    /*FIXME

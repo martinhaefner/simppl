@@ -59,8 +59,8 @@ struct ClientSignalBase
    virtual void eval(DBusMessage* msg) = 0;
    
    inline
-   ClientSignalBase(const char* name, StubBase* stub)
-    : stub_(stub)
+   ClientSignalBase(const char* name, detail::BasicInterface* iface)
+    : iface_(iface)
     , name_(name)
    {
       // NOOP
@@ -82,7 +82,7 @@ protected:
       // NOOP
    }
    
-   StubBase* stub_;
+   detail::BasicInterface* iface_;
    const char* name_;   
 };
 
@@ -96,7 +96,7 @@ struct ClientSignal : ClientSignalBase
       
    inline
    ClientSignal(const char* name, detail::BasicInterface* iface)
-    : ClientSignalBase(name, dynamic_cast<StubBase*>(iface))
+    : ClientSignalBase(name, iface)
    {
       // NOOP
    }
@@ -112,7 +112,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& attach()
    {
-      stub_->sendSignalRegistration(*this);
+      dynamic_cast<StubBase*>(iface_)->sendSignalRegistration(*this);
       return *this;
    }
    
@@ -120,7 +120,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& detach()
    {
-      stub_->sendSignalUnregistration(*this);
+      dynamic_cast<StubBase*>(iface_)->sendSignalUnregistration(*this);
       return *this;
    }
    
@@ -129,8 +129,8 @@ struct ClientSignal : ClientSignalBase
    {
       if (f_)
       {
-          std::cout << "Calling signal function -> implement me!" << std::endl;
-         //detail::Deserializer d(payload, length);
+          f_(3.1415);
+          //detail::Deserializer d(payload, length);
          //detail::GetCaller<T...>::type::template eval(d, f_);
       }
    }

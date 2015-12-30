@@ -10,6 +10,7 @@
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
 #include "simppl/attribute.h"
+#include "simppl/skeletonbase.h"
 #include "simppl/serverrequestdescriptor.h"
 
 #include "simppl/detail/serverresponseholder.h"
@@ -17,7 +18,11 @@
 #include "simppl/detail/serversignalbase.h"
 #include "simppl/detail/validation.h"
 
-#if !(defined(SIMPPL_SKELETONBASE_H) || defined(SIMPPL_DISPATCHER_CPP) || defined(SIMPPL_SERVERSIGNALBASE_CPP))
+#if !(defined(SIMPPL_SKELETONBASE_H) \
+      || defined(SIMPPL_DISPATCHER_CPP) \
+      || defined(SIMPPL_SERVERSIGNALBASE_CPP) \
+      || defined(SIMPPL_SKELETONBASE_CPP) \
+      )
 #   error "Don't include this file manually. Include 'skeleton.h' instead".
 #endif
 
@@ -85,7 +90,9 @@ struct ServerSignal : detail::ServerSignalBase
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
    
    inline
-   ServerSignal(const char* name, detail::BasicInterface* /*iface*/)
+   ServerSignal(const char* name, detail::BasicInterface* iface)
+    : name_(name)
+    , parent_(iface)
    {
       // NOOP
    }
@@ -93,8 +100,13 @@ struct ServerSignal : detail::ServerSignalBase
    inline
    void emit(typename CallTraits<T>::param_type... args)
    {
-      detail::Serializer s;
-      sendSignal(serialize(s, args...));
+      SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
+      
+      //detail::Serializer s;
+      //sendSignal(serialize(s, args...));
+      DBusMessage* msg = dbus_message_new_signal(skel->role(), skel->iface(), name_);
+   
+      dbus_connection_send(parent_->conn_, msg, nullptr);
    }
    
    
@@ -108,6 +120,9 @@ protected:
     
       detail::SignalSender(s.data(), s.size())(detail::ServerSignalBase::recipients_[registrationid]);
    }
+   
+   const char* name_;
+   detail::BasicInterface* parent_;
 };
 
 
