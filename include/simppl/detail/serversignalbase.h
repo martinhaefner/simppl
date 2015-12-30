@@ -14,6 +14,11 @@ namespace ipc
 
 namespace detail
 {
+   
+struct ServerRequestBase
+{
+};
+
 
 struct ServerSignalBase
 {   

@@ -11,6 +11,7 @@
 #include "simppl/detail/serverholder.h"
 #include "simppl/detail/constants.h"
 
+// FIXME can this be removed?
 #include "simppl/clientside.h"
 
 #ifdef NDEBUG
@@ -29,6 +30,9 @@ namespace simppl
    
 namespace ipc
 {
+
+extern DBusObjectPathVTable stub_v_table;
+
 
 // forward decls
 struct StubBase;
@@ -134,6 +138,8 @@ template<typename ServerT>
 void Dispatcher::addServer(ServerT& serv)
 {
    static_assert(isServer<ServerT>::value, "only_add_servers_here");
+   
+   dbus_connection_register_object_path(conn_, serv.role_, &stub_v_table, &serv);
    
    /*FIXME
    std::string name = serv.fqn();

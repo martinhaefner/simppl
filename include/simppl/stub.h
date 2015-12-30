@@ -3,6 +3,8 @@
 
 
 #include <algorithm>
+#include <typeinfo>
+#include <cxxabi.h>
 
 #include "simppl/stubbase.h"
 #include "simppl/clientside.h"
@@ -37,7 +39,7 @@ private:
 public:
    
    Stub(const char* role, const char* boundname)
-    : StubBase(InterfaceNamer<interface_type>::name(), role, boundname)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role, boundname)
    {
       // NOOP
    }

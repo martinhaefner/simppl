@@ -39,7 +39,7 @@ struct StubBase
    
 protected:
    
-   ~StubBase();
+   virtual ~StubBase();
    
 public:
    
@@ -64,15 +64,23 @@ public:
    /// FIXME protected?!
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
    
+   inline
+   const char* destination()
+   {
+       return boundname_;
+   }
+   
+   DBusConnection* conn();
+   
 protected:
    
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
    
-   const char* iface_;
+   char iface_[128];
    const char* role_;
    
-   char boundname_[24];     ///< where to find the server
+   char boundname_[80];     ///< where to find the server
    
    Dispatcher* disp_;
    std::map<std::string, ClientSignalBase*> signals_;

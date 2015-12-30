@@ -2,6 +2,7 @@
 
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
+#include "simppl/skeletonbase.h"
 
 #define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
@@ -66,6 +67,28 @@ namespace simppl
 namespace ipc
 {
 
+DBusObjectPathVTable stub_v_table = { nullptr, &SkeletonBase::method_handler, nullptr, nullptr, nullptr, nullptr };
+
+
+Dispatcher::Dispatcher(const char* bus_name)
+ : running_(false)
+ , conn_(nullptr)
+ , request_timeout_(std::chrono::milliseconds::max())    // TODO move this to a config header, also other timeout defaults
+{
+   DBusError err;
+   int ret;
+   
+   dbus_error_init(&err);
+
+   conn_ = dbus_bus_get(DBUS_BUS_SESSION, &err);
+   assert(!dbus_error_is_set(&err));
+   
+   ret = dbus_bus_request_name(conn_, bus_name, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
+   assert(!dbus_error_is_set(&err));
+   
+   dbus_connection_add_filter(conn_, &signal_filter, this, 0);
+}
+
 
 Dispatcher::~Dispatcher()
 {
@@ -119,6 +142,9 @@ void Dispatcher::addClient(StubBase& clnt)
    
    clnt.disp_ = this;
    
+   // isn't this double the information?
+   dynamic_cast<detail::BasicInterface*>(&clnt)->conn_ = conn_;
+   
    // FIXME somehow integrate interface _and_ rolename
    stubs_.insert(std::make_pair(clnt.iface(), &clnt));
    
@@ -138,26 +164,6 @@ void Dispatcher::removeClient(StubBase& clnt)
          break;
       } 
    }
-}
-
-
-Dispatcher::Dispatcher(const char* bus_name)
- : running_(false)
- , conn_(nullptr)
- , request_timeout_(std::chrono::milliseconds::max())    // TODO move this to a config header, also other timeout defaults
-{
-   DBusError err;
-   int ret;
-   
-   dbus_error_init(&err);
-
-   conn_ = dbus_bus_get(DBUS_BUS_SESSION, &err);
-   assert(!dbus_error_is_set(&err));
-   
-   ret = dbus_bus_request_name(conn_, bus_name, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-   assert(!dbus_error_is_set(&err));
-   
-   dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 }
 
 

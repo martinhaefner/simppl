@@ -6,6 +6,7 @@
 #include "simppl/detail/util.h"
 
 #include <cstring>
+#include <sstream>
 
 
 namespace simppl
@@ -16,13 +17,33 @@ namespace ipc
 
 
 StubBase::StubBase(const char* iface, const char* role, const char* boundname)
- : iface_(iface) 
- , role_(role)
+ : role_(role)
  , disp_(0)
 {
    assert(iface);
    assert(role);
    assert(boundname && strlen(boundname) < sizeof(boundname_));
+   
+   // strip template arguments
+   memset(iface_, 0, sizeof(iface_));
+   strncpy(iface_, iface, strstr(iface, "<") - iface);
+   
+   // remove '::' separation in favour of '.' separation
+   char *readp = iface_, *writep = iface_;
+   while(*readp)
+   {
+      if (*readp == ':')
+      {
+         *writep++ = '.';
+         readp += 2;
+      }
+      else
+         *writep++ = *readp++; 
+   }
+   
+   // terminate
+   *writep = '\0';
+   
    strcpy(boundname_, boundname);
 }
 
@@ -31,6 +52,12 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->removeClient(*this);
+}
+
+
+DBusConnection* StubBase::conn()
+{
+    return disp().conn_;
 }
 
 
@@ -49,7 +76,13 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
    dbus_error_init(&err);
    
    // FIXME do we really need dependency to dispatcher?
-   dbus_bus_add_match(disp_->conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
+   std::ostringstream match_string;
+   match_string << "type='signal'";
+   match_string << ", sender='" << role() << "'";
+   match_string << ", interface='" << iface() << "'";
+   match_string << ", member='" << sigbase.name() << "'";
+   
+   dbus_bus_add_match(disp_->conn_, match_string.str().c_str(), &err);
    assert(!dbus_error_is_set(&err));
    
    // FIXME handle double attach
@@ -78,8 +111,14 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
    
    DBusError err;
    dbus_error_init(&err);
-      
-   dbus_bus_remove_match(disp_->conn_, "type='signal', sender='role_', interface='interface_', member='sigbase.name_'", &err);
+   
+   std::ostringstream match_string;
+   match_string << "type='signal'";
+   match_string << ", sender='" << role() << "'";
+   match_string << ", interface='" << iface() << "'";
+   match_string << ", member='" << sigbase.name() << "'";
+   
+   dbus_bus_remove_match(disp_->conn_, match_string.str().c_str(), &err);
    assert(!dbus_error_is_set(&err));
    
    // FIXME remove signalbase handler again

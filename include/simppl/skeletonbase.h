@@ -21,6 +21,8 @@ struct SkeletonBase
 {
    friend struct Dispatcher;
  
+   static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
+ 
    SkeletonBase(const char* role);
    
    virtual ~SkeletonBase();
@@ -47,9 +49,9 @@ struct SkeletonBase
    
 protected:
    
-   virtual bool find(uint32_t funcid, std::map<uint32_t, ServerRequestBase*>::iterator& iter) = 0;
+   //virtual bool find(uint32_t funcid, std::map<uint32_t, ServerRequestBase*>::iterator& iter) = 0;
    
-   void handleRequest(uint32_t funcid, uint32_t sequence_nr, uint32_t sessionid, int fd, const void* payload, size_t length);
+   DBusHandlerResult handleRequest(DBusMessage* msg);
    
    /// return a session pointer and destruction function if adequate
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();

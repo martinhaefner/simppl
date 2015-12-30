@@ -40,19 +40,14 @@ struct InterfaceBase;
 template<>
 struct InterfaceBase<ClientRequest> : detail::BasicInterface
 {
-   inline
-   InterfaceBase()
-   {
-      // NOOP
-   }
 };
 
 
 template<>
 struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
-   std::map<uint32_t, ServerRequestBase*> container_;
-   std::map<uint32_t, detail::ServerSignalBase*> signals_;
+   std::map<std::string, ServerRequestBase*> methods_;
+   //std::map<const char* name, detail::ServerSignalBase*> signals_;
 };
 
 }   // namespace ipc
@@ -62,17 +57,6 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
 
 /// make sure to NOT put this macro into a namespace
 #define INTERFACE(iface) \
-   template<template<typename...> class Request, \
-            template<typename...> class Response, \
-            template<typename...> class Signal, \
-            template<typename,typename=simppl::ipc::OnChange> class Attribute> \
-      struct iface; \
-            \
-   namespace simppl { namespace ipc { \
-      template<> struct InterfaceNamer<iface<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> > { static inline const char* const name() { return #  iface ; } }; \
-      template<> struct InterfaceNamer<iface<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> > { static inline const char* const name() { return #  iface ; } }; \
-   } } \
-   \
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \

@@ -314,7 +314,7 @@ struct ClientRequest
    ClientRequest(const char* method_name, detail::BasicInterface* parent)
     : method_name_(method_name)
     , handler_(0)
-    , parent_(parent)
+    , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
    {
       // NOOP
    }
@@ -322,15 +322,21 @@ struct ClientRequest
    inline
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      DBusMessage* msg = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
+      StubBase* stub = dynamic_cast<StubBase*>(parent_);
+      DBusMessage* msg = dbus_message_new_method_call(stub->destination(), stub->role(), stub->iface(), method_name_);
       DBusPendingCall* pending = nullptr;
       
-      detail::Serializer s(*msg);
-      serialize(s, t...);
-      
+      // FIXME dbus serialization  
+//      detail::Serializer s(*msg);
+  //    serialize(s, t...);
+    DBusMessageIter args;
+    dbus_message_iter_init_append(msg, &args);
+    int i = 42;
+    dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &i);
+          
       if (handler_)
       {
-         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, detail::request_specific_timeout.count());
+         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, -1/*FIXME detail::request_specific_timeout.count()*/);
          dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, handler_, 0);
       }
       else
@@ -352,6 +358,8 @@ struct ClientRequest
       return *this;
    }
 
+   // FIXME do we really need connection in BasicInterface?
+   // FIXME do we need BasicInterface at all? 
    ClientResponseBase* handler_;
    const char* method_name_;
    detail::BasicInterface* parent_;

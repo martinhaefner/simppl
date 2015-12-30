@@ -5,16 +5,19 @@
 #include <set>
 #include <iostream>
 
+#include <dbus/dbus.h>
+
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
 #include "simppl/attribute.h"
 #include "simppl/serverrequestdescriptor.h"
 
 #include "simppl/detail/serverresponseholder.h"
+#include "simppl/detail/basicinterface.h"
 #include "simppl/detail/serversignalbase.h"
 #include "simppl/detail/validation.h"
 
-#if !(defined(SIMPPL_SKELETONBASE_H) || defined(SIMPPL_DISPATCHER_CPP))
+#if !(defined(SIMPPL_SKELETONBASE_H) || defined(SIMPPL_DISPATCHER_CPP) || defined(SIMPPL_SERVERSIGNALBASE_CPP))
 #   error "Don't include this file manually. Include 'skeleton.h' instead".
 #endif
 
@@ -36,7 +39,7 @@ struct ServerRequestBase
 {
    friend struct detail::ServerRequestBaseSetter;
    
-   virtual void eval(const void* payload, size_t length) = 0;
+   virtual void eval(DBusMessage* msg) = 0;
 
    inline
    bool hasResponse() const
@@ -46,12 +49,7 @@ struct ServerRequestBase
    
 protected:
 
-   inline 
-   ServerRequestBase()
-    : hasResponse_(false)
-   {
-      // NOOP
-   }
+   ServerRequestBase(const char* name, detail::BasicInterface* iface);
    
    inline
    ~ServerRequestBase() 
@@ -60,6 +58,7 @@ protected:
    }
    
    bool hasResponse_;
+   const char* name_;
 };
 
 
@@ -86,9 +85,9 @@ struct ServerSignal : detail::ServerSignalBase
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
    
    inline
-   ServerSignal(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
+   ServerSignal(const char* name, detail::BasicInterface* /*iface*/)
    {
-      _signals[id] = this;
+      // NOOP
    }
    
    inline
@@ -123,9 +122,10 @@ struct ServerRequest : ServerRequestBase
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
      
    inline
-   ServerRequest(uint32_t id, std::map<uint32_t, ServerRequestBase*>& requests)
+   ServerRequest(const char* name, detail::BasicInterface* iface)
+    : ServerRequestBase(name, iface)
    {
-      requests[id] = this;
+      // NOOP
    }
    
    template<typename FunctorT>
@@ -136,17 +136,19 @@ struct ServerRequest : ServerRequestBase
       f_ = func;
    }
       
-   void eval(const void* payload, size_t length)
+   void eval(DBusMessage* msg)
    {
       if (f_)
       {
-         detail::Deserializer d(payload, length);
-         detail::GetCaller<T...>::type::template eval(d, f_);
+         //detail::Deserializer d(payload, length);
+         //detail::GetCaller<T...>::type::template eval(d, f_);
+         std::cout << "Request called" << std::endl;
+         f_(42);
       }
       else
          assert(false);    // no response handler registered
    }
-   
+
    function_type f_;
 };
 
