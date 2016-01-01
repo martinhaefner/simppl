@@ -12,9 +12,8 @@ namespace ipc
 namespace detail
 {
    
-ServerResponseHolder::ServerResponseHolder(Serializer& s, ServerResponseBase& responder)
- : size_(s.size())
- , payload_(s.release())
+ServerResponseHolder::ServerResponseHolder(DBusMessage* response, ServerResponseBase& responder)
+ : response_(response)
  , responder_(&responder)
 {
    // NOOP
@@ -22,18 +21,17 @@ ServerResponseHolder::ServerResponseHolder(Serializer& s, ServerResponseBase& re
 
 
 ServerResponseHolder::ServerResponseHolder(ServerResponseHolder&& rhs)
- : payload_(rhs.payload_)
- , size_(rhs.size_)
+ : response_(rhs.response_)
  , responder_(rhs.responder_)
 {
-   rhs.payload_ = nullptr;
-   rhs.size_ = 0;
+   rhs.response_ = nullptr;
+   rhs.responder_ = nullptr;
 }
 
 
 ServerResponseHolder::~ServerResponseHolder()
 {
-   Serializer::free(payload_);
+   // NOOP
 }
 
 
@@ -41,12 +39,10 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
 {
    if (this != &rhs)
    {
-      payload_ = rhs.payload_;
-      size_ = rhs.size_;
+      response_ = rhs.response_;
       responder_ = rhs.responder_;
 
-      rhs.payload_ = nullptr;
-      rhs.size_ = 0;
+      rhs.response_ = nullptr;
       rhs.responder_ = nullptr;
    }
    

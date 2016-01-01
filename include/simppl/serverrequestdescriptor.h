@@ -5,6 +5,10 @@
 #include <stdint.h>
 
 
+// forward decl
+struct DBusMessage;
+
+
 namespace simppl
 {
    
@@ -25,16 +29,14 @@ struct ServerRequestDescriptor
    ServerRequestDescriptor(ServerRequestDescriptor&& rhs);
    ServerRequestDescriptor& operator=(ServerRequestDescriptor&& rhs);
    
-   ServerRequestDescriptor& set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr, uint32_t sessionid);
+   ServerRequestDescriptor& set(ServerRequestBase* requestor, DBusMessage* msg);
    
    void clear();
    
    operator const void*() const;
    
    ServerRequestBase* requestor_;
-   int fd_;
-   uint32_t sequence_nr_;
-   uint32_t sessionid_;
+   DBusMessage* msg_;
 };
 
 }   // namespace ipc

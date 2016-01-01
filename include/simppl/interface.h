@@ -67,7 +67,7 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    request(# request, this)
 
 #define INIT_RESPONSE(response) \
-   response()
+   response(this)
 
 #define INIT_SIGNAL(signal) \
    signal(# signal, this)

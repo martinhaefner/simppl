@@ -35,6 +35,7 @@ struct ClientResponseBase
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
+std::cout << "Pending notify" << std::endl;
         ClientResponseBase* handler = (ClientResponseBase*)user_data;
         handler->eval(pending);
     }
@@ -329,10 +330,10 @@ struct ClientRequest
       // FIXME dbus serialization  
 //      detail::Serializer s(*msg);
   //    serialize(s, t...);
-    DBusMessageIter args;
-    dbus_message_iter_init_append(msg, &args);
-    int i = 42;
-    dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &i);
+      DBusMessageIter args;
+      dbus_message_iter_init_append(msg, &args);
+      int i = 42;
+      dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &i);
           
       if (handler_)
       {
@@ -376,6 +377,12 @@ struct ClientResponse : ClientResponseBase
    
    typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
    
+   inline
+   ClientResponse(void*)
+   {
+       // NOOP
+   }
+   
    template<typename FunctorT>
    inline
    void handledBy(FunctorT func)
@@ -387,10 +394,13 @@ struct ClientResponse : ClientResponseBase
    {
       if (f_)
       {
+          f_(CallState(42), 42);
           std::cout << "Calling response function -> implement me!" << std::endl;
 //FIXME         detail::Deserializer d(payload, length);
 //         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }
+      else 
+         std::cerr << "No response handler installed" << std::endl;
    }
    
    function_type f_;

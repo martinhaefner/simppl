@@ -37,6 +37,12 @@ void sig_callback(double d)
 }
 
 
+void echo_callback(const spl::CallState&, int i)
+{
+   std::cout << "Reponse from server: " << i << std::endl;
+}
+
+
 int client()
 {
    spl::Stub<test::Simple> sst("/my_simple", "org.simppl.simple_server");
@@ -44,6 +50,8 @@ int client()
    // FIXME client also possible without bus name?
    spl::Dispatcher disp("org.simppl.simple_client");
    disp.addClient(sst);
+   
+   sst.rEcho >> echo_callback;
    
    sst.sigUsr.attach() >> sig_callback;
    sst.echo(42);
@@ -64,6 +72,8 @@ struct SimpleServer : spl::Skeleton<test::Simple>
     {
         std::cout << "Client saying '" << i << "'" << std::endl;
         sigUsr.emit(3.1415);
+        
+        respondWith(rEcho(42));
     }
 };
 

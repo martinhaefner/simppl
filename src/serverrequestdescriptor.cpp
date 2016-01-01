@@ -11,10 +11,8 @@ namespace ipc
 
 
 ServerRequestDescriptor::ServerRequestDescriptor()
- : requestor_(0)
- , fd_(-1)
- , sequence_nr_(INVALID_SEQUENCE_NR)
- , sessionid_(INVALID_SESSION_ID)
+ : requestor_(nullptr)
+ , msg_(nullptr)
 {
    // NOOP
 }
@@ -22,9 +20,7 @@ ServerRequestDescriptor::ServerRequestDescriptor()
 
 ServerRequestDescriptor::ServerRequestDescriptor(ServerRequestDescriptor&& rhs)
  : requestor_(rhs.requestor_)
- , fd_(rhs.fd_)
- , sequence_nr_(rhs.sequence_nr_)
- , sessionid_(rhs.sessionid_)
+ , msg_(rhs.msg_)
 {
    rhs.clear();
 }
@@ -35,10 +31,8 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
    if (this != &rhs)
    {
       requestor_ = rhs.requestor_;
-      fd_ = rhs.fd_;
-      sequence_nr_ = rhs.sequence_nr_;
-      sessionid_ = rhs.sessionid_;
-      
+      msg_ = rhs.msg_;
+            
       rhs.clear();
    }
    
@@ -46,19 +40,18 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
 }
 
 
-ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, int fd, uint32_t sequence_nr, uint32_t sessionid)
+ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, DBusMessage* msg)
 {
    requestor_ = requestor;
-   fd_ = fd;
-   sequence_nr_ = sequence_nr;
-   sessionid_ = sessionid;
+   msg_ = msg;
+   
    return *this;
 }
 
 
 void ServerRequestDescriptor::clear()
 {
-   set(0, -1, INVALID_SEQUENCE_NR, INVALID_SESSION_ID);
+   set(nullptr, nullptr);
 }
 
 

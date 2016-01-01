@@ -177,7 +177,8 @@ struct ServerResponse : ServerResponseBase
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
    
    inline
-   ServerResponse()
+   ServerResponse(detail::BasicInterface* iface)
+    : iface_(iface)
    {
       // NOOP
    }
@@ -185,9 +186,21 @@ struct ServerResponse : ServerResponseBase
    inline
    detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
    { 
-      detail::Serializer s;
-      return detail::ServerResponseHolder(serialize(s, t...), *this);
+      SkeletonBase* skel = dynamic_cast<SkeletonBase*>(iface_);
+      
+      std::cout << "preparing response" << std::endl;
+      DBusMessage* response = dbus_message_new_method_return(skel->currentRequest().msg_);
+      // FIXME serialize
+      
+      DBusMessageIter args;
+      dbus_message_iter_init_append(response, &args);
+      int i = 42;
+      dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &i);
+      
+      return detail::ServerResponseHolder(response, *this);
    }
+   
+   detail::BasicInterface* iface_;
 };
 
 

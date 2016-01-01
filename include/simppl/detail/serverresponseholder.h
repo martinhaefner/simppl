@@ -6,6 +6,10 @@
 #include <sys/types.h>
 
 
+// forward decl
+struct DBusMessage;
+
+
 namespace simppl
 {
    
@@ -24,7 +28,7 @@ struct Serializer;
 
 struct ServerResponseHolder 
 {
-   ServerResponseHolder(Serializer& s, ServerResponseBase& responder);
+   ServerResponseHolder(DBusMessage* response, ServerResponseBase& responder);
    
    ~ServerResponseHolder();
    
@@ -34,8 +38,7 @@ struct ServerResponseHolder
    ServerResponseHolder(const ServerResponseHolder& rhs) = delete;
    ServerResponseHolder& operator=(const ServerResponseHolder& rhs) = delete;
    
-   /*mutable*/ size_t size_;
-   /*mutable*/ void* payload_;
+   /*mutable*/ DBusMessage* response_;
    /*mutable*/ ServerResponseBase* responder_;
 };
 

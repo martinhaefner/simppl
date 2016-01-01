@@ -52,6 +52,7 @@ namespace detail
 struct Dispatcher
 {
    friend struct StubBase;
+   friend struct SkeletonBase;
    
    Dispatcher(const char* bus_name);
    

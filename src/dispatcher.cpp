@@ -107,6 +107,8 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         if (iter != stubs_.end())
             return iter->second->try_handle_signal(msg);
     }
+    else if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
+        std::cout << "Method return" << std::endl;
         
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }

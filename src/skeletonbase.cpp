@@ -21,7 +21,6 @@ namespace ipc
 /*static*/ 
 DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusMessage* msg, void *user_data)
 {
-   std::cout << "Hier" << std::endl;
    SkeletonBase* skel = (SkeletonBase*)user_data;
    return skel->handleRequest(msg);
 }
@@ -81,13 +80,17 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
+   
+   std::cout << "Send response" << std::endl;
+   if (!dbus_connection_send(disp_->conn_, response.response_, nullptr))
+      std::cerr << "Failed sending response" << std::endl;
    /*
    detail::ResponseFrame r(0);
    r.payloadsize_ = response.size_;
    r.sequence_nr_ = current_request_.sequence_nr_;
    
-   detail::genericSend(current_request_.fd_, r, response.payload_);
-   current_request_.clear();   // only respond once!!!*/
+   detail::genericSend(current_request_.fd_, r, response.payload_);*/
+   current_request_.clear();   // only respond once!!!
 }
 
 
@@ -114,8 +117,8 @@ void SkeletonBase::respondWith(const RuntimeError& err)
    r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
    r.sequence_nr_ = current_request_.sequence_nr_;
    
-   genericSend(current_request_.fd_, r, err.what());
-   current_request_.clear();   // only respond once!!!*/
+   genericSend(current_request_.fd_, r, err.what());*/
+   current_request_.clear();   // only respond once!!!
 }
 
 
@@ -123,12 +126,12 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
 {
    assert(req);
    assert(req.requestor_->hasResponse());
-   
+   /*
    detail::ResponseFrame r(err.error());
    r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
    r.sequence_nr_ = req.sequence_nr_;
    
-   genericSend(req.fd_, r, err.what());
+   genericSend(req.fd_, r, err.what());*/
    req.clear();
 }
 
@@ -148,7 +151,18 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    auto iter = methods.find(dbus_message_get_member(msg));
    if (iter != methods.end())
    {
+       current_request_.set(iter->second, msg);
+         
        iter->second->eval(msg);
+       
+       // current_request_ is only valid if no response handler was called
+       if (current_request_)
+       {
+          // in that case the request must not have a reponse
+          assert(!current_request_.requestor_->hasResponse());  
+          current_request_.clear();
+       }
+      
        return DBUS_HANDLER_RESULT_HANDLED;
    }
    else
