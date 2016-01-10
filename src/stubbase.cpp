@@ -92,6 +92,27 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 }
 
 
+void StubBase::getProperty(const char* name)
+{
+   DBusMessage* msg = dbus_message_new_method_call(destination(), role(), "org.freedesktop.DBus.Properties", "Get");
+   DBusPendingCall* pending = nullptr;
+  
+   DBusMessageIter args;
+   dbus_message_iter_init_append(msg, &args);
+   
+   char* arg1 = strdup(iface());
+   char* arg2 = strdup(name);     // property name
+   
+   dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg1);
+   dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg2);
+
+   dbus_connection_send_with_reply(conn(), msg, &pending, -1);
+   
+   // FIXME store pending call somewhere or leave message alone and
+   // handle response somehow different
+}
+
+
 DBusHandlerResult StubBase::try_handle_signal(DBusMessage* msg)
 {
    const char *method = dbus_message_get_member(msg);

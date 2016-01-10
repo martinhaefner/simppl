@@ -28,6 +28,26 @@ INTERFACE(Simple)
    }
 };
 
+
+INTERFACE(Simple2)
+{
+   Request<int> echo;
+   Response<int> rEcho;
+   
+   Signal<double> sigUsr;
+   
+   Attribute<int> attInt;
+   
+   Simple2()
+    : INIT_REQUEST(echo)
+    , INIT_SIGNAL(sigUsr)
+    , INIT_RESPONSE(rEcho)
+    , INIT_ATTRIBUTE(attInt)
+   {
+      echo >> rEcho;
+   }
+};
+
 }   // namespace
 
 
@@ -60,6 +80,24 @@ int client()
 }
 
 
+struct SimpleServer2 : spl::Skeleton<test::Simple2>
+{
+    SimpleServer2()
+     : spl::Skeleton<test::Simple2>("/my_simple2")
+    {
+        echo >> std::bind(&SimpleServer2::handleEcho, this, _1);
+    }
+    
+    void handleEcho(int i)
+    {
+        std::cout << "Client saying '" << i << "'" << std::endl;
+        sigUsr.emit(3.1415);
+        
+        respondWith(rEcho(42));
+    }
+};
+
+
 struct SimpleServer : spl::Skeleton<test::Simple>
 {
     SimpleServer()
@@ -74,6 +112,8 @@ struct SimpleServer : spl::Skeleton<test::Simple>
         sigUsr.emit(3.1415);
         
         respondWith(rEcho(42));
+        SimpleServer2* s2 = new SimpleServer2();
+        disp().addServer(*s2);
     }
 };
 

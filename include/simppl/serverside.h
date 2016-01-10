@@ -507,8 +507,8 @@ struct ServerAttribute
    typedef CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
-   ServerAttribute(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
-    : baseclass(id, _signals)
+   ServerAttribute(const char* name)
+    : baseclass(name)
    {
       // NOOP
    }

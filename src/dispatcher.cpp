@@ -100,7 +100,19 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
     {
-        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "'" << std::endl;
+        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "/" << dbus_message_get_member(msg) << "'" << std::endl;
+        
+        // bus name, not interface
+        if (!strcmp(dbus_message_get_member(msg), "NameAcquired"))
+        {
+           DBusMessageIter args;
+           char* sigvalue = nullptr;
+           
+           dbus_message_iter_init(msg, &args);
+           dbus_message_iter_get_basic(&args, &sigvalue);
+           
+           std::cout << "Name: " << sigvalue << std::endl;
+        }
         
         auto iter = stubs_.find(dbus_message_get_interface(msg));
         
@@ -108,8 +120,11 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
             return iter->second->try_handle_signal(msg);
     }
     else if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
-        std::cout << "Method return" << std::endl;
-        
+    {
+        // FIXME check for property Get return call...
+        std::cout << "Method return: " << dbus_message_get_interface(msg) << ", " << dbus_message_get_member(msg) << std::endl;
+    }   
+    
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 

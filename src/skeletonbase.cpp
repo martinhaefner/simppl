@@ -1,5 +1,7 @@
 #include "simppl/skeletonbase.h"
 
+#include <sstream>
+
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
@@ -148,6 +150,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    const char *method = dbus_message_get_member(msg);
    auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
 
+   // FIXME first split interfaces -> properties / introspection ...
    auto iter = methods.find(dbus_message_get_member(msg));
    if (iter != methods.end())
    {
@@ -164,6 +167,24 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
        }
       
        return DBUS_HANDLER_RESULT_HANDLED;
+   }
+   else if (!strcmp(dbus_message_get_member(msg), "Introspect"))
+   {
+      static char* buf = new char[512];
+      
+      sprintf(buf, "<?xml version=\"1.0\" ?>"
+          "<node name=\"%s\">"
+          "<interface name=\"%s\"></interface>"
+          "</node>", role(), iface());
+
+      DBusMessage* reply = dbus_message_new_method_return(msg);
+      
+      DBusMessageIter args;
+      dbus_message_iter_init_append(reply, &args);
+      
+      dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &buf);
+      
+      dbus_connection_send(disp_->conn_, reply, nullptr);
    }
    else
       std::cerr << "method '" << method << "' does not exist." << std::endl;

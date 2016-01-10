@@ -77,6 +77,8 @@ protected:
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
    
+   void getProperty(const char* name);
+   
    char iface_[128];
    const char* role_;
    

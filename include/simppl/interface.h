@@ -73,8 +73,8 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    signal(# signal, this)
 
 // an attribute is nothing more that an encapsulated signal
-// #define INIT_ATTRIBUTE(attr) \
-//   attr(# name, ((simppl::ipc::InterfaceBase<Request>*)this)->signals_)
+#define INIT_ATTRIBUTE(attr) \
+   attr(# attr, this)
 
 
 template<typename... T, typename... T2>

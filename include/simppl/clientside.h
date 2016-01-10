@@ -74,7 +74,7 @@ struct ClientSignalBase
    }
    
    
-protected:
+// FIXME protected:
    
    
    inline
@@ -189,8 +189,8 @@ struct ClientAttribute
       std::function<void(arg_type)> >::type function_type;
    
    inline
-   ClientAttribute(const char* name, std::vector<detail::Parented*>& parent)
-    : signal_(name, parent)
+   ClientAttribute(const char* name, detail::BasicInterface* iface)
+    : signal_(name, iface)
     , data_()
     , last_update_(0)
    {
@@ -218,6 +218,9 @@ struct ClientAttribute
       signal_.handledBy(std::bind(&ClientAttribute<DataT, EmitPolicyT>::valueChanged, this, std::placeholders::_1));
       
       (void)signal_.attach();
+      
+      dynamic_cast<StubBase*>(signal_.iface_)->getProperty(signal_.name());
+      
       return *this;
    }
    
@@ -390,12 +393,21 @@ struct ClientResponse : ClientResponseBase
       f_ = func;
    }
    
-   void eval(DBusPendingCall* msg)
+   void eval(DBusPendingCall* pc)
    {
       if (f_)
       {
-          f_(CallState(42), 42);
-          std::cout << "Calling response function -> implement me!" << std::endl;
+          DBusMessage* msg = dbus_pending_call_steal_reply(pc);
+          if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
+          {
+              std::cout << "is error" << std::endl;
+              f_(CallState(new TransportError(EIO, 42)), 0);
+          }
+          else
+          {
+             f_(CallState(42), 42);
+             std::cout << "Calling response function -> implement me!" << std::endl;
+          }
 //FIXME         detail::Deserializer d(payload, length);
 //         detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
       }
