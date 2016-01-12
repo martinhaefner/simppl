@@ -35,6 +35,7 @@ struct StubBase
 {
    template<typename... T> friend struct ClientSignal;
    template<typename... T> friend struct ClientRequest;
+   template<typename, typename> friend struct ClientAttribute;
    friend struct Dispatcher;
    
 protected:

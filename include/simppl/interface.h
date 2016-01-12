@@ -8,7 +8,7 @@
 
 #include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
-#include "simppl/detail/serversignalbase.h"
+#include "simppl/detail/serversignalbase.h"  // FIXME can be removed probably...
 #include "simppl/detail/serverrequestbasesetter.h"
 
 
@@ -30,6 +30,7 @@ template<typename...> struct ServerSignal;
 template<typename, typename> struct ServerAttribute;
 
 struct ServerRequestBase;
+struct ServerAttributeBase;
 struct ServerRequestBaseSetter;
 
 
@@ -47,7 +48,7 @@ template<>
 struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
    std::map<std::string, ServerRequestBase*> methods_;
-   //std::map<const char* name, detail::ServerSignalBase*> signals_;
+   std::map<std::string, ServerAttributeBase*> attributes_;
 };
 
 }   // namespace ipc

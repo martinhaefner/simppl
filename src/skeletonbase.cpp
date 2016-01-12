@@ -147,47 +147,78 @@ const ServerRequestDescriptor& SkeletonBase::currentRequest() const
 
 DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 {
-   const char *method = dbus_message_get_member(msg);
-   auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
-
-   // FIXME first split interfaces -> properties / introspection ...
-   auto iter = methods.find(dbus_message_get_member(msg));
-   if (iter != methods.end())
+   const char* method = dbus_message_get_member(msg);
+   const char* interface = dbus_message_get_interface(msg);
+   
+   if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
    {
-       current_request_.set(iter->second, msg);
+      if (!strcmp(method, "Introspect"))
+      {
+         static char* buf = new char[512];
          
-       iter->second->eval(msg);
-       
-       // current_request_ is only valid if no response handler was called
-       if (current_request_)
-       {
-          // in that case the request must not have a reponse
-          assert(!current_request_.requestor_->hasResponse());  
-          current_request_.clear();
-       }
-      
-       return DBUS_HANDLER_RESULT_HANDLED;
-   }
-   else if (!strcmp(dbus_message_get_member(msg), "Introspect"))
-   {
-      static char* buf = new char[512];
-      
-      sprintf(buf, "<?xml version=\"1.0\" ?>"
-          "<node name=\"%s\">"
-          "<interface name=\"%s\"></interface>"
-          "</node>", role(), iface());
+         sprintf(buf, "<?xml version=\"1.0\" ?>"
+             "<node name=\"%s\">"
+             "<interface name=\"%s\"></interface>"
+             "<interface name=\"org.freedesktop.DBus.Introspectable\"></interface>"
+             "<interface name=\"org.freedesktop.DBus.Properties\"></interface>"
+             "</node>", role(), iface());
 
-      DBusMessage* reply = dbus_message_new_method_return(msg);
+         DBusMessage* reply = dbus_message_new_method_return(msg);
+         
+         DBusMessageIter args;
+         dbus_message_iter_init_append(reply, &args);
+         
+         dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &buf);
+         
+         dbus_connection_send(disp_->conn_, reply, nullptr);
+         
+         return DBUS_HANDLER_RESULT_HANDLED;
+      }
+   }
+   else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
+   {
+      std::cout << "FIXME implement property handler here" << std::endl;
+    
+      auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
       
-      DBusMessageIter args;
-      dbus_message_iter_init_append(reply, &args);
+      // FIXME read out first argument -> interface name (probably unused here)
+      // FIXME read out second argument -> property name
+      char* attribute = 0;
       
-      dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &buf);
-      
-      dbus_connection_send(disp_->conn_, reply, nullptr);
+      auto iter = attributes.find(attribute);
+      if (iter != attributes.end())
+      {
+         iter->second->eval(msg);
+         
+         return DBUS_HANDLER_RESULT_HANDLED;
+      }
+      else
+         std::cout << "attribute '" << attribute << "' unknown" << std::endl;
    }
    else
-      std::cerr << "method '" << method << "' does not exist." << std::endl;
+   {
+      auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+
+      auto iter = methods.find(method);
+      if (iter != methods.end())
+      {
+          current_request_.set(iter->second, msg);
+            
+          iter->second->eval(msg);
+          
+          // current_request_ is only valid if no response handler was called
+          if (current_request_)
+          {
+             // in that case the request must not have a reponse
+             assert(!current_request_.requestor_->hasResponse());  
+             current_request_.clear();
+          }
+         
+          return DBUS_HANDLER_RESULT_HANDLED;
+      }
+      else
+         std::cout << "method '" << method << "' unknown" << std::endl;
+   }
    
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 

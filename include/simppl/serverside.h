@@ -111,16 +111,7 @@ struct ServerSignal : detail::ServerSignalBase
    
    
 protected:
-   
-   inline
-   void emitWithId(uint32_t registrationid, T... t)
-   {
-      detail::Serializer s;
-      serialize(s, t...);
-    
-      detail::SignalSender(s.data(), s.size())(detail::ServerSignalBase::recipients_[registrationid]);
-   }
-   
+      
    const char* name_;
    detail::BasicInterface* parent_;
 };
@@ -241,13 +232,33 @@ struct isValidType<ServerVectorAttributeUpdate<VectorT>>
 // --------------------------------------------------------------------------------------------
 
 
+struct ServerAttributeBase
+{
+   ServerAttributeBase(const char* name, detail::BasicInterface* iface);
+   
+   virtual void eval(DBusMessage* msg) = 0;
+   
+protected:
+
+   inline
+   ~ServerAttributeBase() 
+   {
+      // NOOP
+   }
+   
+   const char* name_;
+};
+
+
 template<typename DataT>
 struct BaseAttribute 
  : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
+ , ServerAttributeBase
 {
    inline
-   BaseAttribute(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
-    : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(id, _signals)
+   BaseAttribute(const char* name, detail::BasicInterface* iface)
+    : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(name, iface)
+    , ServerAttributeBase(name, iface)
    {
       // NOOP
    }
@@ -257,7 +268,12 @@ struct BaseAttribute
    {
       return t_;
    }
- 
+   
+   void eval(DBusMessage* msg)
+   {
+      // FIXME handle message, send response
+   }
+   
 protected:
       
    DataT t_;
@@ -472,8 +488,8 @@ template<typename EmitPolicyT, typename BaseT>
 struct CommitMixin : BaseT
 {
    inline
-   CommitMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
-    : BaseT(id, _signals)
+   CommitMixin(const char* name, detail::BasicInterface* iface)
+    : BaseT(name, iface)
    {
       // NOOP
    }
@@ -485,8 +501,8 @@ template<typename BaseT>
 struct CommitMixin<Committed, BaseT> : BaseT
 {
    inline
-   CommitMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
-    : BaseT(id, _signals)
+   CommitMixin(const char* name, detail::BasicInterface* iface)
+    : BaseT(name, iface)
    {
       // NOOP
    }
@@ -507,8 +523,8 @@ struct ServerAttribute
    typedef CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
    
    inline
-   ServerAttribute(const char* name)
-    : baseclass(name)
+   ServerAttribute(const char* name, detail::BasicInterface* iface)
+    : baseclass(name, iface)
    {
       // NOOP
    }
@@ -524,11 +540,6 @@ struct ServerAttribute
       this->t_ = data;
       return *this;
    }   
-   
-   void onAttach(uint32_t registrationid)
-   {
-      this->emitWithId(registrationid, this->t_);
-   }
 };
 
 }   // namespace ipc

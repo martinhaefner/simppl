@@ -19,10 +19,13 @@ INTERFACE(Simple)
    
    Signal<double> sigUsr;
    
+   Attribute<int> attInt;
+   
    Simple()
     : INIT_REQUEST(echo)
     , INIT_SIGNAL(sigUsr)
     , INIT_RESPONSE(rEcho)
+    , INIT_ATTRIBUTE(attInt)
    {
       echo >> rEcho;
    }
@@ -36,13 +39,10 @@ INTERFACE(Simple2)
    
    Signal<double> sigUsr;
    
-   Attribute<int> attInt;
-   
    Simple2()
     : INIT_REQUEST(echo)
     , INIT_SIGNAL(sigUsr)
     , INIT_RESPONSE(rEcho)
-    , INIT_ATTRIBUTE(attInt)
    {
       echo >> rEcho;
    }
@@ -54,6 +54,12 @@ INTERFACE(Simple2)
 void sig_callback(double d)
 {
     std::cout << "Having signal " << d << std::endl;
+}
+
+
+void att_callback(int i)
+{
+   std::cout << "Having attribute change " << i << std::endl;
 }
 
 
@@ -75,6 +81,8 @@ int client()
    
    sst.sigUsr.attach() >> sig_callback;
    sst.echo(42);
+   
+   sst.attInt.attach() >> att_callback;
    
    return disp.run();
 }
