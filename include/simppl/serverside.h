@@ -29,7 +29,7 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
@@ -38,12 +38,12 @@ namespace detail
 {
    struct ServerRequestBaseSetter;
 }
-   
-   
+
+
 struct ServerRequestBase
 {
    friend struct detail::ServerRequestBaseSetter;
-   
+
    virtual void eval(DBusMessage* msg) = 0;
 
    inline
@@ -51,17 +51,17 @@ struct ServerRequestBase
    {
       return hasResponse_;
    }
-   
+
 protected:
 
    ServerRequestBase(const char* name, detail::BasicInterface* iface);
-   
+
    inline
-   ~ServerRequestBase() 
+   ~ServerRequestBase()
    {
       // NOOP
    }
-   
+
    bool hasResponse_;
    const char* name_;
 };
@@ -70,9 +70,9 @@ protected:
 struct ServerResponseBase
 {
    std::set<ServerRequestBase*> allowedRequests_;
-   
+
 protected:
-   
+
    inline
    ~ServerResponseBase()
    {
@@ -88,7 +88,7 @@ template<typename... T>
 struct ServerSignal : detail::ServerSignalBase
 {
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
-   
+
    inline
    ServerSignal(const char* name, detail::BasicInterface* iface)
     : name_(name)
@@ -96,22 +96,26 @@ struct ServerSignal : detail::ServerSignalBase
    {
       // NOOP
    }
-   
+
    inline
    void emit(typename CallTraits<T>::param_type... args)
    {
-      SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-      
-      //detail::Serializer s;
-      //sendSignal(serialize(s, args...));
-      DBusMessage* msg = dbus_message_new_signal(skel->role(), skel->iface(), name_);
-   
-      dbus_connection_send(parent_->conn_, msg, nullptr);
+      if (parent_->conn_)
+      {
+         SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
+         DBusMessage* msg = dbus_message_new_signal(skel->role(), skel->iface(), name_);
+
+         detail::Serializer s(msg);
+         serialize(s, args...);
+
+         dbus_connection_send(parent_->conn_, msg, nullptr);
+         dbus_message_unref(msg);
+      }
    }
-   
-   
+
+
 protected:
-      
+
    const char* name_;
    detail::BasicInterface* parent_;
 };
@@ -124,16 +128,16 @@ template<typename... T>
 struct ServerRequest : ServerRequestBase
 {
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
-   
+
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
-     
+
    inline
    ServerRequest(const char* name, detail::BasicInterface* iface)
     : ServerRequestBase(name, iface)
    {
       // NOOP
    }
-   
+
    template<typename FunctorT>
    inline
    void handledBy(FunctorT func)
@@ -141,15 +145,13 @@ struct ServerRequest : ServerRequestBase
       assert(!f_);
       f_ = func;
    }
-      
+
    void eval(DBusMessage* msg)
    {
       if (f_)
       {
-         //detail::Deserializer d(payload, length);
-         //detail::GetCaller<T...>::type::template eval(d, f_);
-         std::cout << "Request called" << std::endl;
-         f_(42);
+          detail::Deserializer d(msg);
+          detail::GetCaller<T...>::type::template eval(d, f_);
       }
       else
          assert(false);    // no response handler registered
@@ -164,33 +166,29 @@ struct ServerRequest : ServerRequestBase
 
 template<typename... T>
 struct ServerResponse : ServerResponseBase
-{   
+{
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
-   
+
    inline
    ServerResponse(detail::BasicInterface* iface)
     : iface_(iface)
    {
       // NOOP
    }
-   
+
    inline
    detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
-   { 
+   {
       SkeletonBase* skel = dynamic_cast<SkeletonBase*>(iface_);
-      
-      std::cout << "preparing response" << std::endl;
+
       DBusMessage* response = dbus_message_new_method_return(skel->currentRequest().msg_);
-      // FIXME serialize
       
-      DBusMessageIter args;
-      dbus_message_iter_init_append(response, &args);
-      int i = 42;
-      dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &i);
+      detail::Serializer s(response);
+      serialize(s, t...);
       
       return detail::ServerResponseHolder(response, *this);
    }
-   
+
    detail::BasicInterface* iface_;
 };
 
@@ -209,7 +207,7 @@ struct ServerVectorAttributeUpdate
    {
       // NOOP
    }
-   
+
    const VectorT& data_;
    How how_;
    uint32_t where_;
@@ -219,7 +217,7 @@ struct ServerVectorAttributeUpdate
 
 namespace detail
 {
-   
+
 template<typename VectorT>
 struct isValidType<ServerVectorAttributeUpdate<VectorT>>
 {
@@ -235,24 +233,24 @@ struct isValidType<ServerVectorAttributeUpdate<VectorT>>
 struct ServerAttributeBase
 {
    ServerAttributeBase(const char* name, detail::BasicInterface* iface);
-   
+
    virtual void eval(DBusMessage* msg) = 0;
-   
+
 protected:
 
    inline
-   ~ServerAttributeBase() 
+   ~ServerAttributeBase()
    {
       // NOOP
    }
-   
+
    const char* name_;
 };
 
 
 template<typename DataT>
-struct BaseAttribute 
- : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type> 
+struct BaseAttribute
+ : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>
  , ServerAttributeBase
 {
    inline
@@ -262,20 +260,27 @@ struct BaseAttribute
    {
       // NOOP
    }
-    
+
    inline
    const DataT& value() const
    {
       return t_;
    }
-   
+
    void eval(DBusMessage* msg)
    {
-      // FIXME handle message, send response
+      std::cout << "attribute preparing response" << std::endl;
+      DBusMessage* response = dbus_message_new_method_return(msg);
+
+      DBusMessageIter args;
+      dbus_message_iter_init_append(response, &args);
+      dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &t_);
+
+      dbus_connection_send(this->parent_->conn_, response, nullptr);
    }
-   
+
 protected:
-      
+
    DataT t_;
 };
 
@@ -307,45 +312,45 @@ struct VectorValue
    {
       // NOOP
    }
-   
+
    T& operator=(const T& t);
-   
+
    VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin_;
    typename std::vector<T>::iterator iter_;
 };
-   
+
 
 template<typename T, typename EmitPolicyT>
 struct VectorAttributeMixin : BaseAttribute<T>
 {
 public:
-   
+
    inline
    VectorAttributeMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
     : BaseAttribute<T>(id, _signals)
    {
       // NOOP
    }
-   
+
    typedef typename T::pointer pointer;
    typedef typename T::iterator iterator;
    typedef typename T::const_iterator const_iterator;
    typedef typename T::value_type value_type;
-   
+
    template<typename IteratorT>
    inline
    void insert(const_iterator where, IteratorT from, IteratorT to)
    {
       insert(unconst(where), from, to, bool_<std::is_integral<IteratorT>::value>());
    }
-   
+
    inline
    void insert(const_iterator where, const value_type& value)
    {
       this->t_.insert(unconst(where), value);
       emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), 1));
    }
-   
+
    inline
    void erase(const_iterator where)
    {
@@ -355,7 +360,7 @@ public:
          emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, where-this->t_.begin(), 1));
       }
    }
-   
+
    inline
    void erase(const_iterator from, const_iterator to)
    {
@@ -365,68 +370,68 @@ public:
          emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, from-begin(), to-from));
       }
    }
-   
+
    inline
    void clear()
    {
       erase(begin(), end());
    }
-   
+
    inline
    bool empty() const
    {
       return this->t_.empty();
    }
-   
+
    inline
    void push_back(const value_type& val)
    {
       this->t_.push_back(val);
       this->emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, this->t_.size()-1, 1));
    }
-   
+
    inline
    void pop_back()
    {
       this->t_.pop_back();
       this->emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, this->t_.size(), 1));
    }
-   
+
    inline
    size_t size() const
    {
       return this->t_.size();
    }
-   
+
    inline
    const_iterator begin() const
    {
       return this->t_.begin();
    }
-   
+
    inline
    const_iterator end() const
    {
       return this->t_.end();
    }
-   
+
    inline
    VectorValue<value_type, EmitPolicyT> operator[](size_t idx)
    {
       return VectorValue<value_type, EmitPolicyT>(*this, this->t_.begin()+idx);
    }
-   
+
    template<typename IteratorT>
    inline
    void replace(const_iterator where, IteratorT from, IteratorT to)
    {
       bool doEmit = false;
-      
+
       size_t len = std::distance(from, to);
       for(iterator iter = unconst(where); iter != this->t_.end() && from != to; ++iter, ++from)
       {
          this->t_.replace(unconst(where), *from);
-         
+
          if (EmitPolicyT::eval(*where, *from))
             doEmit = true;
       }
@@ -441,29 +446,29 @@ public:
             ++from;
          }
       }
-      
+
       if (EmitPolicyT::eval(doEmit, false))
          emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), len));
    }
-   
+
    inline
    void replace(const_iterator where, const value_type& v)
    {
       *unconst(where) = v;
-         
+
       if (EmitPolicyT::eval(*where, v))
          emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), 1));
    }
-   
+
 protected:
-   
+
    inline
    void insert(const_iterator where, size_t count, const value_type& value, tTrueType)
    {
       this->t_.insert(unconst(where), count, value);
       emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), count));
    }
-   
+
    template<typename IteratorT>
    inline
    void insert(const_iterator where, IteratorT from, IteratorT to, tFalseType)
@@ -506,7 +511,7 @@ struct CommitMixin<Committed, BaseT> : BaseT
    {
       // NOOP
    }
-   
+
    void commit()
    {
       this->emit(this->t_);
@@ -515,31 +520,29 @@ struct CommitMixin<Committed, BaseT> : BaseT
 
 
 template<typename DataT, typename EmitPolicyT>
-struct ServerAttribute 
-   : CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type> 
+struct ServerAttribute
+   : CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
-   
+
    typedef CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
-   
+
    inline
    ServerAttribute(const char* name, detail::BasicInterface* iface)
     : baseclass(name, iface)
    {
       // NOOP
    }
-   
+
    inline
    ServerAttribute& operator=(const DataT& data)
    {
       if (EmitPolicyT::eval(this->t_, data))
-      {
          this->emit(data);
-      }
-      
+
       this->t_ = data;
       return *this;
-   }   
+   }
 };
 
 }   // namespace ipc
@@ -548,7 +551,7 @@ struct ServerAttribute
 
 
 template<typename FunctorT, typename... T>
-inline 
+inline
 void operator>>(simppl::ipc::ServerRequest<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
@@ -561,7 +564,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& ost
    ostream << (uint32_t)updt.how_;
    ostream << updt.where_;
    ostream << updt.len_;
-   
+
    if (updt.how_ != simppl::ipc::Remove)
    {
       for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
@@ -569,7 +572,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& ost
          ostream << updt.data_[i];
       }
    }
-   
+
    return ostream;
 }
 

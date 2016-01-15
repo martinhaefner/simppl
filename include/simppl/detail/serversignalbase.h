@@ -8,36 +8,24 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
 namespace detail
 {
-   
+
 struct ServerRequestBase
 {
 };
 
 
+// FIXME obsolete?
 struct ServerSignalBase
-{   
-   void sendSignal(const Serializer& s);
-   
-   void addRecipient(int fd, uint32_t registrationid, uint32_t clientsid);
-
-   void removeRecipient(uint32_t registrationid);
-   
-   virtual void onAttach(uint32_t /*registrationid*/);
-   
-   /// remove all recipients which may emit to the file descriptor 'fd'
-   void removeAllWithFd(int fd);
-   
+{
 protected:
-   
+
    ~ServerSignalBase();
-   
-   std::map<uint32_t/*registrationid*/, SignalRecipient> recipients_;
 };
 
 }   // namespace detail

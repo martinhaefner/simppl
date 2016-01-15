@@ -8,17 +8,24 @@ struct DBusConnection;
 
 namespace simppl
 {
-    
+
 namespace ipc
 {
-    
+
 namespace detail
 {
 
 struct BasicInterface
 {
+    inline
+    BasicInterface()
+     : conn_(nullptr)
+    {
+        // NOOP
+    }
+
     virtual ~BasicInterface() { /*NOOP*/ }  // FIXME move to .cpp file
-    
+
     DBusConnection* conn_;
 };
 

@@ -16,7 +16,7 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
@@ -37,54 +37,54 @@ struct StubBase
    template<typename... T> friend struct ClientRequest;
    template<typename, typename> friend struct ClientAttribute;
    friend struct Dispatcher;
-   
+
 protected:
-   
+
    virtual ~StubBase();
-   
+
 public:
-   
+
    std::function<void(ConnectionState)> connected;
-   
+
    StubBase(const char* iface, const char* role, const char* boundname);
-   
+
    inline
    const char* iface() const
    {
       return iface_;
    }
-   
+
    inline
    const char* role() const
    {
       return role_;
    }
-   
+
    Dispatcher& disp();
-   
+
    /// FIXME protected?!
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
-   
+
    inline
    const char* destination()
    {
        return boundname_;
    }
-   
+
    DBusConnection* conn();
-   
+
 protected:
-   
+
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
-   
-   void getProperty(const char* name);
-   
+
+   void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
+
    char iface_[128];
    const char* role_;
-   
+
    char boundname_[80];     ///< where to find the server
-   
+
    Dispatcher* disp_;
    std::map<std::string, ClientSignalBase*> signals_;
 };

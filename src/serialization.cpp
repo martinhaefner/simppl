@@ -3,113 +3,58 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
-detail::Serializer::Serializer(size_t initial)
- : capacity_(initial)
- , buf_(capacity_ > 0 ? (char*)malloc(capacity_) : 0)
- , current_(buf_)
+detail::Serializer::Serializer(DBusMessage* msg)
 {
-   // NOOP
-}
-
-
-void* detail::Serializer::release()
-{
-   void* rc = buf_;
-   buf_ = 0;
-   return rc;
-}
-
-
-size_t detail::Serializer::size() const
-{
-   if (capacity_ > 0)
-   {
-      assert(buf_);
-      return current_ - buf_;
-   }
-   else
-      return 0;
+    dbus_message_iter_init_append(msg, &iter_);
 }
 
 
 detail::Serializer& detail::Serializer::write(const std::string& str)
 {
-   int32_t len = str.size();
-   enlarge(len + sizeof(len));
-   
-   memcpy(current_, &len, sizeof(len));
-   current_ += sizeof(len);
-   memcpy(current_, str.c_str(), len);
-   current_ += len;
-   
+   char* c_str = const_cast<char*>(str.c_str());
+   dbus_message_iter_append_basic(&iter_, DBUS_TYPE_STRING, &c_str);
    return *this;
-}
-
-
-void detail::Serializer::enlarge(size_t needed)
-{
-   size_t current = size();
-   size_t estimated_capacity = current + needed;
-   
-   if (capacity_ < estimated_capacity)
-   {
-      while (capacity_ < estimated_capacity)
-         capacity_ <<=1 ;
-      
-      buf_ = (char*)realloc(buf_, capacity_);
-      current_ = buf_ + current;
-   }
 }
 
 
 // ----------------------------------------------------------------------------
 
 
-detail::Deserializer::Deserializer(const void* buf, size_t capacity)
- : capacity_(capacity)
- , buf_((const char*)buf)
- , current_(buf_)
+detail::Deserializer::Deserializer(DBusMessage* msg)
 {
-   // NOOP
+    dbus_message_iter_init(msg, &iter_);
 }
 
 
 detail::Deserializer& detail::Deserializer::read(char*& str)
 {
    assert(str == 0);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
-   
-   uint32_t len;
-   read(len);
-   
-   if (len > 0)
+
+   char* c_str = 0;
+   dbus_message_iter_get_basic(&iter_, &c_str);
+
+   if (c_str)
    {
-      str = allocate(len);
-      memcpy(str, current_, len);
-      current_ += len;
+      str = allocate(strlen(c_str)+1);
+      strcpy(str, c_str);
    }
-   else
-   {
-      str = allocate(1);
-      *str = '\0';
-   }
-   
+
    return *this;
 }
 
 
 detail::Deserializer& detail::Deserializer::read(std::string& str)
 {
-   uint32_t len;
-   read(len);
-   
-   if (len > 0)
+   char* c_str = 0;
+   dbus_message_iter_get_basic(&iter_, &c_str);
+
+   if (c_str)
    {
-      str.assign(current_, len);
-      current_ += len;
+      str.assign(c_str);
    }
    else
       str.clear();

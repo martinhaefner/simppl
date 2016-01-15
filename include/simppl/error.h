@@ -54,6 +54,9 @@ struct RuntimeError : Error
    
    RuntimeError(int error, const char* message);
    
+   /// only for dispatcher
+   RuntimeError(int error, const char* message, uint32_t sequence_nr);
+   
    ~RuntimeError() throw();
  
    /// this shoudl be a move and will probably be optimized out
@@ -79,11 +82,6 @@ struct RuntimeError : Error
    }
    
 private:
-   
-   friend struct Dispatcher;
-   
-   /// only for dispatcher
-   RuntimeError(int error, const char* message, uint32_t sequence_nr);
    
    int error_;
    char* message_;

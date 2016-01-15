@@ -31,7 +31,8 @@ ServerResponseHolder::ServerResponseHolder(ServerResponseHolder&& rhs)
 
 ServerResponseHolder::~ServerResponseHolder()
 {
-   // NOOP
+   if (response_)
+      dbus_message_unref(response_);
 }
 
 

@@ -15,12 +15,12 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
 
-/*static*/ 
+/*static*/
 DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusMessage* msg, void *user_data)
 {
    SkeletonBase* skel = (SkeletonBase*)user_data;
@@ -33,11 +33,11 @@ SkeletonBase::SkeletonBase(const char* iface, const char* role)
  , disp_(nullptr)
 {
    assert(role_);
-   
+
    // strip template arguments
    memset(iface_, 0, sizeof(iface_));
    strncpy(iface_, iface, strstr(iface, "<") - iface);
-   
+
    // remove '::' separation in favour of '.' separation
    char *readp = iface_, *writep = iface_;
    while(*readp)
@@ -48,9 +48,9 @@ SkeletonBase::SkeletonBase(const char* iface, const char* role)
          readp += 2;
       }
       else
-         *writep++ = *readp++; 
+         *writep++ = *readp++;
    }
-   
+
    // terminate
    *writep = '\0';
 }
@@ -72,8 +72,8 @@ Dispatcher& SkeletonBase::disp()
 ServerRequestDescriptor SkeletonBase::deferResponse()
 {
    assert(current_request_);
-   assert(current_request_.requestor_->hasResponse());  
-   
+   assert(current_request_.requestor_->hasResponse());
+
    return std::move(current_request_);
 }
 
@@ -82,16 +82,9 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
+
+   dbus_connection_send(disp_->conn_, response.response_, nullptr);
    
-   std::cout << "Send response" << std::endl;
-   if (!dbus_connection_send(disp_->conn_, response.response_, nullptr))
-      std::cerr << "Failed sending response" << std::endl;
-   /*
-   detail::ResponseFrame r(0);
-   r.payloadsize_ = response.size_;
-   r.sequence_nr_ = current_request_.sequence_nr_;
-   
-   detail::genericSend(current_request_.fd_, r, response.payload_);*/
    current_request_.clear();   // only respond once!!!
 }
 
@@ -100,40 +93,45 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 {
    assert(req);
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
-   /*
-   detail::ResponseFrame r(0);
-   r.payloadsize_ = response.size_;
-   r.sequence_nr_ = req.sequence_nr_;
    
-   genericSend(req.fd_, r, response.payload_);
-   req.clear();*/
+   dbus_connection_send(disp_->conn_, response.response_, nullptr);
+   
+   req.clear();
 }
 
 
 void SkeletonBase::respondWith(const RuntimeError& err)
 {
+   char buf[512];
+   
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
-   /*
-   detail::ResponseFrame r(err.error());
-   r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
-   r.sequence_nr_ = current_request_.sequence_nr_;
+   assert(!err.what() || strlen(err.what()) < sizeof(buf));
    
-   genericSend(current_request_.fd_, r, err.what());*/
+   sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
+   
+   DBusMessage* response = dbus_message_new_error(currentRequest().msg_, DBUS_ERROR_FAILED, buf);
+   dbus_connection_send(disp_->conn_, response, nullptr);
+   
+   dbus_message_unref(response);
    current_request_.clear();   // only respond once!!!
 }
 
 
 void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
 {
+   char buf[512];
+   
    assert(req);
    assert(req.requestor_->hasResponse());
-   /*
-   detail::ResponseFrame r(err.error());
-   r.payloadsize_ = err.what() ? strlen(err.what()) + 1 : 0;
-   r.sequence_nr_ = req.sequence_nr_;
+   assert(!err.what() || strlen(err.what()) < sizeof(buf));
    
-   genericSend(req.fd_, r, err.what());*/
+   sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
+   
+   DBusMessage* response = dbus_message_new_error(currentRequest().msg_, DBUS_ERROR_FAILED, buf);
+   dbus_connection_send(disp_->conn_, response, nullptr);
+   
+   dbus_message_unref(response);
    req.clear();
 }
 
@@ -149,13 +147,13 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 {
    const char* method = dbus_message_get_member(msg);
    const char* interface = dbus_message_get_interface(msg);
-   
+
    if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
    {
       if (!strcmp(method, "Introspect"))
       {
          static char* buf = new char[512];
-         
+
          sprintf(buf, "<?xml version=\"1.0\" ?>"
              "<node name=\"%s\">"
              "<interface name=\"%s\"></interface>"
@@ -164,32 +162,42 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
              "</node>", role(), iface());
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
-         
+
          DBusMessageIter args;
          dbus_message_iter_init_append(reply, &args);
-         
+
          dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &buf);
-         
+
          dbus_connection_send(disp_->conn_, reply, nullptr);
-         
+
          return DBUS_HANDLER_RESULT_HANDLED;
       }
    }
    else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
    {
-      std::cout << "FIXME implement property handler here" << std::endl;
-    
       auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
-      
-      // FIXME read out first argument -> interface name (probably unused here)
-      // FIXME read out second argument -> property name
+
+      DBusMessageIter args;
+      dbus_message_iter_init(msg, &args);
+
+      char* interface = 0;
       char* attribute = 0;
-      
+
+      if (DBUS_TYPE_STRING == dbus_message_iter_get_arg_type(&args))
+      {
+          dbus_message_iter_get_basic(&args, &interface);
+          dbus_message_iter_next(&args);
+      }
+      if (DBUS_TYPE_STRING == dbus_message_iter_get_arg_type(&args))
+          dbus_message_iter_get_basic(&args, &attribute);
+
+      std::cout << "interface=" << interface << ", attribute=" << attribute << std::endl;
+
       auto iter = attributes.find(attribute);
       if (iter != attributes.end())
       {
          iter->second->eval(msg);
-         
+
          return DBUS_HANDLER_RESULT_HANDLED;
       }
       else
@@ -203,40 +211,40 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
       if (iter != methods.end())
       {
           current_request_.set(iter->second, msg);
-            
+
           iter->second->eval(msg);
-          
+
           // current_request_ is only valid if no response handler was called
           if (current_request_)
           {
              // in that case the request must not have a reponse
-             assert(!current_request_.requestor_->hasResponse());  
+             assert(!current_request_.requestor_->hasResponse());
              current_request_.clear();
           }
-         
+
           return DBUS_HANDLER_RESULT_HANDLED;
       }
       else
          std::cout << "method '" << method << "' unknown" << std::endl;
    }
-   
+
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
    //std::cout << "Skeleton::handleRequest '" << funcid << "'" << std::endl;
    /*std::map<uint32_t, ServerRequestBase*>::iterator iter;
-   
+
    if (find(funcid, iter))
    {
       try
       {
          current_request_.set(iter->second, fd, sequence_nr, sessionid);
          iter->second->eval(payload, length);
-         
+
          // current_request_ is only valid if no response handler was called
          if (current_request_)
          {
              // in that case the request must not have a reponse
-            assert(!current_request_.requestor_->hasResponse());  
+            assert(!current_request_.requestor_->hasResponse());
             current_request_.clear();
          }
       }
@@ -255,7 +263,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
             RuntimeError err(-1, "Unknown unhandled exception occured on server");
             respondWith(err);
          }
-            
+
          current_request_.clear();
          throw;
       }

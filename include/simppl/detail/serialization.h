@@ -13,6 +13,10 @@
 #include <cassert>
 #include <algorithm>
 #include <tuple>
+#include <iostream>   // FIXME remove this
+#include <stdint.h>
+
+#include <dbus/dbus.h>
 
 #ifdef SIMPPL_HAVE_BOOST_FUSION
 #   include <boost/fusion/support/is_sequence.hpp>
@@ -22,7 +26,7 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
@@ -34,9 +38,9 @@ template<typename> struct ClientVectorAttributeUpdate;
 namespace detail
 {
 
-template<typename T> 
-struct isPod 
-{ 
+template<typename T>
+struct isPod
+{
    typedef TYPELIST_14( \
       bool, \
       char, \
@@ -52,8 +56,8 @@ struct isPod
       unsigned long long, \
       float, \
       double) pod_types;
-   
-  enum { value = Find<T, pod_types>::value >= 0 }; 
+
+  enum { value = Find<T, pod_types>::value >= 0 };
 };
 
 
@@ -69,14 +73,14 @@ struct SerializerTuple : T1
       T1::write(s);
       s.write(data_);
    }
-   
+
    template<typename DeserializerT>
    void read(DeserializerT& s)
    {
       T1::read(s);
       s.read(data_);
    }
-   
+
    T2 data_;
 };
 
@@ -89,13 +93,13 @@ struct SerializerTuple<T, NilType>
    {
       s.write(data_);
    }
-   
+
    template<typename DeserializerT>
    void read(DeserializerT& s)
    {
       s.read(data_);
    }
-   
+
    T data_;
 };
 
@@ -112,14 +116,14 @@ struct VectorSerializer
    {
       // NOOP
    }
-   
+
    template<typename T>
    inline
    void operator()(const T& t)
    {
       s_.write(t);
    }
-   
+
    SerT& s_;
 };
 
@@ -132,10 +136,10 @@ struct TupleSerializer // : noncopable
    {
       // NOOP
    }
-   
+
    template<typename T>
    void operator()(const T& t);
-   
+
    SerializerT& s_;
 };
 
@@ -148,10 +152,10 @@ struct TupleDeserializer // : noncopable
    {
       // NOOP
    }
-   
+
    template<typename T>
    void operator()(T& t);
-   
+
    DeserializerT& s_;
 };
 
@@ -188,7 +192,7 @@ struct StructSerializationHelper
       const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
       s.write(tuple);
    }
-   
+
    template<typename DeserializerT, typename StructT>
    static inline
    void read(DeserializerT& s, StructT& st)
@@ -212,14 +216,14 @@ struct FusionWriter
    {
       // NOOP
    }
-   
+
    template<typename T>
    inline
    void operator()(const T& t) const
    {
       s_.write(t);
    }
-   
+
    SerializerT& s_;
 };
 
@@ -233,14 +237,14 @@ struct FusionReader
    {
       // NOOP
    }
-   
+
    template<typename T>
    inline
    void operator()(T& t) const
    {
       s_.read(t);
    }
-   
+
    DeserializerT& s_;
 };
 
@@ -252,14 +256,14 @@ struct StructSerializationHelper<boost::mpl::true_>
    static inline
    void write(SerializerT& s, const StructT& st)
    {
-      boost::fusion::for_each(st, FusionWriter<SerializerT>(s));         
+      boost::fusion::for_each(st, FusionWriter<SerializerT>(s));
    }
-   
+
    template<typename DeserializerT, typename StructT>
    static inline
    void read(DeserializerT& s, StructT& st)
    {
-      boost::fusion::for_each(st, FusionReader<DeserializerT>(s));         
+      boost::fusion::for_each(st, FusionReader<DeserializerT>(s));
    }
 };
 #endif
@@ -305,33 +309,36 @@ void std_tuple_for_each(TupleT& t, FunctorT functor)
 // ------------------------------------------------------------------------------------
 
 
+// forward decl
+template<typename T> struct dbus_type_code;
+
+template<> struct dbus_type_code<bool>     { enum { value = DBUS_TYPE_BOOLEAN }; };
+template<> struct dbus_type_code<char>     { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<uint8_t>  { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<uint16_t> { enum { value = DBUS_TYPE_UINT16  }; };
+template<> struct dbus_type_code<uint32_t> { enum { value = DBUS_TYPE_UINT32  }; };
+//template<> struct dbus_type_code<uint64_t> { enum { value = DBUS_TYPE_UINT64  }; };
+template<> struct dbus_type_code<unsigned long> { enum { value = DBUS_TYPE_UINT32   }; };
+template<> struct dbus_type_code<unsigned long long> { enum { value = DBUS_TYPE_UINT64   }; };
+template<> struct dbus_type_code<int8_t>   { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<int16_t>  { enum { value = DBUS_TYPE_INT16   }; };
+template<> struct dbus_type_code<int32_t>  { enum { value = DBUS_TYPE_INT32   }; };
+//template<> struct dbus_type_code<int64_t>  { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct dbus_type_code<long> { enum { value = DBUS_TYPE_INT32   }; };
+template<> struct dbus_type_code<long long> { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct dbus_type_code<double>   { enum { value = DBUS_TYPE_DOUBLE  }; };
+
 struct Serializer // : noncopyable
-{   
+{
    explicit
-   Serializer(size_t initial = 64);
-    
+   Serializer(DBusMessage* msg);
+
    inline
    ~Serializer()
    {
-      free(buf_);
+      // FIXME
    }
-   
-   static inline
-   void free(void* ptr)
-   {
-      return ::free(ptr);
-   }
- 
-   void* release();
-   
-   size_t size() const;
-   
-   inline
-   const void* data() const
-   {
-      return buf_;
-   }
-   
+
    template<typename T>
    inline
    Serializer& write(const T& t)
@@ -343,14 +350,10 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(T t, tTrueType)
    {
-      enlarge(sizeof(T));
-      
-      memcpy(current_, &t, sizeof(T));
-      current_ += sizeof(T);
-      
+      dbus_message_iter_append_basic(&iter_, dbus_type_code<T>::value, &t);
       return *this;
    }
-   
+
    template<typename T>
    inline
    Serializer& write(const T& t, tFalseType)
@@ -360,51 +363,52 @@ struct Serializer // : noncopyable
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int
-#endif            
-         >::template write(*this, t);      
-         
-      return *this;
-   }
-   
-   
-   Serializer& write(const std::string& str);
-   
-   template<typename T>
-   inline
-   Serializer& write(const std::vector<T>& v)
-   {
-      int32_t len = v.size();
-      enlarge(len*sizeof(T) + sizeof(len));
- 
-      memcpy(current_, &len, sizeof(len));
-      current_ += sizeof(len);
- 
-      std::for_each(v.begin(), v.end(), VectorSerializer<Serializer>(*this));
-            
-      return *this;
-   }
-   
-   template<typename KeyT, typename ValueT>
-   Serializer& write(const std::map<KeyT, ValueT>& m)
-   {
-      int32_t len = m.size();
-      enlarge(len*(sizeof(KeyT) + sizeof(ValueT)) + sizeof(len));
-      
-      memcpy(current_, &len, sizeof(len));
-      current_ += sizeof(len);
- 
-      std::for_each(m.begin(), m.end(), std::bind(&Serializer::write<KeyT, ValueT>, this, std::placeholders::_1));
+#endif
+         >::template write(*this, t);
 
       return *this;
    }
-   
+
+
+   Serializer& write(const std::string& str);
+
+   template<typename T>
+   inline
+   Serializer& write(const std::vector<T>& v)
+   {/*
+      int32_t len = v.size();
+      enlarge(len*sizeof(T) + sizeof(len));
+
+      memcpy(current_, &len, sizeof(len));
+      current_ += sizeof(len);
+
+      std::for_each(v.begin(), v.end(), VectorSerializer<Serializer>(*this));
+*/
+      return *this;
+   }
+
+   template<typename KeyT, typename ValueT>
+   Serializer& write(const std::map<KeyT, ValueT>& m)
+   {
+       /*
+      int32_t len = m.size();
+      enlarge(len*(sizeof(KeyT) + sizeof(ValueT)) + sizeof(len));
+
+      memcpy(current_, &len, sizeof(len));
+      current_ += sizeof(len);
+
+      std::for_each(m.begin(), m.end(), std::bind(&Serializer::write<KeyT, ValueT>, this, std::placeholders::_1));
+*/
+      return *this;
+   }
+
    template<typename... T>
    Serializer& write(const std::tuple<T...>& t)
    {
       std_tuple_for_each(t, TupleSerializer<Serializer>(*this));
       return *this;
    }
-   
+
    template<typename T1, typename T2>
    Serializer& write(const SerializerTuple<T1, T2>& tuple)
    {
@@ -412,22 +416,17 @@ struct Serializer // : noncopyable
       return *this;
    }
 
- 
+
 private:
-   
+
    template<typename KeyT, typename ValueT>
    inline
    void write(const std::pair<KeyT, ValueT>& p)
    {
       write(p.first).write(p.second);
    }
-   
-   void enlarge(size_t needed);
-   
-   size_t capacity_;
-   
-   char* buf_;
-   char* current_;
+
+   DBusMessageIter iter_;
 };
 
 }   // namespace detail
@@ -462,30 +461,30 @@ MAKE_SERIALIZER(double)
 
 
 // forward decl
-template<typename VectorT> 
+template<typename VectorT>
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer&, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>&);
 
 
-inline 
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::string& str) 
-{ 
-   return s.write(str); 
+inline
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::string& str)
+{
+   return s.write(str);
 }
 
 
 template<typename T>
-inline 
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::vector<T>& v) 
-{ 
-   return s.write(v); 
+inline
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::vector<T>& v)
+{
+   return s.write(v);
 }
 
 
 template<typename KeyT, typename ValueT>
-inline 
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::map<KeyT, ValueT>& m) 
-{ 
-   return s.write(m); 
+inline
+simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::map<KeyT, ValueT>& m)
+{
+   return s.write(m);
 }
 
 
@@ -493,7 +492,7 @@ template<typename StructT>
 inline
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const StructT& st)
 {
-   return s.write(st);   
+   return s.write(st);
 }
 
 
@@ -505,7 +504,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
 }
 
 
-template<typename SerializerT>   
+template<typename SerializerT>
 template<typename T>
 inline
 void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
@@ -519,13 +518,13 @@ void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)  
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
 namespace detail
 {
-   
+
 struct Deserializer // : noncopyable
 {
    static inline
@@ -533,31 +532,23 @@ struct Deserializer // : noncopyable
    {
       delete[] ptr;
    }
-   
-   Deserializer(const void* buf, size_t capacity);
-   
-   inline
-   size_t size() const
-   {
-      return current_ - buf_;
-   }
-   
+
+   Deserializer(DBusMessage* msg);
+
    template<typename T>
    inline
    Deserializer& read(T& t)
    {
       return read(t, bool_<isPod<T>::value>());
    }
-   
+
    template<typename T>
    Deserializer& read(T& t, tTrueType)
    {
-      memcpy(&t, current_, sizeof(T));
-      current_ += sizeof(T);
-      
+      dbus_message_iter_get_basic(&iter_, &t);
       return *this;
    }
-   
+
    template<typename T>
    Deserializer& read(T& t, tFalseType)
    {
@@ -566,24 +557,24 @@ struct Deserializer // : noncopyable
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int
-#endif            
-         >::template read(*this, t);      
+#endif
+         >::template read(*this, t);
    }
-   
+
    Deserializer& read(char*& str);
-   
+
    Deserializer& read(std::string& str);
-   
+
    template<typename T>
    Deserializer& read(std::vector<T>& v)
    {
       uint32_t len;
       read(len);
-      
+
       if (len > 0)
       {
          v.resize(len);
-         
+
          for(uint32_t i=0; i<len; ++i)
          {
             read(v[i]);
@@ -591,16 +582,16 @@ struct Deserializer // : noncopyable
       }
       else
          v.clear();
-   
+
       return *this;
    }
-   
+
    template<typename KeyT, typename ValueT>
    Deserializer& read(std::map<KeyT, ValueT>& m)
    {
       uint32_t len;
       read(len);
-      
+
       if (len > 0)
       {
          for(uint32_t i=0; i<len; ++i)
@@ -612,36 +603,33 @@ struct Deserializer // : noncopyable
       }
       else
          m.clear();
-   
+
       return *this;
    }
-   
+
    template<typename... T>
    Deserializer& read(std::tuple<T...>& t)
    {
       std_tuple_for_each(t, TupleDeserializer<Deserializer>(*this));
       return *this;
    }
-   
+
    template<typename T1, typename T2>
    Deserializer& read(SerializerTuple<T1, T2>& tuple)
    {
       tuple.read(*this);
       return *this;
    }
-   
+
 private:
-   
+
    static inline
    char* allocate(size_t len)
    {
       return new char[len];
    }
-   
-   const size_t capacity_;
-   
-   const char* buf_;
-   const char* current_;
+
+   DBusMessageIter iter_;
 };
 
 }   // namespace detail
@@ -680,30 +668,30 @@ template<typename VectorT>
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&, simppl::ipc::ClientVectorAttributeUpdate<VectorT>&);
 
 
-inline 
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::string& str) 
-{ 
-   return s.read(str); 
+inline
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::string& str)
+{
+   return s.read(str);
 }
 
 template<typename T>
-inline 
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::vector<T>& v) 
-{ 
-   return s.read(v); 
+inline
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::vector<T>& v)
+{
+   return s.read(v);
 }
 
 template<typename KeyT, typename ValueT>
-inline 
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::map<KeyT, ValueT>& m) 
-{ 
-   return s.read(m); 
+inline
+simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::map<KeyT, ValueT>& m)
+{
+   return s.read(m);
 }
 
 template<typename StructT>
 inline
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, StructT& st)
-{   
+{
    return s.read(st);
 }
 
@@ -729,10 +717,10 @@ void simppl::ipc::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
-   
+
 namespace detail
 {
 
@@ -765,21 +753,21 @@ struct FunctionCaller
    {
       FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
    }
-   
+
    template<typename FunctorT>
    static inline
    void eval_cs(FunctorT& f, const CallState& cs, const TupleT& tuple)
    {
       FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
    }
-   
+
    template<typename FunctorT, typename... T>
    static inline
    void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
    {
      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
    }
-   
+
    template<typename FunctorT, typename... T>
    static inline
    void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& tuple, const T&... t)
@@ -797,7 +785,7 @@ struct FunctionCaller<-1, TupleT>
    {
       f(t...);
    }
-   
+
    template<typename FunctorT, typename... T>
    static inline
    void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& /*tuple*/, const T&... t)
@@ -816,19 +804,19 @@ struct DeserializeAndCall : simppl::NonInstantiable
    {
       std::tuple<T...> tuple;
       d >> tuple;
-      
+
       FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
-   
+
    template<typename FunctorT>
    static inline
    void evalResponse(Deserializer& d, FunctorT& f, const simppl::ipc::CallState& cs)
    {
       std::tuple<T...> tuple;
-      
+
       if (cs)
          d >> tuple;
-      
+
       FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
    }
 };
@@ -842,7 +830,7 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
    {
       f();
    }
-   
+
    template<typename FunctorT>
    static inline
    void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::ipc::CallState& cs)
