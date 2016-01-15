@@ -12,27 +12,26 @@ namespace ipc
 namespace detail
 {
    
-ServerResponseHolder::ServerResponseHolder(DBusMessage* response, ServerResponseBase& responder)
- : response_(response)
- , responder_(&responder)
+ServerResponseHolder::ServerResponseHolder(ServerResponseBase& responder, std::function<void(Serializer&)> f)
+ : responder_(&responder)
+ , f_(f)
 {
    // NOOP
 }
 
 
 ServerResponseHolder::ServerResponseHolder(ServerResponseHolder&& rhs)
- : response_(rhs.response_)
- , responder_(rhs.responder_)
+ : responder_(rhs.responder_)
+ , f_(rhs.f_)
 {
-   rhs.response_ = nullptr;
    rhs.responder_ = nullptr;
+   // FIXME implement real move semantics
 }
 
 
 ServerResponseHolder::~ServerResponseHolder()
 {
-   if (response_)
-      dbus_message_unref(response_);
+   // NOOP
 }
 
 
@@ -40,10 +39,9 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
 {
    if (this != &rhs)
    {
-      response_ = rhs.response_;
       responder_ = rhs.responder_;
+      f_ = rhs.f_;
 
-      rhs.response_ = nullptr;
       rhs.responder_ = nullptr;
    }
    

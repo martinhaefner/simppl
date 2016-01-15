@@ -179,14 +179,8 @@ struct ServerResponse : ServerResponseBase
    inline
    detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
-      SkeletonBase* skel = dynamic_cast<SkeletonBase*>(iface_);
-
-      DBusMessage* response = dbus_message_new_method_return(skel->currentRequest().msg_);
-      
-      detail::Serializer s(response);
-      serialize(s, t...);
-      
-      return detail::ServerResponseHolder(response, *this);
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::ipc::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      return detail::ServerResponseHolder(*this, f);
    }
 
    detail::BasicInterface* iface_;
@@ -269,13 +263,11 @@ struct BaseAttribute
 
    void eval(DBusMessage* msg)
    {
-      std::cout << "attribute preparing response" << std::endl;
       DBusMessage* response = dbus_message_new_method_return(msg);
 
-      DBusMessageIter args;
-      dbus_message_iter_init_append(response, &args);
-      dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &t_);
-
+      detail::Serializer s(response);
+      serialize(s, t_);
+      
       dbus_connection_send(this->parent_->conn_, response, nullptr);
    }
 

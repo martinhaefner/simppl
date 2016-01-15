@@ -8,8 +8,23 @@ namespace ipc
 {
 
 detail::Serializer::Serializer(DBusMessage* msg)
+ : parent_(nullptr)
 {
     dbus_message_iter_init_append(msg, &iter_);
+}
+
+
+detail::Serializer::Serializer(DBusMessageIter* iter)
+ : parent_(iter)
+{
+    dbus_message_iter_open_container(parent_, DBUS_TYPE_STRUCT, nullptr, &iter_);
+}
+
+
+detail::Serializer::~Serializer()
+{
+    if (parent_)
+        dbus_message_iter_close_container(parent_, &iter_);
 }
 
 
@@ -25,8 +40,23 @@ detail::Serializer& detail::Serializer::write(const std::string& str)
 
 
 detail::Deserializer::Deserializer(DBusMessage* msg)
+ : parent_(0)
 {
     dbus_message_iter_init(msg, &iter_);
+}
+
+
+detail::Deserializer::Deserializer(DBusMessageIter* iter)
+ : parent_(iter)
+{
+    dbus_message_iter_open_container(parent_, DBUS_TYPE_STRUCT, nullptr, &iter_);
+}
+
+
+detail::Deserializer::~Deserializer()
+{
+    if (parent_)
+        dbus_message_iter_close_container(parent_, &iter_);
 }
 
 

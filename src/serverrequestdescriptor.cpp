@@ -2,6 +2,8 @@
 
 #include "simppl/detail/constants.h"
 
+#include <dbus/dbus.h>
+
 
 namespace simppl
 {
@@ -33,7 +35,8 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
       requestor_ = rhs.requestor_;
       msg_ = rhs.msg_;
             
-      rhs.clear();
+      rhs.requestor_ = nullptr;
+      rhs.msg_ = nullptr;
    }
    
    return *this;
@@ -42,8 +45,14 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
 
 ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, DBusMessage* msg)
 {
+   if (msg_)
+      dbus_message_unref(msg_);
+   
    requestor_ = requestor;
    msg_ = msg;
+   
+   if (msg_)
+      dbus_message_ref(msg_);
    
    return *this;
 }

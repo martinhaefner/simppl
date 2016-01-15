@@ -150,5 +150,15 @@ int server()
 
 int main(int argc, char** argv)
 {
+   /*
+    DBusMessage* msg;
+    spl::detail::Serializer s(msg);
+    std::tuple<int, double> tup;
+    s << tup;
+   
+    spl::detail::Deserializer ds(msg);
+    ds >> tup;
+   */
+    
     return argc > 1 ? server() : client();
 }

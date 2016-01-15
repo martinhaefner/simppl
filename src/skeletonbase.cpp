@@ -82,9 +82,15 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
-
-   dbus_connection_send(disp_->conn_, response.response_, nullptr);
    
+   DBusMessage* msg = dbus_message_new_method_return(current_request_.msg_);
+   
+   detail::Serializer s(msg);
+   response.f_(s);
+      
+   dbus_connection_send(disp_->conn_, msg, nullptr);
+   
+   dbus_message_unref(msg);
    current_request_.clear();   // only respond once!!!
 }
 
@@ -94,8 +100,14 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    assert(req);
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
    
-   dbus_connection_send(disp_->conn_, response.response_, nullptr);
+   DBusMessage* msg = dbus_message_new_method_return(req.msg_);
    
+   detail::Serializer s(msg);
+   response.f_(s);
+   
+   dbus_connection_send(disp_->conn_, msg, nullptr);
+   
+   dbus_message_unref(msg);   
    req.clear();
 }
 
@@ -128,7 +140,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
    
    sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
    
-   DBusMessage* response = dbus_message_new_error(currentRequest().msg_, DBUS_ERROR_FAILED, buf);
+   DBusMessage* response = dbus_message_new_error(req.msg_, DBUS_ERROR_FAILED, buf);
    dbus_connection_send(disp_->conn_, response, nullptr);
    
    dbus_message_unref(response);

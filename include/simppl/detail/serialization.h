@@ -132,15 +132,17 @@ template<typename SerializerT>
 struct TupleSerializer // : noncopable
 {
    TupleSerializer(SerializerT& s)
-    : s_(s)
+    : orig_(s)
+    , s_(&s.iter_)
    {
       // NOOP
    }
-
+   
    template<typename T>
    void operator()(const T& t);
 
-   SerializerT& s_;
+   SerializerT& orig_;
+   SerializerT s_;
 };
 
 
@@ -148,7 +150,8 @@ template<typename DeserializerT>
 struct TupleDeserializer // : noncopable
 {
    TupleDeserializer(DeserializerT& s)
-    : s_(s)
+    : orig_(s)
+    , s_(&s.iter_)
    {
       // NOOP
    }
@@ -156,7 +159,8 @@ struct TupleDeserializer // : noncopable
    template<typename T>
    void operator()(T& t);
 
-   DeserializerT& s_;
+   DeserializerT& orig_;
+   DeserializerT s_;
 };
 
 
@@ -328,16 +332,16 @@ template<> struct dbus_type_code<long> { enum { value = DBUS_TYPE_INT32   }; };
 template<> struct dbus_type_code<long long> { enum { value = DBUS_TYPE_INT64   }; };
 template<> struct dbus_type_code<double>   { enum { value = DBUS_TYPE_DOUBLE  }; };
 
+
 struct Serializer // : noncopyable
 {
    explicit
    Serializer(DBusMessage* msg);
 
-   inline
-   ~Serializer()
-   {
-      // FIXME
-   }
+   explicit
+   Serializer(DBusMessageIter* iter);
+
+   ~Serializer();
 
    template<typename T>
    inline
@@ -426,7 +430,10 @@ private:
       write(p.first).write(p.second);
    }
 
+public:   // FIXME make friend?!
+
    DBusMessageIter iter_;
+   DBusMessageIter* parent_;
 };
 
 }   // namespace detail
@@ -533,7 +540,13 @@ struct Deserializer // : noncopyable
       delete[] ptr;
    }
 
+   explicit
    Deserializer(DBusMessage* msg);
+
+   explicit
+   Deserializer(DBusMessageIter* iter);
+
+   ~Deserializer();
 
    template<typename T>
    inline
@@ -629,7 +642,10 @@ private:
       return new char[len];
    }
 
+public: // FIXME private?
+
    DBusMessageIter iter_;
+   DBusMessageIter* parent_;
 };
 
 }   // namespace detail

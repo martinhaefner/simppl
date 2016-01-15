@@ -2,7 +2,9 @@
 #define SIMPPL_DETAIL_SERVERRESPONSEHOLDER_H
 
 
+#include <functional>
 #include <cstdint>
+
 #include <sys/types.h>
 
 
@@ -28,7 +30,7 @@ struct Serializer;
 
 struct ServerResponseHolder 
 {
-   ServerResponseHolder(DBusMessage* response, ServerResponseBase& responder);
+   ServerResponseHolder(ServerResponseBase& responder, std::function<void(Serializer&)> f);
    
    ~ServerResponseHolder();
    
@@ -38,8 +40,8 @@ struct ServerResponseHolder
    ServerResponseHolder(const ServerResponseHolder& rhs) = delete;
    ServerResponseHolder& operator=(const ServerResponseHolder& rhs) = delete;
    
-   /*mutable*/ DBusMessage* response_;
    /*mutable*/ ServerResponseBase* responder_;
+   std::function<void(Serializer&)> f_;
 };
 
 }   // namespace detail
