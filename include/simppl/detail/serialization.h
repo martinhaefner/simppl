@@ -162,7 +162,6 @@ struct TupleSerializer // : noncopable
     : orig_(s)
     , s_(&iter_)
    {
-      std::cout << "Ser: " << &iter_ << std::endl;
       dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_STRUCT, nullptr, &iter_);
    }
    
@@ -553,8 +552,8 @@ struct Serializer // : noncopyable
    template<typename... T>
    Serializer& write(const std::tuple<T...>& t)
    {
-      std::cout << "std::tuple write" << std::endl;
-      std_tuple_for_each(t, TupleSerializer<Serializer>(*this));
+      TupleSerializer<Serializer> ts(*this);
+      std_tuple_for_each(t, std::ref(ts));
       return *this;
    }
 
@@ -678,9 +677,7 @@ template<typename T>
 inline
 void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
-   std::cout << "Ser: " << s_.iter_ << std::endl;
-      
-  s_ << t;
+    s_ << t;
 }
 
 
@@ -789,23 +786,22 @@ struct Deserializer // : noncopyable
    template<typename... T>
    Deserializer& read(std::tuple<T...>& t)
    {
-      std::cout << "std::tuple read" << std::endl;
-      std_tuple_for_each(t, TupleDeserializer<Deserializer>(*this));
+      TupleDeserializer<Deserializer> tds(*this);
+      std_tuple_for_each(t, std::ref(tds));
       return *this;
    }
    
    template<typename... T>
    Deserializer& read_flattened(std::tuple<T...>& t)
    {
-      std::cout << "std::tuple read (flattened)" << std::endl;
-      std_tuple_for_each(t, TupleDeserializer<Deserializer>(*this, true));
+      TupleDeserializer<Deserializer> tds(*this, true);
+      std_tuple_for_each(t, std::ref(tds));
       return *this;
    }
 
    template<typename T1, typename T2>
    Deserializer& read(SerializerTuple<T1, T2>& tuple)
    {
-      std::cout << "SerializerTuple" << std::endl;
       DBusMessageIter iter;
       dbus_message_iter_recurse(iter_, &iter);
       

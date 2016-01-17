@@ -30,7 +30,7 @@ INTERFACE(Simple)
    Request<A, int> echoA;
    Request<std::vector<int>, int> echoVi;
    Request<std::vector<A>, int> echoVa;
-   Request<std::tuple<int, std::string>> echoTup;
+   Request<std::tuple<int, std::string, int>> echoTup;
    
    Signal<double> sigUsr;
 
@@ -115,7 +115,7 @@ int client()
    va.push_back(a);
    sst.echoVa(va, 99);
    
-   std::tuple<int, std::string> tup(42, "Hallo Welt");
+   std::tuple<int, std::string, int> tup(42, "Hallo Welt", 666);
    sst.echoTup(tup);
    
    sst.rEcho >> echo_callback;
@@ -171,9 +171,9 @@ void handleEchoVa(const std::vector<test::A>& va, int i)
 }
 
 
-void handleEchoTup(const std::tuple<int, std::string>& t)
+void handleEchoTup(const std::tuple<int, std::string, int>& t)
 {
-   std::cout << "Having " << std::get<0>(t) << " -> " << std::get<1>(t) << std::endl;
+   std::cout << "Having " << std::get<0>(t) << " -> " << std::get<1>(t) << " " << std::get<2>(t) << std::endl;
 }
 
 

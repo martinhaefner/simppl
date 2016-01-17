@@ -86,9 +86,6 @@ Dispatcher::Dispatcher(const char* bus_name)
    ret = dbus_bus_request_name(conn_, bus_name, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
    assert(!dbus_error_is_set(&err));
    
-   ret = dbus_bus_request_name(conn_, "nix.was.toll", DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-   assert(!dbus_error_is_set(&err));
-   
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 }
 
