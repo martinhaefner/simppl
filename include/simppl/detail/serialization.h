@@ -65,6 +65,38 @@ struct isPod
 // --------------------------------------------------------------------------------------
 
 
+// generic type switch
+template<typename T> struct dbus_type_code
+{ enum { value = std::is_enum<T>::value ? DBUS_TYPE_INT32 : DBUS_TYPE_STRUCT }; };
+
+template<> struct dbus_type_code<bool>               { enum { value = DBUS_TYPE_BOOLEAN }; };
+template<> struct dbus_type_code<char>               { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
+template<> struct dbus_type_code<uint32_t>           { enum { value = DBUS_TYPE_UINT32  }; };
+//template<> struct dbus_type_code<uint64_t> { enum { value = DBUS_TYPE_UINT64  }; };
+template<> struct dbus_type_code<unsigned long>      { enum { value = DBUS_TYPE_UINT32   }; };
+template<> struct dbus_type_code<unsigned long long> { enum { value = DBUS_TYPE_UINT64   }; };
+template<> struct dbus_type_code<int8_t>             { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct dbus_type_code<int16_t>            { enum { value = DBUS_TYPE_INT16   }; };
+template<> struct dbus_type_code<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
+//template<> struct dbus_type_code<int64_t>  { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct dbus_type_code<long>               { enum { value = DBUS_TYPE_INT32   }; };
+template<> struct dbus_type_code<long long>          { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
+
+template<typename... T>
+struct dbus_type_code<std::tuple<T...>>              { enum { value = DBUS_TYPE_STRUCT }; };
+
+
+// forward decl
+template<typename T>
+struct make_type_signature;
+
+
+// --------------------------------------------------------------------------------------
+
+
 template<typename T1, typename T2>
 struct SerializerTuple : T1
 {
@@ -80,6 +112,13 @@ struct SerializerTuple : T1
    {
       T1::read(s);
       s.read(data_);
+   }
+   
+   static
+   void write_signature(std::ostream& os)
+   {
+      T1::write_signature(os);
+      make_type_signature<T2>::eval(os);
    }
 
    T2 data_;
@@ -99,6 +138,12 @@ struct SerializerTuple<T, NilType>
    void read(DeserializerT& s)
    {
       s.read(data_);
+   }
+   
+   static 
+   void write_signature(std::ostream& os)
+   {
+      make_type_signature<T>::eval(os);
    }
 
    T data_;
@@ -311,33 +356,6 @@ void std_tuple_for_each(TupleT& t, FunctorT functor)
 }
 
 
-// ------------------------------------------------------------------------------------
-
-
-// generic type switch
-template<typename T> struct dbus_type_code
-{ enum { value = std::is_enum<T>::value ? DBUS_TYPE_INT32 : DBUS_TYPE_STRUCT }; };
-
-template<> struct dbus_type_code<bool>               { enum { value = DBUS_TYPE_BOOLEAN }; };
-template<> struct dbus_type_code<char>               { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
-template<> struct dbus_type_code<uint32_t>           { enum { value = DBUS_TYPE_UINT32  }; };
-//template<> struct dbus_type_code<uint64_t> { enum { value = DBUS_TYPE_UINT64  }; };
-template<> struct dbus_type_code<unsigned long>      { enum { value = DBUS_TYPE_UINT32   }; };
-template<> struct dbus_type_code<unsigned long long> { enum { value = DBUS_TYPE_UINT64   }; };
-template<> struct dbus_type_code<int8_t>             { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<int16_t>            { enum { value = DBUS_TYPE_INT16   }; };
-template<> struct dbus_type_code<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
-//template<> struct dbus_type_code<int64_t>  { enum { value = DBUS_TYPE_INT64   }; };
-template<> struct dbus_type_code<long>               { enum { value = DBUS_TYPE_INT32   }; };
-template<> struct dbus_type_code<long long>          { enum { value = DBUS_TYPE_INT64   }; };
-template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
-
-template<typename... T>
-struct dbus_type_code<std::tuple<T...>>              { enum { value = DBUS_TYPE_STRUCT }; };
-
-
 // ---------------------------------------------------------------------
 
 
@@ -349,17 +367,21 @@ struct make_type_signature
       make_type_signature<T>::helper(os, bool_<isPod<T>::value>());
       return os;
    }
+
+
+private:
    
    // pod helper
    static inline void helper(std::ostream& os, tTrueType)
    {
       os << (char)dbus_type_code<T>::value;
    }
-   
+
    // struct helper
    static inline void helper(std::ostream& os, tFalseType)
    {
-      os << "(ii)";   // FIXME recurse
+      T::serializer_type::write_signature(os << "(");
+      os << ")";
    }
 };
 
@@ -367,12 +389,30 @@ struct make_type_signature
 template<typename... T>
 struct make_type_signature<std::tuple<T...>>
 {
+   // if templated lambdas are available this could be removed!
+   struct helper
+   {
+      helper(std::ostream& os)
+       : os_(os)
+      {
+         // NOOP
+      }
+      
+      template<typename U>
+      void operator()(const U&)
+      {
+         make_type_signature<U>::eval(os_);
+      }
+      
+      std::ostream& os_;
+   };
+   
    static inline 
    std::ostream& eval(std::ostream& os)
    {
       os << "(";
-      os << "ii";  // FIXME recurse
-      //make_type_signature_helper<T...>::eval(os);
+      std::tuple<T...> t;   // FIXME make this a type based version only, no value based iteration
+      std_tuple_for_each(t, helper(os));
       os << ")";
       
       return os;

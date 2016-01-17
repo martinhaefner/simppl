@@ -30,6 +30,7 @@ INTERFACE(Simple)
    Request<A, int> echoA;
    Request<std::vector<int>, int> echoVi;
    Request<std::vector<A>, int> echoVa;
+   Request<std::tuple<int, std::string>> echoTup;
    
    Signal<double> sigUsr;
 
@@ -41,6 +42,7 @@ INTERFACE(Simple)
     , INIT_REQUEST(echoA)
     , INIT_REQUEST(echoVi)
     , INIT_REQUEST(echoVa)
+    , INIT_REQUEST(echoTup)
     , INIT_SIGNAL(sigUsr)
     , INIT_ATTRIBUTE(attInt)
    {
@@ -113,6 +115,9 @@ int client()
    va.push_back(a);
    sst.echoVa(va, 99);
    
+   std::tuple<int, std::string> tup(42, "Hallo Welt");
+   sst.echoTup(tup);
+   
    sst.rEcho >> echo_callback;
 
    sst.sigUsr.attach() >> sig_callback;
@@ -166,6 +171,12 @@ void handleEchoVa(const std::vector<test::A>& va, int i)
 }
 
 
+void handleEchoTup(const std::tuple<int, std::string>& t)
+{
+   std::cout << "Having " << std::get<0>(t) << " -> " << std::get<1>(t) << std::endl;
+}
+
+
 struct SimpleServer : spl::Skeleton<test::Simple>
 {
     SimpleServer()
@@ -176,6 +187,7 @@ struct SimpleServer : spl::Skeleton<test::Simple>
         echoA >> handleEchoA;
         echoVi >> handleEchoVi;
         echoVa >> handleEchoVa;
+        echoTup >> handleEchoTup;
     }
 
     void handleEcho(int i)
