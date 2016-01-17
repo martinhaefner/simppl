@@ -70,20 +70,15 @@ namespace ipc
 DBusObjectPathVTable stub_v_table = { nullptr, &SkeletonBase::method_handler, nullptr, nullptr, nullptr, nullptr };
 
 
-Dispatcher::Dispatcher(const char* bus_name)
+Dispatcher::Dispatcher()
  : running_(false)
  , conn_(nullptr)
  , request_timeout_(std::chrono::milliseconds::max())    // TODO move this to a config header, also other timeout defaults
 {
    DBusError err;
-   int ret;
-   
    dbus_error_init(&err);
 
    conn_ = dbus_bus_get(DBUS_BUS_SESSION, &err);
-   assert(!dbus_error_is_set(&err));
-   
-   ret = dbus_bus_request_name(conn_, bus_name, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
    assert(!dbus_error_is_set(&err));
    
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);

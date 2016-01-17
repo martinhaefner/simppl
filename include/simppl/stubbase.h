@@ -5,6 +5,8 @@
 #include <cassert>
 #include <functional>
 #include <map>
+#include <sstream>
+#include <iostream>  // FIXME remove this
 
 #include <dbus/dbus.h>
 
@@ -46,7 +48,7 @@ public:
 
    std::function<void(ConnectionState)> connected;
 
-   StubBase(const char* iface, const char* role, const char* boundname);
+   StubBase(const char* iface, const char* role);
 
    inline
    const char* iface() const
@@ -59,21 +61,35 @@ public:
    {
       return role_;
    }
+   
+   // FIXME make this function some generic helper. 
+   // FIXME either const char* or string return, must be clean all-over
+   std::string objectpath() const
+   {
+       std::ostringstream opath;
+       opath << "/" << iface() << "." << role();
+       
+       std::string objectpath = opath.str();
+       
+       std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
+       if (c == '.')
+           c = '/';
+       });
+       
+       std::cout << objectpath << std::endl;
+       return objectpath;
+   }
 
    Dispatcher& disp();
 
    /// FIXME protected?!
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
 
-   inline
-   const char* destination()
-   {
-       return boundname_;
-   }
-
    DBusConnection* conn();
 
 protected:
+
+   std::string boundname() const;
 
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
@@ -82,8 +98,6 @@ protected:
 
    char iface_[128];
    const char* role_;
-
-   char boundname_[80];     ///< where to find the server
 
    Dispatcher* disp_;
    std::map<std::string, ClientSignalBase*> signals_;

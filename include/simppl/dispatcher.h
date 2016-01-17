@@ -54,7 +54,7 @@ struct Dispatcher
    friend struct StubBase;
    friend struct SkeletonBase;
    
-   Dispatcher(const char* bus_name);
+   Dispatcher();
    
    template<typename RepT, typename PeriodT>
    inline
@@ -142,10 +142,27 @@ void Dispatcher::addServer(ServerT& serv)
    
    serv.disp_ = this;
    
+   // FIXME move most code to .cpp 
+   DBusError err;
+   dbus_error_init(&err);
+
+   std::ostringstream busname;
+   busname << serv.iface_ << '.' << serv.role_;
+   
+   dbus_bus_request_name(conn_, busname.str().c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
+   assert(!dbus_error_is_set(&err));   
+   
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
    
-   dbus_connection_register_object_path(conn_, serv.role_, &stub_v_table, &serv);
+   std::string objectpath = "/" + busname.str();
+   std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
+      if (c == '.')
+         c = '/';
+   });
+   
+   // FIXME register same path as busname, just with / instead of .
+   dbus_connection_register_object_path(conn_, objectpath.c_str(), &stub_v_table, &serv);
    
    /*FIXME
    std::string name = serv.fqn();

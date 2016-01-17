@@ -38,8 +38,8 @@ private:
    
 public:
    
-   Stub(const char* role, const char* boundname)
-    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role, boundname)
+   Stub(const char* role)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role)
    {
       // NOOP
    }

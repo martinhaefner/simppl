@@ -94,12 +94,10 @@ void echo_callback(const spl::CallState&, int i)
 
 int client()
 {
-   spl::Stub<test::Simple> sst("/my_simple", "org.simppl.simple_server");
+   spl::Stub<test::Simple> sst("my_simple");
    psst = &sst;
 
-   // FIXME client also possible without bus name?
-   // YES! Busname will be requested for servers only, objectpath will repeat the busname
-   spl::Dispatcher disp("org.simppl.simple_client");
+   spl::Dispatcher disp;
    disp.addClient(sst);
 
    test::A a = { 3, 4 };
@@ -135,7 +133,7 @@ int client()
 struct SimpleServer2 : spl::Skeleton<test::Simple2>
 {
     SimpleServer2()
-     : spl::Skeleton<test::Simple2>("/my_simple2")
+     : spl::Skeleton<test::Simple2>("my_simple2")
     {
         echo >> std::bind(&SimpleServer2::handleEcho, this, _1);
     }
@@ -180,7 +178,7 @@ void handleEchoTup(const std::tuple<int, std::string, int>& t)
 struct SimpleServer : spl::Skeleton<test::Simple>
 {
     SimpleServer()
-     : spl::Skeleton<test::Simple>("/my_simple")
+     : spl::Skeleton<test::Simple>("my_simple")
     {
         attInt = 4711;
         echo >> std::bind(&SimpleServer::handleEcho, this, _1);
@@ -211,7 +209,7 @@ int server()
 {
    SimpleServer serv;
 
-   spl::Dispatcher disp("org.simppl.simple_server");
+   spl::Dispatcher disp;
    disp.addServer(serv);
 
    return disp.run();

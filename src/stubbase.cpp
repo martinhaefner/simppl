@@ -16,14 +16,13 @@ namespace ipc
 {
 
 
-StubBase::StubBase(const char* iface, const char* role, const char* boundname)
+StubBase::StubBase(const char* iface, const char* role)
  : role_(role)
  , disp_(0)
 {
    assert(iface);
    assert(role);
-   assert(boundname && strlen(boundname) < sizeof(boundname_));
-
+   
    // strip template arguments
    memset(iface_, 0, sizeof(iface_));
    strncpy(iface_, iface, strstr(iface, "<") - iface);
@@ -43,8 +42,6 @@ StubBase::StubBase(const char* iface, const char* role, const char* boundname)
 
    // terminate
    *writep = '\0';
-
-   strcpy(boundname_, boundname);
 }
 
 
@@ -68,6 +65,15 @@ Dispatcher& StubBase::disp()
 }
 
 
+std::string StubBase::boundname() const
+{
+    std::ostringstream bname;
+    bname << iface_ << "." << role_;
+    
+    return bname.str();
+}
+
+
 void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
@@ -78,7 +84,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
    // FIXME do we really need dependency to dispatcher?
    std::ostringstream match_string;
    match_string << "type='signal'";
-   match_string << ",sender='" << boundname_ << "'";
+   match_string << ",sender='" << boundname() << "'";
    match_string << ",interface='" << iface() << "'";
    match_string << ",member='" << sigbase.name() << "'";
 
@@ -94,7 +100,8 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 
 void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data)
 {
-   DBusMessage* msg = dbus_message_new_method_call(destination(), role(), "org.freedesktop.DBus.Properties", "Get");
+    std::cout << "Hier" << std::endl;
+   DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath().c_str(), "org.freedesktop.DBus.Properties", "Get");
    DBusPendingCall* pending = nullptr;
 
    DBusMessageIter args;

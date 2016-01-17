@@ -103,7 +103,7 @@ struct ServerSignal : detail::ServerSignalBase
       if (parent_->conn_)
       {
          SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-         DBusMessage* msg = dbus_message_new_signal(skel->role(), skel->iface(), name_);
+         DBusMessage* msg = dbus_message_new_signal(skel->objectpath().c_str(), skel->iface(), name_);
 
          detail::Serializer s(msg);
          serialize(s, args...);

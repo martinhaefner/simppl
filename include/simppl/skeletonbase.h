@@ -5,6 +5,10 @@
 
 #include <dbus/dbus.h>
 
+#include <sstream>   // FIXME move to impl
+#include <iostream>  // FIXME remove this
+#include <algorithm> // FIXME move to impl
+
 #include "simppl/error.h"
 #include "simppl/serverrequestdescriptor.h"
 
@@ -60,6 +64,24 @@ struct SkeletonBase
    const char* role() const
    {
       return role_;
+   }
+   
+   // FIXME make this function some generic helper. 
+   // FIXME either const char* or string return, must be clean all-over
+   std::string objectpath() const
+   {
+       std::ostringstream opath;
+       opath << "/" << iface() << "." << role();
+       
+       std::string objectpath = opath.str();
+       
+       std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
+       if (c == '.')
+           c = '/';
+       });
+       
+       std::cout << "path: " << objectpath << std::endl;
+       return objectpath;
    }
 
    

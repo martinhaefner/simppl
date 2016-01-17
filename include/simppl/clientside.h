@@ -349,7 +349,7 @@ struct ClientRequest
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
-      DBusMessage* msg = dbus_message_new_method_call(stub->destination(), stub->role(), stub->iface(), method_name_);
+      DBusMessage* msg = dbus_message_new_method_call(stub->boundname().c_str(), stub->objectpath().c_str(), stub->iface(), method_name_);
       DBusPendingCall* pending = nullptr;
 
       detail::Serializer s(msg);
