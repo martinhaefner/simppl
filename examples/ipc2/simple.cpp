@@ -12,19 +12,36 @@ namespace spl = simppl::ipc;
 namespace test
 {
 
+
+struct A
+{
+   typedef spl::make_serializer<int, int>::type serializer_type;
+   
+   int i;
+   int j;
+};
+
+
 INTERFACE(Simple)
 {
    Request<int> echo;
    Response<int> rEcho;
 
+   Request<A, int> echoA;
+   Request<std::vector<int>, int> echoVi;
+   Request<std::vector<A>, int> echoVa;
+   
    Signal<double> sigUsr;
 
    Attribute<int> attInt;
 
    Simple()
     : INIT_REQUEST(echo)
-    , INIT_SIGNAL(sigUsr)
     , INIT_RESPONSE(rEcho)
+    , INIT_REQUEST(echoA)
+    , INIT_REQUEST(echoVi)
+    , INIT_REQUEST(echoVa)
+    , INIT_SIGNAL(sigUsr)
     , INIT_ATTRIBUTE(attInt)
    {
       echo >> rEcho;
@@ -79,9 +96,23 @@ int client()
    psst = &sst;
 
    // FIXME client also possible without bus name?
+   // YES! Busname will be requested for servers only, objectpath will repeat the busname
    spl::Dispatcher disp("org.simppl.simple_client");
    disp.addClient(sst);
 
+   test::A a = { 3, 4 };
+   sst.echoA(a, 77);
+   
+   std::vector<int> vi({ 42, 43 });
+   sst.echoVi(vi, 88);
+   
+   std::vector<test::A> va;
+   va.push_back(a);
+   a.i = 7;
+   a.j = 8;
+   va.push_back(a);
+   sst.echoVa(va, 99);
+   
    sst.rEcho >> echo_callback;
 
    sst.sigUsr.attach() >> sig_callback;
@@ -91,6 +122,9 @@ int client()
 
    return disp.run();
 }
+
+
+// ---------------------------------------------------------------------
 
 
 struct SimpleServer2 : spl::Skeleton<test::Simple2>
@@ -110,6 +144,27 @@ struct SimpleServer2 : spl::Skeleton<test::Simple2>
     }
 };
 
+void handleEchoA(test::A a, int i)
+{
+   std::cout << "Having " << a.i << " " << a.j << " and " << i << std::endl;
+}
+
+
+void handleEchoVi(const std::vector<int>& vi, int i)
+{
+   std::cout << "Having " << vi.size() << ": ";
+   std::for_each(vi.begin(), vi.end(), []( int i){ std::cout << i << ", "; });
+   std::cout << "and " << i << std::endl;
+}
+
+
+void handleEchoVa(const std::vector<test::A>& va, int i)
+{
+   std::cout << "Having " << va.size() << ": ";
+   std::for_each(va.begin(), va.end(), [](const test::A& a){ std::cout << "[" << a.i << "," << a.j << "], "; });
+   std::cout << "and " << i << std::endl;
+}
+
 
 struct SimpleServer : spl::Skeleton<test::Simple>
 {
@@ -118,6 +173,9 @@ struct SimpleServer : spl::Skeleton<test::Simple>
     {
         attInt = 4711;
         echo >> std::bind(&SimpleServer::handleEcho, this, _1);
+        echoA >> handleEchoA;
+        echoVi >> handleEchoVi;
+        echoVa >> handleEchoVa;
     }
 
     void handleEcho(int i)
@@ -148,17 +206,35 @@ int server()
 }
 
 
-int main(int argc, char** argv)
+void dummy()
 {
-   /*
-    DBusMessage* msg;
-    spl::detail::Serializer s(msg);
+   DBusMessage* msg;
+    
     std::tuple<int, double> tup;
+    std::vector<int> vi;
+    test::A a;
+    std::vector<test::A> va;
+    
+    spl::detail::Serializer s(msg);
+    
+    s << a;
     s << tup;
+    s << vi;
+    s << va;
    
     spl::detail::Deserializer ds(msg);
+    ds >> a;
     ds >> tup;
-   */
-    
+    ds >> vi;
+    ds >> va;
+}
+
+
+int main(int argc, char** argv)
+{
+   // never call, will core dump, just a compile test!
+   if (argc > 10)
+      dummy();
+      
     return argc > 1 ? server() : client();
 }
