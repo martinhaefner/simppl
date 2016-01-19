@@ -82,14 +82,14 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
-   
+
    DBusMessage* msg = dbus_message_new_method_return(current_request_.msg_);
-   
+
    detail::Serializer s(msg);
    response.f_(s);
-      
+
    dbus_connection_send(disp_->conn_, msg, nullptr);
-   
+
    dbus_message_unref(msg);
    current_request_.clear();   // only respond once!!!
 }
@@ -99,15 +99,15 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 {
    assert(req);
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
-   
+
    DBusMessage* msg = dbus_message_new_method_return(req.msg_);
-   
+
    detail::Serializer s(msg);
    response.f_(s);
-   
+
    dbus_connection_send(disp_->conn_, msg, nullptr);
-   
-   dbus_message_unref(msg);   
+
+   dbus_message_unref(msg);
    req.clear();
 }
 
@@ -115,16 +115,16 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 void SkeletonBase::respondWith(const RuntimeError& err)
 {
    char buf[512];
-   
+
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
    assert(!err.what() || strlen(err.what()) < sizeof(buf));
-   
+
    sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
-   
+
    DBusMessage* response = dbus_message_new_error(currentRequest().msg_, DBUS_ERROR_FAILED, buf);
    dbus_connection_send(disp_->conn_, response, nullptr);
-   
+
    dbus_message_unref(response);
    current_request_.clear();   // only respond once!!!
 }
@@ -133,16 +133,16 @@ void SkeletonBase::respondWith(const RuntimeError& err)
 void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
 {
    char buf[512];
-   
+
    assert(req);
    assert(req.requestor_->hasResponse());
    assert(!err.what() || strlen(err.what()) < sizeof(buf));
-   
+
    sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
-   
+
    DBusMessage* response = dbus_message_new_error(req.msg_, DBUS_ERROR_FAILED, buf);
    dbus_connection_send(disp_->conn_, response, nullptr);
-   
+
    dbus_message_unref(response);
    req.clear();
 }
@@ -175,10 +175,8 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
-         DBusMessageIter args;
-         dbus_message_iter_init_append(reply, &args);
-
-         dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &buf);
+         detail::Serializer s(reply);
+         s << buf;
 
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
@@ -189,21 +187,13 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    {
       auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
 
-      DBusMessageIter args;
-      dbus_message_iter_init(msg, &args);
+      std::string interface;
+      std::string attribute;
 
-      char* interface = 0;
-      char* attribute = 0;
+      detail::Deserializer ds(msg);
+      ds >> interface >> attribute;
 
-      if (DBUS_TYPE_STRING == dbus_message_iter_get_arg_type(&args))
-      {
-          dbus_message_iter_get_basic(&args, &interface);
-          dbus_message_iter_next(&args);
-      }
-      if (DBUS_TYPE_STRING == dbus_message_iter_get_arg_type(&args))
-          dbus_message_iter_get_basic(&args, &attribute);
-
-      std::cout << "interface=" << interface << ", attribute=" << attribute << std::endl;
+      std::cout << "Get: interface=" << interface << ", attribute=" << attribute << std::endl;
 
       auto iter = attributes.find(attribute);
       if (iter != attributes.end())

@@ -61,22 +61,21 @@ public:
    {
       return role_;
    }
-   
-   // FIXME make this function some generic helper. 
+
+   // FIXME make this function some generic helper.
    // FIXME either const char* or string return, must be clean all-over
    std::string objectpath() const
    {
        std::ostringstream opath;
        opath << "/" << iface() << "." << role();
-       
+
        std::string objectpath = opath.str();
-       
+
        std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
        if (c == '.')
            c = '/';
        });
-       
-       std::cout << objectpath << std::endl;
+
        return objectpath;
    }
 
@@ -85,7 +84,15 @@ public:
    /// FIXME protected?!
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
 
+   void connection_state_changed(ConnectionState state);
+
    DBusConnection* conn();
+
+   inline
+   bool is_connected() const
+   {
+       return conn_state_ == ConnectionState::Connected;
+   }
 
 protected:
 
@@ -98,6 +105,7 @@ protected:
 
    char iface_[128];
    const char* role_;
+   ConnectionState conn_state_;
 
    Dispatcher* disp_;
    std::map<std::string, ClientSignalBase*> signals_;

@@ -27,8 +27,9 @@ namespace detail
 struct ClientResponseHolder
 {
    inline
-   ClientResponseHolder(ClientResponseBase* r, DBusPendingCall* pending)
-    : r_(r)
+   ClientResponseHolder(Dispatcher& disp, ClientResponseBase* r, DBusPendingCall* pending)
+    : dispatcher_(disp)
+    , r_(r)
     , pending_(pending)
    {
       // NOOP
@@ -42,6 +43,7 @@ struct ClientResponseHolder
    explicit
    operator bool();
 
+   Dispatcher& dispatcher_;
    ClientResponseBase* r_;
    DBusPendingCall* pending_;
 };

@@ -2,6 +2,7 @@
 #include "simppl/skeleton.h"
 #include "simppl/interface.h"
 #include "simppl/dispatcher.h"
+#include "simppl/blocking.h"
 
 
 using namespace std::placeholders;
@@ -16,7 +17,7 @@ namespace test
 struct A
 {
    typedef spl::make_serializer<int, int>::type serializer_type;
-   
+
    int i;
    int j;
 };
@@ -31,7 +32,7 @@ INTERFACE(Simple)
    Request<std::vector<int>, int> echoVi;
    Request<std::vector<A>, int> echoVa;
    Request<std::tuple<int, std::string, int>> echoTup;
-   
+
    Signal<double> sigUsr;
 
    Attribute<int> attInt;
@@ -70,6 +71,15 @@ INTERFACE(Simple2)
 }   // namespace
 
 
+// ---------------------------------------------------------------------
+
+
+void handle_connected(spl::ConnectionState s)
+{
+    std::cout << "Connectionstate changed: " << ((int)s==0?"Connected":"Disconnected") << std::endl;
+}
+
+
 void sig_callback(double d)
 {
     std::cout << "Having signal " << d << std::endl;
@@ -97,25 +107,31 @@ int client()
    spl::Stub<test::Simple> sst("my_simple");
    psst = &sst;
 
+   sst.connected >> &handle_connected;
+
    spl::Dispatcher disp;
    disp.addClient(sst);
 
+   int j = 0;
+   sst.echo(55) >> j;
+   std::cout << "j=" << j << std::endl; 
+
    test::A a = { 3, 4 };
    sst.echoA(a, 77);
-   
+
    std::vector<int> vi({ 42, 43 });
    sst.echoVi(vi, 88);
-   
+
    std::vector<test::A> va;
    va.push_back(a);
    a.i = 7;
    a.j = 8;
    va.push_back(a);
    sst.echoVa(va, 99);
-   
+
    std::tuple<int, std::string, int> tup(42, "Hallo Welt", 666);
    sst.echoTup(tup);
-   
+
    sst.rEcho >> echo_callback;
 
    sst.sigUsr.attach() >> sig_callback;
@@ -219,19 +235,19 @@ int server()
 void dummy()
 {
    DBusMessage* msg;
-    
+
     std::tuple<int, double> tup;
     std::vector<int> vi;
     test::A a;
     std::vector<test::A> va;
-    
+
     spl::detail::Serializer s(msg);
-    
+
     s << a;
     s << tup;
     s << vi;
     s << va;
-   
+
     spl::detail::Deserializer ds(msg);
     ds >> a;
     ds >> tup;
@@ -245,6 +261,6 @@ int main(int argc, char** argv)
    // never call, will core dump, just a compile test!
    if (argc > 10)
       dummy();
-      
+
     return argc > 1 ? server() : client();
 }

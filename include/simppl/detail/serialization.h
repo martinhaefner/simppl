@@ -113,7 +113,7 @@ struct SerializerTuple : T1
       T1::read(s);
       s.read(data_);
    }
-   
+
    static
    void write_signature(std::ostream& os)
    {
@@ -139,8 +139,8 @@ struct SerializerTuple<T, NilType>
    {
       s.read(data_);
    }
-   
-   static 
+
+   static
    void write_signature(std::ostream& os)
    {
       make_type_signature<T>::eval(os);
@@ -164,13 +164,13 @@ struct TupleSerializer // : noncopable
    {
       dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_STRUCT, nullptr, &iter_);
    }
-   
+
    inline
    ~TupleSerializer()
    {
       dbus_message_iter_close_container(orig_.iter_, &iter_);
    }
-   
+
    template<typename T>
    void operator()(const T& t);
 
@@ -192,13 +192,13 @@ struct TupleDeserializer // : noncopable
       if (!flattened)
          dbus_message_iter_recurse(orig_.iter_, &iter_);
    }
-   
+
    ~TupleDeserializer()
    {
       if (!flattened_)
          dbus_message_iter_next(orig_.iter_);
    }
-   
+
    template<typename T>
    void operator()(T& t);
 
@@ -360,7 +360,7 @@ void std_tuple_for_each(TupleT& t, FunctorT functor)
 
 template<typename T>
 struct make_type_signature
-{   
+{
    static inline std::ostream& eval(std::ostream& os)
    {
       make_type_signature<T>::helper(os, bool_<isPod<T>::value>());
@@ -369,7 +369,7 @@ struct make_type_signature
 
 
 private:
-   
+
    // pod helper
    static inline void helper(std::ostream& os, tTrueType)
    {
@@ -396,24 +396,24 @@ struct make_type_signature<std::tuple<T...>>
       {
          // NOOP
       }
-      
+
       template<typename U>
       void operator()(const U&)
       {
          make_type_signature<U>::eval(os_);
       }
-      
+
       std::ostream& os_;
    };
-   
-   static inline 
+
+   static inline
    std::ostream& eval(std::ostream& os)
    {
       os << "(";
       std::tuple<T...> t;   // FIXME make this a type based version only, no value based iteration
       std_tuple_for_each(t, helper(os));
       os << ")";
-      
+
       return os;
    }
 };
@@ -422,7 +422,7 @@ struct make_type_signature<std::tuple<T...>>
 template<typename T>
 struct make_type_signature<std::vector<T>>
 {
-   static inline 
+   static inline
    std::ostream& eval(std::ostream& os)
    {
       return make_type_signature<T>::eval(os << "a");
@@ -433,7 +433,7 @@ struct make_type_signature<std::vector<T>>
 template<>
 struct make_type_signature<std::string>
 {
-   static inline 
+   static inline
    std::ostream& eval(std::ostream& os)
    {
       return os << "s";
@@ -456,7 +456,7 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(const T& t)
    {
-      return write(t, bool_<isPod<T>::value>());
+      return write(t, bool_<isPod<T>::value || std::is_pointer<T>::value>());
    }
 
    template<typename T>
@@ -484,6 +484,7 @@ struct Serializer // : noncopyable
 
 
    Serializer& write(const std::string& str);
+   Serializer& write(const char* str);
 
    template<typename T>
    inline
@@ -492,16 +493,16 @@ struct Serializer // : noncopyable
       DBusMessageIter iter;
       std::ostringstream buf;
       make_type_signature<T>::eval(buf);
-      
+
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
-      
+
       Serializer s(&iter);
       std::for_each(v.begin(), v.end(), [&s](const T& t){
          s.write(t);
       });
 
       dbus_message_iter_close_container(iter_, &iter);
-      
+
       return *this;
    }
 
@@ -510,41 +511,41 @@ struct Serializer // : noncopyable
    {
       DBusMessageIter iter;
       char typebuf[64];
-      
+
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, make_type_signature<std::pair<KeyT, ValueT>>::eval(typebuf), &iter);
-      
+
       Serializer s(&iter);
       std::for_each(m.begin(), m.end(), [&s](const std::pair<KeyT, ValueT>& t){
          s.write(t);
       });
 
       dbus_message_iter_close_container(iter_, &iter);
-      
+
       return *this;
       /*
       // 'it' message iterator is created
-> 
+>
 >   dict_signature = '{' + key type + value type + '}'
-> 
+>
 >   // init 'sub' iterator
-> 
->   dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY, 
+>
+>   dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY,
 >               dict_signature, sub)
-> 
+>
 >   for(iterate_over_my_container) {
 >       DBusMessageIter item_iterator;
->       dbus_message_iter_open_container(sub, DBUS_TYPE_DICT_ENTRY, 
+>       dbus_message_iter_open_container(sub, DBUS_TYPE_DICT_ENTRY,
 >               0, item_iterator)
-> 
+>
 >       // appending via main iterator
 >       dbus_message_iter_append_basic(it, key type, key);
-> 
+>
 >       // appending via item_iterator
 >       dbus_message_iter_append_basic(item_iterator, value type, value);
-> 
+>
 >       dbus_message_iter_close_container(sub, item_iterator);
 >    }
-> 
+>
 >    dbus_message_iter_close_container(...)
 */
    }
@@ -560,14 +561,14 @@ struct Serializer // : noncopyable
    template<typename T1, typename T2>
    Serializer& write(const SerializerTuple<T1, T2>& tuple)
    {
-      DBusMessageIter iter;      
+      DBusMessageIter iter;
       dbus_message_iter_open_container(iter_, DBUS_TYPE_STRUCT, nullptr, &iter);
-      
+
       Serializer sub(&iter);
       tuple.write(sub);
-      
+
       dbus_message_iter_close_container(iter_, &iter);
-      
+
       return *this;
    }
 
@@ -580,18 +581,18 @@ private:
    {
       DBusMessageIter item_iterator;
       dbus_message_iter_open_container(iter_, DBUS_TYPE_DICT_ENTRY, 0, &item_iterator);
- 
+
       write(p.first);
-      
+
       Serializer s(&item_iterator);
       s.write(p.second);
-      
+
       dbus_message_iter_close_container(iter_, &item_iterator);
    }
 
    DBusMessageIter private_iter_;
 
-   
+
 public:
 
    DBusMessageIter* iter_;
@@ -627,17 +628,13 @@ MAKE_SERIALIZER(long long)
 
 MAKE_SERIALIZER(double)
 
+MAKE_SERIALIZER(const char*)
+MAKE_SERIALIZER(const std::string&)
+
 
 // forward decl
 template<typename VectorT>
 simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer&, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>&);
-
-
-inline
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::string& str)
-{
-   return s.write(str);
-}
 
 
 template<typename T>
@@ -719,7 +716,7 @@ struct Deserializer // : noncopyable
    {
       dbus_message_iter_get_basic(iter_, &t);
       dbus_message_iter_next(iter_);
-      
+
       return *this;
    }
 
@@ -743,22 +740,22 @@ struct Deserializer // : noncopyable
    Deserializer& read(std::vector<T>& v)
    {
       v.clear();
-      
-      DBusMessageIter iter;           
+
+      DBusMessageIter iter;
       dbus_message_iter_recurse(iter_, &iter);
-      
+
       Deserializer s(&iter);
-      
+
       while(dbus_message_iter_get_arg_type(&iter) != 0)
       {
          T t;
          s.read(t);
          v.push_back(t);
       }
-      
+
       // advance to next element
       dbus_message_iter_next(iter_);
-      
+
       return *this;
    }
 
@@ -790,7 +787,7 @@ struct Deserializer // : noncopyable
       std_tuple_for_each(t, std::ref(tds));
       return *this;
    }
-   
+
    template<typename... T>
    Deserializer& read_flattened(std::tuple<T...>& t)
    {
@@ -804,12 +801,12 @@ struct Deserializer // : noncopyable
    {
       DBusMessageIter iter;
       dbus_message_iter_recurse(iter_, &iter);
-      
+
       Deserializer sub(&iter);
       tuple.read(sub);
 
       dbus_message_iter_next(iter_);
-      
+
       return *this;
    }
 
@@ -822,9 +819,9 @@ private:
    }
 
    DBusMessageIter private_iter_;
-   
+
 public:   // FIXME friend?
-   
+
    DBusMessageIter* iter_;
 };
 
@@ -858,17 +855,13 @@ MAKE_DESERIALIZER(long long)
 
 MAKE_DESERIALIZER(double)
 
+MAKE_DESERIALIZER(char*)
+MAKE_DESERIALIZER(std::string)
+
 
 // forward decl
 template<typename VectorT>
 simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&, simppl::ipc::ClientVectorAttributeUpdate<VectorT>&);
-
-
-inline
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::string& str)
-{
-   return s.read(str);
-}
 
 template<typename T>
 inline
@@ -1000,7 +993,7 @@ struct DeserializeAndCall : simppl::NonInstantiable
    {
       std::tuple<T...> tuple;
       d.read_flattened(tuple);
-      
+
       FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
 

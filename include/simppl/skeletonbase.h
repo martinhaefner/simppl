@@ -17,10 +17,10 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
-   
+
 // forward decl
 struct Dispatcher;
 
@@ -28,75 +28,74 @@ struct Dispatcher;
 struct SkeletonBase
 {
    friend struct Dispatcher;
- 
+
    static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
- 
+
    SkeletonBase(const char* iface, const char* role);
-   
+
    virtual ~SkeletonBase();
-   
+
    Dispatcher& disp();
-   
+
    /// only valid within request handler - must be called in order to respond to the request later in time
    ServerRequestDescriptor deferResponse();
-   
+
    /// only valid to call within request handler
    void respondWith(detail::ServerResponseHolder response);
-   
+
    /// send deferred response as retrieved by calling deferResponse()
    void respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response);
-   
+
    /// send error response - only valid to call within request handler
    void respondWith(const RuntimeError& err);
-   
+
    /// send deferred error response as retrieved by calling deferResponse()
    void respondOn(ServerRequestDescriptor& req, const RuntimeError& err);
-   
+
    const ServerRequestDescriptor& currentRequest() const;
-   
+
    inline
    const char* iface() const
    {
       return iface_;
    }
-   
+
    inline
    const char* role() const
    {
       return role_;
    }
-   
-   // FIXME make this function some generic helper. 
+
+   // FIXME make this function some generic helper.
    // FIXME either const char* or string return, must be clean all-over
    std::string objectpath() const
    {
        std::ostringstream opath;
        opath << "/" << iface() << "." << role();
-       
+
        std::string objectpath = opath.str();
-       
+
        std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
        if (c == '.')
            c = '/';
        });
-       
-       std::cout << "path: " << objectpath << std::endl;
+
        return objectpath;
    }
 
-   
+
 protected:
-   
+
    //virtual bool find(uint32_t funcid, std::map<uint32_t, ServerRequestBase*>::iterator& iter) = 0;
-   
+
    DBusHandlerResult handleRequest(DBusMessage* msg);
-   
+
    /// return a session pointer and destruction function if adequate
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
-   
+
    char iface_[128];
    const char* role_;
-   
+
    Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
 };

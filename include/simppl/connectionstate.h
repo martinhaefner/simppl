@@ -4,7 +4,7 @@
 
 namespace simppl
 {
-   
+
 namespace ipc
 {
 
@@ -13,8 +13,8 @@ enum struct ConnectionState
 {
    Connected,
    Disconnected,
-   NotAvailable,
-   Timeout
+   NotAvailable,    // probably not necessary
+   Timeout          // probably not necessary
 };
 
 

@@ -29,6 +29,14 @@ detail::Serializer& detail::Serializer::write(const std::string& str)
 }
 
 
+detail::Serializer& detail::Serializer::write(const char* str)
+{
+   char* c_str = const_cast<char*>(str);
+   dbus_message_iter_append_basic(iter_, DBUS_TYPE_STRING, &c_str);
+   return *this;
+}
+
+
 // ----------------------------------------------------------------------------
 
 
@@ -69,7 +77,7 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
    char* c_str = 0;
    dbus_message_iter_get_basic(iter_, &c_str);
    dbus_message_iter_next(iter_);
-   
+
    if (c_str)
    {
       str.assign(c_str);

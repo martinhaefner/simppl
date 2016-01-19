@@ -252,13 +252,11 @@ private:
         DBusMessage* msg = dbus_pending_call_steal_reply(pending);
         if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
         {
-            DBusMessageIter args;
-            dbus_message_iter_init(msg, &args);
+            detail::Deserializer ds(msg);
+            DataT t;
+            ds >> t;
 
-            int i;
-            dbus_message_iter_get_basic(&args, &i);
-
-            setAndCall(i);
+            setAndCall(t);
         }
     }
 
@@ -354,7 +352,7 @@ struct ClientRequest
 
       detail::Serializer s(msg);
       serialize(s, t...);
-      
+
       if (handler_)
       {
          dbus_connection_send_with_reply(parent_->conn_, msg, &pending, -1/*FIXME detail::request_specific_timeout.count()*/);
@@ -365,7 +363,7 @@ struct ClientRequest
 
       dbus_message_unref(msg);
 
-      return detail::ClientResponseHolder(handler_, pending);
+      return detail::ClientResponseHolder(stub->disp(), handler_, pending);
    }
 
    inline
@@ -415,7 +413,7 @@ struct ClientResponse : ClientResponseBase
       if (f_)
       {
           DBusMessage* msg = dbus_pending_call_steal_reply(pc);
-          
+
           // FIXME error handling
           if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
@@ -423,7 +421,7 @@ struct ClientResponse : ClientResponseBase
               dbus_error_init(&err);
 
               dbus_set_error_from_message(&err, msg);
-                            
+
               if (!strcmp(err.name, DBUS_ERROR_FAILED))
               {
                   int error;
@@ -437,17 +435,17 @@ struct ClientResponse : ClientResponseBase
                   std::cout << "Having transport error: name=" << err.name << ", message=" << err.message << std::endl;
                   f_(CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), 0);  /* FIXME dummy args */
               }
-              
+
               dbus_error_free(&err);
           }
           else
           {
              CallState cs(dbus_message_get_reply_serial(msg));
-             
+
              detail::Deserializer d(msg);
              detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
           }
-          
+
           dbus_message_unref(msg);
       }
       else
