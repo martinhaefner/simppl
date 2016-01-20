@@ -428,12 +428,14 @@ struct ClientResponse : ClientResponseBase
                   char buf[512];
                   sscanf(err.message, "%d %s", &error, buf);
 
-                  f_(CallState(new RuntimeError(error, buf, dbus_message_get_reply_serial(msg))), 0);  /* FIXME dummy args */
+                  std::tuple<T...> dummies;
+                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, buf, dbus_message_get_reply_serial(msg))), dummies);
               }
               else
               {
                   std::cout << "Having transport error: name=" << err.name << ", message=" << err.message << std::endl;
-                  f_(CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), 0);  /* FIXME dummy args */
+                  std::tuple<T...> dummies;
+                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), dummies);
               }
 
               dbus_error_free(&err);

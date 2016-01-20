@@ -38,10 +38,13 @@ private:
    
 public:
    
-   Stub(const char* role)
+   /**
+    * @param unused For compatibility reason to socket based simppl only. Unused on dbus.
+    */
+   Stub(const char* role, const char* unused = nullptr)
     : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role)
    {
-      // NOOP
+      (void)unused;   // make compiler happy
    }
 };
 

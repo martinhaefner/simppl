@@ -55,7 +55,10 @@ struct Dispatcher
    friend struct StubBase;
    friend struct SkeletonBase;
 
-   Dispatcher();
+   /**
+    * @param busname the busname to use, e.g. "dbus:session" or "dbus:system. 0 is session.
+    */
+   Dispatcher(const char* busname = 0);
 
    template<typename RepT, typename PeriodT>
    inline

@@ -10,4 +10,4 @@ include_directories(/usr/lib/arm-linux-gnueabihf/dbus-1.0/include)
 
 add_subdirectory(src)
 add_subdirectory(examples)
-#add_subdirectory(tests)
+add_subdirectory(tests)

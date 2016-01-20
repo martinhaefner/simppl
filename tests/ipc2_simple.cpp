@@ -12,6 +12,9 @@
 using namespace std::placeholders;
 
 
+namespace test
+{
+   
 INTERFACE(Simple)
 {   
    Request<> hello;
@@ -44,6 +47,10 @@ INTERFACE(Simple)
       echo >> rEcho;
    }
 };
+
+}
+
+using namespace test;
 
 
 namespace {
@@ -244,7 +251,7 @@ struct Server : simppl::ipc::Skeleton<Simple>
 
 TEST(Simple, methods) 
 {
-   simppl::ipc::Dispatcher d("unix:SimpleTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
    
@@ -257,7 +264,7 @@ TEST(Simple, methods)
 
 TEST(Simple, signal) 
 {
-   simppl::ipc::Dispatcher d("unix:SimpleTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    SignalClient c;
    Server s("ss");
    
@@ -272,7 +279,7 @@ TEST(Simple, signal)
 
 TEST(Simple, attribute) 
 {
-   simppl::ipc::Dispatcher d("unix:SimpleTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    AttributeClient c;
    Server s("sa");
    
@@ -285,12 +292,12 @@ TEST(Simple, attribute)
 
 TEST(Simple, blocking) 
 {
-   simppl::ipc::Dispatcher d("unix:SimpleTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    
    Server s("sb");
    d.addServer(s);
    
-   simppl::ipc::Stub<Simple> stub("sb", "unix:SimpleTest");
+   simppl::ipc::Stub<Simple> stub("sb", "dbus:session");
    d.addClient(stub);
    
    stub.connect();
@@ -332,7 +339,7 @@ TEST(Simple, disconnect)
    clientd.addClient(c);
    
    {
-      simppl::ipc::Dispatcher* serverd = new simppl::ipc::Dispatcher("unix:SimpleTest");
+      simppl::ipc::Dispatcher* serverd = new simppl::ipc::Dispatcher("dbus:session");
       Server* s = new Server("s");
       serverd->addServer(*s);
       

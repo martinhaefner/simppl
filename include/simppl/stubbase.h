@@ -93,6 +93,13 @@ public:
    {
        return conn_state_ == ConnectionState::Connected;
    }
+   
+   // FIXME
+   inline
+   bool connect()
+   {
+       return true;
+   }
 
 protected:
 

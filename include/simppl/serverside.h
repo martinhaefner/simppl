@@ -179,7 +179,23 @@ struct ServerResponse : ServerResponseBase
    inline
    detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
+      return __impl(bool_<(sizeof...(t) > 0)>(), t...);
+   }
+   
+   
+private:
+   
+   inline
+   detail::ServerResponseHolder __impl(tTrueType, typename CallTraits<T>::param_type... t)
+   {
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::ipc::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      return detail::ServerResponseHolder(*this, f);
+   }
+   
+   inline
+   detail::ServerResponseHolder __impl(tFalseType, typename CallTraits<T>::param_type... t)
+   {
+      std::function<void(detail::Serializer&)> f;
       return detail::ServerResponseHolder(*this, f);
    }
 

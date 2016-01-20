@@ -983,6 +983,17 @@ struct FunctionCaller<-1, TupleT>
    }
 };
 
+template<>
+struct FunctionCaller<0, std::tuple<>>
+{
+   template<typename FunctorT, typename... T>
+   static inline
+   void eval_cs(FunctorT& f, const CallState& cs, const std::tuple<>& tuple)
+   {
+      f(cs);
+   }
+};
+
 
 template<typename... T>
 struct DeserializeAndCall : simppl::NonInstantiable
