@@ -169,11 +169,15 @@ struct SignalClient : simppl::ipc::Stub<Simple>
    
    void handleConnected(simppl::ipc::ConnectionState s)
    {
+      std::cout << "I" << std::endl;
       EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
       
+      std::cout << "II" << std::endl;
       // like for attributes, attributes must be attached when the client is connected
       sig.attach() >> std::bind(&SignalClient::handleSignal, this, _1);
+      std::cout << "III" << std::endl;
       oneway(100);
+      std::cout << "IV" << std::endl;
    }
    
    
@@ -249,7 +253,7 @@ struct Server : simppl::ipc::Skeleton<Simple>
 }   // anonymous namespace
 
 
-TEST(Simple, methods) 
+/*TEST(Simple, methods) 
 {
    simppl::ipc::Dispatcher d("dbus:session");
    Client c;
@@ -259,7 +263,7 @@ TEST(Simple, methods)
    d.addServer(s);
    
    d.run();
-}
+}*/
 
 
 TEST(Simple, signal) 

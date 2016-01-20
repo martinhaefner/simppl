@@ -173,7 +173,13 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         }
 
         std::cout << "Having signal '" << dbus_message_get_interface(msg) << "/" << dbus_message_get_member(msg) << "'" << std::endl;
-
+/*
+        std::for_each(range.first, range.second, [state](decltype(*range.first)& entry){
+         entry.second->connection_state_changed(state);
+        });
+        */
+        // FIXME need to identify if a client is attached to the signal if there are multiple clients
+        // registered on the same server with different signals...lookup must be fixed here!
         auto iter = stubs_.find(dbus_message_get_interface(msg));
 
         if (iter != stubs_.end())
@@ -224,6 +230,7 @@ void Dispatcher::addClient(StubBase& clnt)
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&clnt)->conn_ = conn_;
 
+   std::cout << "Adding stub: " << clnt.boundname() << std::endl;
    stubs_.insert(std::make_pair(clnt.boundname(), &clnt));
 
    /* if (isRunning())

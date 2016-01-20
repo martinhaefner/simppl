@@ -85,8 +85,11 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 
    DBusMessage* msg = dbus_message_new_method_return(current_request_.msg_);
 
-   detail::Serializer s(msg);
-   response.f_(s);
+   if (response.f_)
+   {
+      detail::Serializer s(msg);
+      response.f_(s);
+   }
 
    dbus_connection_send(disp_->conn_, msg, nullptr);
 
@@ -102,9 +105,12 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 
    DBusMessage* msg = dbus_message_new_method_return(req.msg_);
 
-   detail::Serializer s(msg);
-   response.f_(s);
-
+   if (response.f_)
+   {
+      detail::Serializer s(msg);
+      response.f_(s);
+   }
+   
    dbus_connection_send(disp_->conn_, msg, nullptr);
 
    dbus_message_unref(msg);
@@ -213,7 +219,6 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
       if (iter != methods.end())
       {
           current_request_.set(iter->second, msg);
-
           iter->second->eval(msg);
 
           // current_request_ is only valid if no response handler was called

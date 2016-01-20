@@ -77,10 +77,16 @@ std::string StubBase::boundname() const
 
 void StubBase::connection_state_changed(ConnectionState state)
 {
+   std::cout << "1I" << std::endl;
    conn_state_ = state;
 
+std::cout << "2I" << std::endl;
    if (connected)
+   {
+      std::cout << "3I" << std::endl;
       connected(conn_state_);
+      std::cout << "4I" << std::endl;
+   }
 }
 
 
@@ -136,6 +142,8 @@ DBusHandlerResult StubBase::try_handle_signal(DBusMessage* msg)
        iter->second->eval(msg);
        return DBUS_HANDLER_RESULT_HANDLED;
    }
+   else
+      std::cout << "Signal " << dbus_message_get_member(msg) << " not found" << std::endl;
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }

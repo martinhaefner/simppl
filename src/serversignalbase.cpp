@@ -19,7 +19,6 @@ ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* i
  : hasResponse_(false)
  , name_(name)
 {
-   std::cout << "method register: " << name_ << std::endl;
    dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->methods_[name_] = this;
 }
 
@@ -27,7 +26,6 @@ ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* i
 ServerAttributeBase::ServerAttributeBase(const char* name, detail::BasicInterface* iface)
  : name_(name)
 {
-   std::cout << "attribute register: " << name_ << std::endl;
    dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->attributes_[name_] = this;
 }
 

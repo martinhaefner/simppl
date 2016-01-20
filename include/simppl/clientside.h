@@ -35,7 +35,6 @@ struct ClientResponseBase
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
-std::cout << "Pending notify" << std::endl;
         ClientResponseBase* handler = (ClientResponseBase*)user_data;
         handler->eval(pending);
     }
