@@ -241,7 +241,7 @@ private:
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
-        std::cout << "Pending attribute notify" << std::endl;
+//        std::cout << "Pending attribute notify" << std::endl;
         ClientAttribute* handler = (ClientAttribute*)user_data;
         handler->eval(pending);
     }
@@ -354,13 +354,14 @@ struct ClientRequest
 
       if (handler_)
       {
-         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, -1/*FIXME detail::request_specific_timeout.count()*/);
+         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, detail::request_specific_timeout.count() > 0 ? detail::request_specific_timeout.count() : -1);
          dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, handler_, 0);
       }
       else
          dbus_connection_send(parent_->conn_, msg, nullptr);
 
       dbus_message_unref(msg);
+      detail::request_specific_timeout = std::chrono::milliseconds(0);
 
       return detail::ClientResponseHolder(stub->disp(), handler_, pending);
    }

@@ -13,6 +13,9 @@ using namespace std::literals::chrono_literals;
 using namespace std::placeholders;
 
 
+namespace test
+{
+   
 INTERFACE(Timeout)
 {   
    Request<int> eval;
@@ -29,6 +32,10 @@ INTERFACE(Timeout)
       eval >> rEval;
    }
 };
+
+}   // namespace
+
+using namespace test;
 
 
 namespace {
@@ -198,7 +205,7 @@ struct Server : simppl::ipc::Skeleton<Timeout>
 
 void runServer()
 {
-   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    gbl_disp = &d;
    
    Server s;
@@ -360,7 +367,7 @@ TEST(Timeout, blocking_api)
 
 TEST(Timeout, interface_attach_invalid_server)
 {
-   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    NeverConnectedClient c(simppl::ipc::ConnectionState::NotAvailable);
    
    d.addClient(c);
@@ -371,7 +378,7 @@ TEST(Timeout, interface_attach_invalid_server)
 TEST(Timeout, interface_attach)
 {
    // server dispatcher not running ant therefore never returning response frame
-   simppl::ipc::Dispatcher d("unix:TimeoutTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    simppl::ipc::Dispatcher d_client;
    NeverConnectedClient c;
    

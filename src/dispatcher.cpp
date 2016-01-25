@@ -74,18 +74,18 @@ DBusObjectPathVTable stub_v_table = { nullptr, &SkeletonBase::method_handler, nu
 Dispatcher::Dispatcher(const char* busname)
  : running_(false)
  , conn_(nullptr)
- , request_timeout_(std::chrono::milliseconds::max())    // TODO move this to a config header, also other timeout defaults
+ , request_timeout_(0)
 {
    DBusError err;
    dbus_error_init(&err);
 
    if (!busname || !strcmp(busname, "dbus:session"))
    {
-      conn_ = dbus_bus_get(DBUS_BUS_SESSION, &err);
+      conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
    else
       conn_ = dbus_bus_get(DBUS_BUS_SYSTEM, &err);
-   
+
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
 
@@ -137,6 +137,66 @@ void Dispatcher::notify_clients(const std::string& boundname, ConnectionState st
 }
 
 
+void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
+{
+   DBusError err;
+   dbus_error_init(&err);
+
+   std::string signalname(stub.boundname() + "." + sigbase.name());
+
+   auto iter = signal_matches_.find(signalname);
+
+   if (iter == signal_matches_.end())
+   {
+       // FIXME do we really need dependency to dispatcher?
+       std::ostringstream match_string;
+       match_string << "type='signal'";
+       match_string << ",sender='" << stub.boundname() << "'";
+       match_string << ",interface='" << stub.iface() << "'";
+       match_string << ",member='" << sigbase.name() << "'";
+
+       dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
+       assert(!dbus_error_is_set(&err));
+
+       dbus_error_free(&err);
+
+       signal_matches_[signalname] = 1;
+   }
+   else
+       ++iter->second;
+}
+
+
+void Dispatcher::unregisterSignal(StubBase& stub, ClientSignalBase& sigbase)
+{
+    std::string signalname(stub.boundname() + "." + sigbase.name());
+
+    auto iter = signal_matches_.find(signalname);
+
+    if (iter != signal_matches_.end())
+    {
+        if (--iter->second == 0)
+        {
+            DBusError err;
+            dbus_error_init(&err);
+
+            std::ostringstream match_string;
+            match_string << "type='signal'";
+            match_string << ", sender='" << stub.role() << "'";
+            match_string << ", interface='" << stub.iface() << "'";
+            match_string << ", member='" << sigbase.name() << "'";
+
+            dbus_bus_remove_match(conn_, match_string.str().c_str(), &err);
+            assert(!dbus_error_is_set(&err));
+
+            dbus_error_free(&err);
+
+            signal_matches_.erase(iter);
+        }
+    }
+}
+
+
 DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
@@ -155,14 +215,14 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            {
                if (old_name.empty())
                {
-                   std::cout << "Add service : " << bus_name << std::endl;
+//                   std::cout << "Add service : " << bus_name << std::endl;
                    busnames_.insert(bus_name);
 
                    notify_clients(bus_name, ConnectionState::Connected);
                }
                else if (new_name.empty())
                {
-                   std::cout << "Drop service: " << bus_name << std::endl;
+//                   std::cout << "Drop service: " << bus_name << std::endl;
                    busnames_.erase(bus_name);
 
                    notify_clients(bus_name, ConnectionState::Disconnected);
@@ -172,18 +232,23 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            return DBUS_HANDLER_RESULT_HANDLED;
         }
 
-        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "/" << dbus_message_get_member(msg) << "'" << std::endl;
-/*
-        std::for_each(range.first, range.second, [state](decltype(*range.first)& entry){
-         entry.second->connection_state_changed(state);
-        });
-        */
-        // FIXME need to identify if a client is attached to the signal if there are multiple clients
-        // registered on the same server with different signals...lookup must be fixed here!
-        auto iter = stubs_.find(dbus_message_get_interface(msg));
+//        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "/" << dbus_message_get_member(msg)
+//            << "' from '" << dbus_message_get_sender(msg) <<  "." << std::endl;
 
-        if (iter != stubs_.end())
-            return iter->second->try_handle_signal(msg);
+        std::string rolename(dbus_message_get_path(msg));
+        rolename = rolename.substr(rolename.rfind('/')+1);
+
+        std::string originator(dbus_message_get_interface(msg));
+        originator += ".";
+        originator += rolename;
+
+        auto range = stubs_.equal_range(originator);
+
+        std::for_each(range.first, range.second, [msg](decltype(*range.first)& entry){
+            entry.second->try_handle_signal(msg);
+        });
+
+        return DBUS_HANDLER_RESULT_HANDLED;
     }
     else if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
     {
@@ -230,7 +295,7 @@ void Dispatcher::addClient(StubBase& clnt)
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&clnt)->conn_ = conn_;
 
-   std::cout << "Adding stub: " << clnt.boundname() << std::endl;
+//   std::cout << "Adding stub: " << clnt.boundname() << std::endl;
    stubs_.insert(std::make_pair(clnt.boundname(), &clnt));
 
    /* if (isRunning())

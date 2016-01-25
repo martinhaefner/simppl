@@ -77,42 +77,29 @@ std::string StubBase::boundname() const
 
 void StubBase::connection_state_changed(ConnectionState state)
 {
-   std::cout << "1I" << std::endl;
    conn_state_ = state;
 
-std::cout << "2I" << std::endl;
    if (connected)
-   {
-      std::cout << "3I" << std::endl;
       connected(conn_state_);
-      std::cout << "4I" << std::endl;
-   }
 }
 
 
 void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
-
-   DBusError err;
-   dbus_error_init(&err);
-
-   // FIXME do we really need dependency to dispatcher?
-   std::ostringstream match_string;
-   match_string << "type='signal'";
-   match_string << ",sender='" << boundname() << "'";
-   match_string << ",interface='" << iface() << "'";
-   match_string << ",member='" << sigbase.name() << "'";
-
-   dbus_bus_add_match(disp_->conn_, match_string.str().c_str(), &err);
-   //assert(!dbus_error_is_set(&err));
-   if (dbus_error_is_set(&err))
-       std::cerr << err.name << " " << err.message << std::endl;
+   disp_->registerSignal(*this, sigbase);
 
    // FIXME handle double attach
    signals_[sigbase.name()] = &sigbase;
+}
 
-   dbus_error_free(&err);
+
+void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
+{
+   assert(disp_);
+   disp_->unregisterSignal(*this, sigbase);
+
+   signals_.erase(sigbase.name());
 }
 
 
@@ -132,7 +119,7 @@ void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, v
 }
 
 
-DBusHandlerResult StubBase::try_handle_signal(DBusMessage* msg)
+void StubBase::try_handle_signal(DBusMessage* msg)
 {
    const char *method = dbus_message_get_member(msg);
 
@@ -140,33 +127,9 @@ DBusHandlerResult StubBase::try_handle_signal(DBusMessage* msg)
    if (iter != signals_.end())
    {
        iter->second->eval(msg);
-       return DBUS_HANDLER_RESULT_HANDLED;
    }
    else
       std::cout << "Signal " << dbus_message_get_member(msg) << " not found" << std::endl;
-
-   return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-}
-
-
-void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
-{
-   assert(disp_);
-
-   DBusError err;
-   dbus_error_init(&err);
-
-   std::ostringstream match_string;
-   match_string << "type='signal'";
-   match_string << ", sender='" << role() << "'";
-   match_string << ", interface='" << iface() << "'";
-   match_string << ", member='" << sigbase.name() << "'";
-
-   dbus_bus_remove_match(disp_->conn_, match_string.str().c_str(), &err);
-   assert(!dbus_error_is_set(&err));
-
-   dbus_error_free(&err);
-   // FIXME remove signalbase handler again
 }
 
 

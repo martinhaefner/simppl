@@ -82,7 +82,7 @@ public:
    Dispatcher& disp();
 
    /// FIXME protected?!
-   DBusHandlerResult try_handle_signal(DBusMessage* msg);
+   void try_handle_signal(DBusMessage* msg);
 
    void connection_state_changed(ConnectionState state);
 
@@ -93,7 +93,7 @@ public:
    {
        return conn_state_ == ConnectionState::Connected;
    }
-   
+
    // FIXME
    inline
    bool connect()

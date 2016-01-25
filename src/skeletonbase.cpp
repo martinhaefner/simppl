@@ -110,7 +110,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
       detail::Serializer s(msg);
       response.f_(s);
    }
-   
+
    dbus_connection_send(disp_->conn_, msg, nullptr);
 
    dbus_message_unref(msg);
@@ -199,7 +199,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
       detail::Deserializer ds(msg);
       ds >> interface >> attribute;
 
-      std::cout << "Get: interface=" << interface << ", attribute=" << attribute << std::endl;
+//      std::cout << "Get: interface=" << interface << ", attribute=" << attribute << std::endl;
 
       auto iter = attributes.find(attribute);
       if (iter != attributes.end())

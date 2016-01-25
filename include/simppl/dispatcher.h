@@ -90,15 +90,18 @@ struct Dispatcher
    void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t);
 
    int run();
-   
-   /// same as run() 
+
+   /// same as run()
    void loop();
-   
+
    void stop();
 
    bool isRunning() const;
 
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
+
+   void registerSignal(StubBase& stub, ClientSignalBase& sigbase);
+   void unregisterSignal(StubBase& stub, ClientSignalBase& sigbase);
 
 private:
 
@@ -111,6 +114,8 @@ private:
    std::chrono::milliseconds request_timeout_;
 
    std::multimap<std::string, StubBase*> stubs_;
+
+   std::map<std::string, int> signal_matches_;
 
    /// service registration's list
    std::set<std::string> busnames_;
