@@ -11,6 +11,8 @@
 using namespace std::placeholders;
 
 
+namespace test {
+   
 INTERFACE(AsyncServer)
 {   
    Request<int> oneway;
@@ -34,6 +36,10 @@ INTERFACE(AsyncServer)
       echo >> rEcho;
    }
 };
+
+}   // namespace
+
+using namespace test;
 
 
 namespace {
@@ -149,7 +155,7 @@ struct Server : simppl::ipc::Skeleton<AsyncServer>
 /// one response can overtake another
 TEST(AServer, trivial) 
 {
-   simppl::ipc::Dispatcher d("unix:AServerTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
    
@@ -166,7 +172,7 @@ TEST(AServer, trivial)
 /// with a transport error
 TEST(AServer, outstanding)
 {
-   std::unique_ptr<simppl::ipc::Dispatcher> sd(new simppl::ipc::Dispatcher("unix:AServerTest"));
+   std::unique_ptr<simppl::ipc::Dispatcher> sd(new simppl::ipc::Dispatcher("dbus:session"));
    simppl::ipc::Dispatcher cd;
    
    ShutdownClient c;
