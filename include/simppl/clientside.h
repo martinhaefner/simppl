@@ -354,7 +354,11 @@ struct ClientRequest
 
       if (handler_)
       {
-         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, detail::request_specific_timeout.count() > 0 ? detail::request_specific_timeout.count() : -1);
+          // FIXME timeout
+          std::cout << "Timeout: " << detail::request_specific_timeout.count() << std::endl;
+         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, 
+            detail::request_specific_timeout.count() > 0 ? detail::request_specific_timeout.count() : -1/*stub->disp().request_timeout()*/);
+         
          dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, handler_, 0);
       }
       else
@@ -417,6 +421,7 @@ struct ClientResponse : ClientResponseBase
           // FIXME error handling
           if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
+              std::cout << "is error" << std::endl;
               DBusError err;
               dbus_error_init(&err);
 
@@ -442,6 +447,7 @@ struct ClientResponse : ClientResponseBase
           }
           else
           {
+              std::cout << "is response" << std::endl;
              CallState cs(dbus_message_get_reply_serial(msg));
 
              detail::Deserializer d(msg);

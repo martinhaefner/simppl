@@ -74,11 +74,16 @@ DBusObjectPathVTable stub_v_table = { nullptr, &SkeletonBase::method_handler, nu
 Dispatcher::Dispatcher(const char* busname)
  : running_(false)
  , conn_(nullptr)
- , request_timeout_(0)
+ , request_timeout_(DBUS_TIMEOUT_USE_DEFAULT)
 {
+   // FIXME make this part of the dispatcher interface...
+   dbus_threads_init_default();
+    
    DBusError err;
    dbus_error_init(&err);
 
+   assert(!busname || !strncmp(busname, "dbus:", 5));
+   
    if (!busname || !strcmp(busname, "dbus:session"))
    {
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
@@ -118,6 +123,15 @@ Dispatcher::Dispatcher(const char* busname)
    dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
+   
+   dbus_error_init(&err);
+   std::ostringstream match_string;
+   match_string 
+       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
+
+   dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
+   assert(!dbus_error_is_set(&err));
+   dbus_error_free(&err);
 }
 
 
@@ -131,7 +145,7 @@ void Dispatcher::notify_clients(const std::string& boundname, ConnectionState st
 {
    auto range = stubs_.equal_range(boundname);
 
-   std::for_each(range.first, range.second, [state](decltype(*range.first)& entry){
+   std::for_each(range.first, range.second, [state](auto& entry){
       entry.second->connection_state_changed(state);
    });
 }
@@ -201,9 +215,23 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
     {
-        // bus name, not interface
-        if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
+        if (!strcmp(dbus_message_get_member(msg), "notify_client"))
         {
+           // FIXME rename boundname to busname or whatever...
+           std::string boundname;
+           
+           detail::Deserializer ds(msg);
+           ds >> boundname;
+         
+           std::cout << "Check for clients with '" << boundname << "'" << std::endl;
+             
+           if (busnames_.find(boundname) != busnames_.end())
+            notify_clients(boundname, ConnectionState::Connected);
+        }
+        else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
+        {
+           // bus name, not interface
+           
            std::string bus_name;
            std::string old_name;
            std::string new_name;
@@ -244,7 +272,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         auto range = stubs_.equal_range(originator);
 
-        std::for_each(range.first, range.second, [msg](decltype(*range.first)& entry){
+        std::for_each(range.first, range.second, [msg](auto& entry){
             entry.second->try_handle_signal(msg);
         });
 
@@ -298,9 +326,25 @@ void Dispatcher::addClient(StubBase& clnt)
 //   std::cout << "Adding stub: " << clnt.boundname() << std::endl;
    stubs_.insert(std::make_pair(clnt.boundname(), &clnt));
 
-   /* if (isRunning())
-         connect(clnt);
-   }*/
+std::cout << "Add client '" << clnt.boundname() << "'" << std::endl;
+
+   // send connected request from event loop
+   auto iter = busnames_.find(clnt.boundname());
+   if (iter != busnames_.end())
+   {
+      std::cout << "Sending notify message for '" << clnt.boundname() << "'" << std::endl;
+
+      std::ostringstream objpath;
+      objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
+      
+      DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
+
+      detail::Serializer s(msg);
+      serialize(s, clnt.boundname());
+
+      dbus_connection_send(conn_, msg, nullptr);
+      dbus_message_unref(msg);
+   }
 }
 
 

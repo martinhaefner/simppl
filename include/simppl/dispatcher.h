@@ -12,7 +12,7 @@
 #include "simppl/detail/serverholder.h"
 #include "simppl/detail/constants.h"
 
-// FIXME can this be removed?
+// FIXME can this be remroved?
 #include "simppl/clientside.h"
 
 #ifdef NDEBUG
@@ -64,7 +64,7 @@ struct Dispatcher
    inline
    void setRequestTimeout(std::chrono::duration<RepT, PeriodT> duration)
    {
-      request_timeout_ = duration;
+      request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
 
    ~Dispatcher();
@@ -102,6 +102,11 @@ struct Dispatcher
 
    void registerSignal(StubBase& stub, ClientSignalBase& sigbase);
    void unregisterSignal(StubBase& stub, ClientSignalBase& sigbase);
+   
+   int request_timeout() const
+   {
+      return request_timeout_;
+   }
 
 private:
 
@@ -111,7 +116,7 @@ private:
 
    DBusConnection* conn_;
 
-   std::chrono::milliseconds request_timeout_;
+   int request_timeout_;    ///< default request timeout in milliseconds
 
    std::multimap<std::string, StubBase*> stubs_;
 
@@ -178,21 +183,10 @@ void Dispatcher::addServer(ServerT& serv)
          c = '/';
    });
 
-   // FIXME register same path as busname, just with / instead of .
+   // register same path as busname, just with / instead of .
    dbus_connection_register_object_path(conn_, objectpath.c_str(), &stub_v_table, &serv);
 
-   /*FIXME
-   std::string name = serv.fqn();
-
-   assert(std::find_if(servers_by_id_.begin(), servers_by_id_.end(), [&name](decltype(*servers_by_id_.begin())& iter){
-      return name == iter.second->fqn();
-      }) == servers_by_id_.end());
-
-   registerAtBroker(name, endpoints_.front());
-
-   detail::ServerHolder<ServerT>* holder = new detail::ServerHolder<ServerT>(serv);
-   servers_by_id_[generateId()] = holder;
-   */
+std::cout << "Added server '" << busname.str() << "'" << std::endl;
    serv.disp_ = this;
 }
 

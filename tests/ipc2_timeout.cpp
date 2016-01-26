@@ -181,12 +181,15 @@ struct Server : simppl::ipc::Skeleton<Timeout>
    
    void handleEval(int i)
    {
+      std::cout << "handleeval" << std::endl;
       // generate timeout on client side
       std::this_thread::sleep_for(1s);
    
       if (i == 42)
       {
-         respondWith(rEval(3.1415));
+         std::cout << "response" << std::endl;
+         //respondWith(rEval(3.1415));
+         deferResponse();
       }
       else
          (void)deferResponse();
