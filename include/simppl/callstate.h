@@ -3,6 +3,7 @@
 
 
 #include <memory>
+#include <cassert>
 
 #include "simppl/error.h"
 
@@ -32,6 +33,20 @@ struct CallState
       // NOOP
    }
    
+   CallState(CallState&& st)
+    : ex_(st.ex_.release())
+    , sequence_nr_(st.sequence_nr_)
+   {
+      // NOOP
+   }
+
+   // FIXME why is this necessary, we are not copyable by design?!
+   CallState(const CallState& st)
+    : ex_()
+    , sequence_nr_(st.sequence_nr_)
+   {
+      ex_.reset(const_cast<CallState&>(st).ex_.release());
+   }
    
    explicit inline
    operator bool() const
@@ -74,6 +89,7 @@ struct CallState
    inline
    void throw_exception() const
    {
+      assert(ex_);
       ex_->_throw();
    }
    

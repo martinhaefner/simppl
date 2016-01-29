@@ -927,6 +927,12 @@ Serializer& serialize(Serializer& s, T1 t1, T... t)
    return serialize(s, t...);
 }
 
+template<typename... T>
+inline
+void serializeN(Serializer& s, T... t)
+{
+   serialize(s, t...);
+}
 
 // -----------------------------------------------------------------------
 

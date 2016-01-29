@@ -328,15 +328,28 @@ private:
 // --------------------------------------------------------------------------------
 
 
+struct ClientRequestBase
+{
+   ClientRequestBase(const char* method_name)
+    : method_name_(method_name)
+    , handler_(0)
+   {
+       // NOOP
+   }
+
+   ClientResponseBase* handler_;
+   const char* method_name_;
+};
+
+
 template<typename... T>
-struct ClientRequest
+struct ClientRequest : ClientRequestBase
 {
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
 
    inline
    ClientRequest(const char* method_name, detail::BasicInterface* parent)
-    : method_name_(method_name)
-    , handler_(0)
+    : ClientRequestBase(method_name)
     , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
    {
       // NOOP
@@ -346,28 +359,9 @@ struct ClientRequest
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
-      DBusMessage* msg = dbus_message_new_method_call(stub->boundname().c_str(), stub->objectpath().c_str(), stub->iface(), method_name_);
-      DBusPendingCall* pending = nullptr;
 
-      detail::Serializer s(msg);
-      serialize(s, t...);
-
-      if (handler_)
-      {
-          // FIXME timeout
-          std::cout << "Timeout: " << detail::request_specific_timeout.count() << std::endl;
-         dbus_connection_send_with_reply(parent_->conn_, msg, &pending, 
-            detail::request_specific_timeout.count() > 0 ? detail::request_specific_timeout.count() : -1/*stub->disp().request_timeout()*/);
-         
-         dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, handler_, 0);
-      }
-      else
-         dbus_connection_send(parent_->conn_, msg, nullptr);
-
-      dbus_message_unref(msg);
-      detail::request_specific_timeout = std::chrono::milliseconds(0);
-
-      return detail::ClientResponseHolder(stub->disp(), handler_, pending);
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::ipc::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      return detail::ClientResponseHolder(stub->disp(), handler_, stub->sendRequest(*this, f));
    }
 
    inline
@@ -383,8 +377,6 @@ struct ClientRequest
 
    // FIXME do we really need connection in BasicInterface?
    // FIXME do we need BasicInterface at all?
-   ClientResponseBase* handler_;
-   const char* method_name_;
    detail::BasicInterface* parent_;
 };
 
@@ -421,10 +413,10 @@ struct ClientResponse : ClientResponseBase
           // FIXME error handling
           if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
-              std::cout << "is error" << std::endl;
               DBusError err;
               dbus_error_init(&err);
 
+              // FIXME read message in other way, see introspection
               dbus_set_error_from_message(&err, msg);
 
               if (!strcmp(err.name, DBUS_ERROR_FAILED))
@@ -438,7 +430,6 @@ struct ClientResponse : ClientResponseBase
               }
               else
               {
-                  std::cout << "Having transport error: name=" << err.name << ", message=" << err.message << std::endl;
                   std::tuple<T...> dummies;
                   detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), dummies);
               }
@@ -447,7 +438,6 @@ struct ClientResponse : ClientResponseBase
           }
           else
           {
-              std::cout << "is response" << std::endl;
              CallState cs(dbus_message_get_reply_serial(msg));
 
              detail::Deserializer d(msg);

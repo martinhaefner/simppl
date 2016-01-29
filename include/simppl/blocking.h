@@ -108,8 +108,10 @@ void BlockingResponseHandler<T>::operator()(const simppl::ipc::CallState& state,
    disp_.stop();
    r_.handledBy(std::nullptr_t());
    
+   // do not allow to propagate the exception through the dbus C library, otherwise we could have severe 
+   // trouble if libdbus is not compiled with exception support.
    if (!state)
-      state.throw_exception();
+      disp_.propagate(state);
    
    t_ = t;
 }
@@ -133,7 +135,7 @@ void BlockingResponseHandlerN<T...>::operator()(const simppl::ipc::CallState& st
    r_.handledBy(std::nullptr_t());
    
    if (!state)
-      state.throw_exception();
+      disp_.propagate(state);
    
    t_ = std::make_tuple(t...);
 }

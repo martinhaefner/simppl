@@ -12,6 +12,9 @@
 using namespace std::placeholders;
 
 
+namespace test
+{
+   
 INTERFACE(Errors)
 {   
    Request<> hello;
@@ -31,6 +34,10 @@ INTERFACE(Errors)
       hello1 >> world1;
    }
 };
+
+}
+
+using namespace test;
 
 
 namespace {
@@ -60,6 +67,7 @@ struct Client : simppl::ipc::Stub<Errors>
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
       EXPECT_TRUE(state.isRuntimeError());
+      std::cout << "XXX" << state.what() << std::endl;
       EXPECT_EQ(0, strcmp(state.what(), "Shit happens"));
       
       hello1(42);
@@ -104,7 +112,7 @@ struct Server : simppl::ipc::Skeleton<Errors>
 
 TEST(Errors, methods) 
 {
-   simppl::ipc::Dispatcher d("unix:ErrorsTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
    
@@ -117,7 +125,7 @@ TEST(Errors, methods)
 
 TEST(Errors, blocking) 
 {
-   simppl::ipc::Dispatcher d("unix:ErrorsTest");
+   simppl::ipc::Dispatcher d("dbus:session");
    
    Server s("s");
    d.addServer(s);

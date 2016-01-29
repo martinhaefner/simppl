@@ -120,15 +120,10 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 
 void SkeletonBase::respondWith(const RuntimeError& err)
 {
-   char buf[512];
-
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
-   assert(!err.what() || strlen(err.what()) < sizeof(buf));
 
-   sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
-
-   DBusMessage* response = dbus_message_new_error(currentRequest().msg_, DBUS_ERROR_FAILED, buf);
+   DBusMessage* response = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
    dbus_connection_send(disp_->conn_, response, nullptr);
 
    dbus_message_unref(response);
@@ -138,15 +133,10 @@ void SkeletonBase::respondWith(const RuntimeError& err)
 
 void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
 {
-   char buf[512];
-
    assert(req);
    assert(req.requestor_->hasResponse());
-   assert(!err.what() || strlen(err.what()) < sizeof(buf));
 
-   sprintf(buf, "%d %s", err.error(), err.what()?err.what():"");
-
-   DBusMessage* response = dbus_message_new_error(req.msg_, DBUS_ERROR_FAILED, buf);
+   DBusMessage* response = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
    dbus_connection_send(disp_->conn_, response, nullptr);
 
    dbus_message_unref(response);

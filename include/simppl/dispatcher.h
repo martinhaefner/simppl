@@ -8,6 +8,7 @@
 #include <memory>
 #include <chrono>
 #include <atomic>
+#include <queue>
 
 #include "simppl/detail/serverholder.h"
 #include "simppl/detail/constants.h"
@@ -55,6 +56,9 @@ struct Dispatcher
    friend struct StubBase;
    friend struct SkeletonBase;
 
+   Dispatcher(const Dispatcher&) = delete;
+   Dispatcher& operator=(const Dispatcher&) = delete;
+
    /**
     * @param busname the busname to use, e.g. "dbus:session" or "dbus:system. 0 is session.
     */
@@ -91,6 +95,16 @@ struct Dispatcher
 
    int run();
 
+   /**
+    * Do some IO and dispatch the retrieved messages.
+    */
+   template<typename RepT, typename PeriodT>
+   inline
+   int step(std::chrono::duration<RepT, PeriodT> duration)
+   {
+       return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+   }
+
    /// same as run()
    void loop();
 
@@ -102,13 +116,18 @@ struct Dispatcher
 
    void registerSignal(StubBase& stub, ClientSignalBase& sigbase);
    void unregisterSignal(StubBase& stub, ClientSignalBase& sigbase);
-   
+
    int request_timeout() const
    {
       return request_timeout_;
    }
+   
+   /// propagate exception
+   void propagate(const CallState& state);
 
 private:
+
+   int step_ms(int millis);
 
    void notify_clients(const std::string& boundname, ConnectionState state);
 
@@ -124,6 +143,11 @@ private:
 
    /// service registration's list
    std::set<std::string> busnames_;
+
+   std::queue<CallState> exceptions_;
+
+   struct Private;
+   Private* d;
 };
 
 
@@ -186,7 +210,7 @@ void Dispatcher::addServer(ServerT& serv)
    // register same path as busname, just with / instead of .
    dbus_connection_register_object_path(conn_, objectpath.c_str(), &stub_v_table, &serv);
 
-std::cout << "Added server '" << busname.str() << "'" << std::endl;
+//std::cout << this << ": added server '" << busname.str() << "'" << std::endl;
    serv.disp_ = this;
 }
 

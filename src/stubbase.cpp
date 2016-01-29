@@ -4,9 +4,15 @@
 
 #include "simppl/detail/frames.h"
 #include "simppl/detail/util.h"
+#include "simppl/clientside.h"
 
 #include <cstring>
+#include <thread>
+#include <chrono>
 #include <sstream>
+
+
+using namespace std::literals::chrono_literals;
 
 
 namespace simppl
@@ -53,6 +59,35 @@ StubBase::~StubBase()
 }
 
 
+// FIXME void return value
+bool StubBase::connect()
+{
+    std::chrono::milliseconds sum = 0ms;
+    auto finish = std::chrono::steady_clock::now();
+
+    if (disp().request_timeout() > 0)
+    {
+        finish += std::chrono::milliseconds(disp().request_timeout());
+    }
+    else
+        finish = std::chrono::steady_clock::time_point::max();
+
+    while(!is_connected() && std::chrono::steady_clock::now() <= finish)
+    {
+        if (std::chrono::steady_clock::now() < finish)
+        {
+            disp().step(50ms);
+            sum += 50ms;
+        }
+    }
+
+    if (!is_connected())
+       throw TransportError(ETIMEDOUT, -1 /* FIXME what's that sequence nr for */);
+       
+   return is_connected();
+}
+
+
 DBusConnection* StubBase::conn()
 {
     return disp().conn_;
@@ -63,6 +98,34 @@ Dispatcher& StubBase::disp()
 {
    assert(disp_);
    return *disp_;
+}
+
+
+DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f)
+{
+    DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath().c_str(), iface(), req.method_name_);
+    DBusPendingCall* pending = nullptr;
+
+    detail::Serializer s(msg);
+    f(s);
+
+    if (req.handler_)
+    {
+        int timeout = disp().request_timeout();
+
+        if (detail::request_specific_timeout.count() > 0)
+            timeout = detail::request_specific_timeout.count();
+
+        dbus_connection_send_with_reply(disp().conn_, msg, &pending, timeout);
+        dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, req.handler_, 0);
+    }
+    else
+       dbus_connection_send(disp().conn_, msg, nullptr);
+
+    dbus_message_unref(msg);
+    detail::request_specific_timeout = std::chrono::milliseconds(0);
+
+    return pending;
 }
 
 
@@ -78,7 +141,7 @@ std::string StubBase::boundname() const
 void StubBase::connection_state_changed(ConnectionState state)
 {
    std::cout << "connection state change: " << (int)conn_state_ << " -> " << (int)state << std::endl;
-   
+
    if (conn_state_ != state)
    {
       conn_state_ = state;

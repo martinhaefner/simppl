@@ -25,6 +25,7 @@ namespace ipc
 // forward decls
 struct Dispatcher;
 struct ClientResponseBase;
+struct ClientRequestBase;
 struct ClientSignalBase;
 
 namespace detail
@@ -94,14 +95,12 @@ public:
        return conn_state_ == ConnectionState::Connected;
    }
 
-   // FIXME
-   inline
-   bool connect()
-   {
-       return true;
-   }
+   bool connect();
+
 
 protected:
+
+   DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 
    std::string boundname() const;
 
