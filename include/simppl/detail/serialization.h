@@ -441,6 +441,31 @@ struct make_type_signature<std::string>
 };
 
 
+template<typename KeyT, typename ValueT>
+struct make_type_signature<std::pair<KeyT, ValueT>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      os << "{";
+      make_type_signature<KeyT>::eval(os);
+      make_type_signature<ValueT>::eval(os);
+      return os << "}";
+   }
+};
+
+
+template<typename KeyT, typename ValueT>
+struct make_type_signature<std::map<KeyT, ValueT>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return make_type_signature<std::pair<typename std::decay<KeyT>::type, ValueT>>::eval(os << "a");
+   }
+};
+
+
 // ---------------------------------------------------------------------
 
 
@@ -497,9 +522,10 @@ struct Serializer // : noncopyable
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-      std::for_each(v.begin(), v.end(), [&s](const T& t){
+      for (auto& t : v)
+      {
          s.write(t);
-      });
+      }
 
       dbus_message_iter_close_container(iter_, &iter);
 
@@ -510,44 +536,20 @@ struct Serializer // : noncopyable
    Serializer& write(const std::map<KeyT, ValueT>& m)
    {
       DBusMessageIter iter;
-      char typebuf[64];
+      std::ostringstream buf;
+      make_type_signature<std::pair<KeyT, ValueT>>::eval(buf);
 
-      dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, make_type_signature<std::pair<KeyT, ValueT>>::eval(typebuf), &iter);
+      dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-      std::for_each(m.begin(), m.end(), [&s](const std::pair<KeyT, ValueT>& t){
-         s.write(t);
-      });
+      for (auto& e : m)
+      {
+         s.write(e);
+      }
 
       dbus_message_iter_close_container(iter_, &iter);
 
       return *this;
-      /*
-      // 'it' message iterator is created
->
->   dict_signature = '{' + key type + value type + '}'
->
->   // init 'sub' iterator
->
->   dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY,
->               dict_signature, sub)
->
->   for(iterate_over_my_container) {
->       DBusMessageIter item_iterator;
->       dbus_message_iter_open_container(sub, DBUS_TYPE_DICT_ENTRY,
->               0, item_iterator)
->
->       // appending via main iterator
->       dbus_message_iter_append_basic(it, key type, key);
->
->       // appending via item_iterator
->       dbus_message_iter_append_basic(item_iterator, value type, value);
->
->       dbus_message_iter_close_container(sub, item_iterator);
->    }
->
->    dbus_message_iter_close_container(...)
-*/
    }
 
    template<typename... T>
@@ -580,11 +582,10 @@ private:
    void write(const std::pair<KeyT, ValueT>& p)
    {
       DBusMessageIter item_iterator;
-      dbus_message_iter_open_container(iter_, DBUS_TYPE_DICT_ENTRY, 0, &item_iterator);
-
-      write(p.first);
-
+      dbus_message_iter_open_container(iter_, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
+      
       Serializer s(&item_iterator);
+      s.write(p.first);
       s.write(p.second);
 
       dbus_message_iter_close_container(iter_, &item_iterator);
@@ -759,23 +760,39 @@ struct Deserializer // : noncopyable
       return *this;
    }
 
+
+   template<typename KeyT, typename ValueT>
+   inline
+   void read(std::pair<KeyT, ValueT>& p)
+   {
+      DBusMessageIter item_iterator;
+      dbus_message_iter_recurse(iter_, &item_iterator);
+      
+      Deserializer s(&item_iterator);
+      s.read(p.first);
+      s.read(p.second);
+   }
+
+
    template<typename KeyT, typename ValueT>
    Deserializer& read(std::map<KeyT, ValueT>& m)
    {
-      uint32_t len;
-      read(len);
+      m.clear();
 
-      if (len > 0)
+      DBusMessageIter iter;
+      dbus_message_iter_recurse(iter_, &iter);
+
+      Deserializer s(&iter);
+
+      while(dbus_message_iter_get_arg_type(&iter) != 0)
       {
-         for(uint32_t i=0; i<len; ++i)
-         {
-            std::pair<KeyT, ValueT> p;
-            read(p.first).read(p.second);
-            m.insert(p);
-         }
+         std::pair<KeyT, ValueT> p;
+         s.read(p);
+         m.insert(p);
       }
-      else
-         m.clear();
+
+      // advance to next element
+      dbus_message_iter_next(iter_);
 
       return *this;
    }

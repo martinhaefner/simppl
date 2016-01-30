@@ -257,21 +257,6 @@ protected:
 };
 
 
-#if FIXME 
-// remove this
-// horrible hack to remove the constness of the stl iterator for vector,
-// maybe there are better solutions to achieve this?
-template<typename IteratorT, typename ContainerT>
-inline
-__gnu_cxx::__normal_iterator<typename std::remove_const<IteratorT>::type, ContainerT>
-unconst(__gnu_cxx::__normal_iterator<IteratorT, ContainerT>& iter)
-{
-   return __gnu_cxx::__normal_iterator<typename std::remove_const<IteratorT>::type, ContainerT>(
-      const_cast<typename std::remove_const<IteratorT>::type>(iter.base()));
-}
-#endif
-
-
 /// a NOOP
 template<typename EmitPolicyT, typename BaseT>
 struct CommitMixin : BaseT
