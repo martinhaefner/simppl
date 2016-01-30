@@ -46,7 +46,7 @@ struct BlockingResponseHandler0
       r_.handledBy(std::nullptr_t());
 
       if (!state)
-         state.throw_exception();
+         disp_.propagate(state);
    }
 
    simppl::ipc::Dispatcher& disp_;
@@ -424,10 +424,8 @@ Dispatcher::~Dispatcher()
 void Dispatcher::notify_clients(const std::string& boundname, ConnectionState state)
 {
    auto range = stubs_.equal_range(boundname);
-   std::cout << stubs_.size() << std::endl;
 
    std::for_each(range.first, range.second, [state](auto& entry){
-       std::cout << "Having entry.first" << std::endl;
       entry.second->connection_state_changed(state);
    });
 }
@@ -581,8 +579,7 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
    assert(r);
 
    BlockingResponseHandler0 handler(*this, *r);
-
-//   loop();
+   loop();
 }
 
 

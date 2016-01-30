@@ -67,7 +67,6 @@ struct Client : simppl::ipc::Stub<Errors>
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
       EXPECT_TRUE(state.isRuntimeError());
-      std::cout << "XXX" << state.what() << std::endl;
       EXPECT_EQ(0, strcmp(state.what(), "Shit happens"));
       
       hello1(42);

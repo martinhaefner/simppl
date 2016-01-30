@@ -140,8 +140,6 @@ std::string StubBase::boundname() const
 
 void StubBase::connection_state_changed(ConnectionState state)
 {
-   std::cout << "connection state change: " << (int)conn_state_ << " -> " << (int)state << std::endl;
-
    if (conn_state_ != state)
    {
       conn_state_ = state;

@@ -112,7 +112,7 @@ void BlockingResponseHandler<T>::operator()(const simppl::ipc::CallState& state,
    // trouble if libdbus is not compiled with exception support.
    if (!state)
       disp_.propagate(state);
-   
+
    t_ = t;
 }
 
@@ -160,7 +160,7 @@ void BlockingResponseHandlerN<T...>::operator()(const simppl::ipc::CallState& st
 inline
 void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::nullptr_t)
 {
-   holder.dispatcher_.waitForResponse(holder);
+   holder.dispatcher_.waitForResponse(holder);   
 }
 
 

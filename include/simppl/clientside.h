@@ -410,23 +410,25 @@ struct ClientResponse : ClientResponseBase
       {
           DBusMessage* msg = dbus_pending_call_steal_reply(pc);
 
-          // FIXME error handling
+          // FIXME error handling - make it simpler
           if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
               DBusError err;
               dbus_error_init(&err);
 
-              // FIXME read message in other way, see introspection
               dbus_set_error_from_message(&err, msg);
 
               if (!strcmp(err.name, DBUS_ERROR_FAILED))
               {
-                  int error;
-                  char buf[512];
-                  sscanf(err.message, "%d %s", &error, buf);
-
+                  detail::Deserializer d(msg);
+                  std::string text;
+                  d >> text;
+                  
+                  char* end;
+                  int error = strtol(text.c_str(), &end, 10);
+                  
                   std::tuple<T...> dummies;
-                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, buf, dbus_message_get_reply_serial(msg))), dummies);
+                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, end+1, dbus_message_get_reply_serial(msg))), dummies);
               }
               else
               {
