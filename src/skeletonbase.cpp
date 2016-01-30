@@ -83,17 +83,17 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
    assert(current_request_);
    assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
 
-   DBusMessage* msg = dbus_message_new_method_return(current_request_.msg_);
+   DBusMessage* rmsg = dbus_message_new_method_return(current_request_.msg_);
 
    if (response.f_)
    {
-      detail::Serializer s(msg);
+      detail::Serializer s(rmsg);
       response.f_(s);
    }
 
-   dbus_connection_send(disp_->conn_, msg, nullptr);
+   dbus_connection_send(disp_->conn_, rmsg, nullptr);
 
-   dbus_message_unref(msg);
+   dbus_message_unref(rmsg);
    current_request_.clear();   // only respond once!!!
 }
 
@@ -103,17 +103,18 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    assert(req);
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
-   DBusMessage* msg = dbus_message_new_method_return(req.msg_);
+   DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
+   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
    if (response.f_)
    {
-      detail::Serializer s(msg);
+      detail::Serializer s(rmsg);
       response.f_(s);
    }
 
-   dbus_connection_send(disp_->conn_, msg, nullptr);
+   dbus_connection_send(disp_->conn_, rmsg, nullptr);
 
-   dbus_message_unref(msg);
+   dbus_message_unref(rmsg);
    req.clear();
 }
 
@@ -123,10 +124,10 @@ void SkeletonBase::respondWith(const RuntimeError& err)
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
 
-   DBusMessage* response = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
-   dbus_connection_send(disp_->conn_, response, nullptr);
+   DBusMessage* rmsg = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
+   dbus_connection_send(disp_->conn_, rmsg, nullptr);
 
-   dbus_message_unref(response);
+   dbus_message_unref(rmsg);
    current_request_.clear();   // only respond once!!!
 }
 
@@ -136,10 +137,12 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
    assert(req);
    assert(req.requestor_->hasResponse());
 
-   DBusMessage* response = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
-   dbus_connection_send(disp_->conn_, response, nullptr);
+   DBusMessage* rmsg = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
+   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
-   dbus_message_unref(response);
+   dbus_connection_send(disp_->conn_, rmsg, nullptr);
+
+   dbus_message_unref(rmsg);
    req.clear();
 }
 

@@ -206,40 +206,6 @@ private:
 // -----------------------------------------------------------------------------------------
 
 
-template<typename VectorT>
-struct ServerVectorAttributeUpdate
-{
-   ServerVectorAttributeUpdate(const VectorT& vec, How how = Full, uint32_t from = 0, uint32_t len = 0)
-    : data_(vec)
-    , how_(how)
-    , where_(from)
-    , len_(how == Full ? vec.size() : len)
-   {
-      // NOOP
-   }
-
-   const VectorT& data_;
-   How how_;
-   uint32_t where_;
-   uint32_t len_;
-};
-
-
-namespace detail
-{
-
-template<typename VectorT>
-struct isValidType<ServerVectorAttributeUpdate<VectorT>>
-{
-   enum { value = true };
-};
-
-}   // namespace detail
-
-
-// --------------------------------------------------------------------------------------------
-
-
 struct ServerAttributeBase
 {
    ServerAttributeBase(const char* name, detail::BasicInterface* iface);
@@ -259,13 +225,11 @@ protected:
 
 
 template<typename DataT>
-struct BaseAttribute
- : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>
- , ServerAttributeBase
+struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
 {
    inline
    BaseAttribute(const char* name, detail::BasicInterface* iface)
-    : ServerSignal<typename if_<detail::is_vector<DataT>::value, ServerVectorAttributeUpdate<DataT>, DataT>::type>(name, iface)
+    : ServerSignal<DataT>(name, iface)
     , ServerAttributeBase(name, iface)
    {
       // NOOP
@@ -293,6 +257,8 @@ protected:
 };
 
 
+#if FIXME 
+// remove this
 // horrible hack to remove the constness of the stl iterator for vector,
 // maybe there are better solutions to achieve this?
 template<typename IteratorT, typename ContainerT>
@@ -303,197 +269,7 @@ unconst(__gnu_cxx::__normal_iterator<IteratorT, ContainerT>& iter)
    return __gnu_cxx::__normal_iterator<typename std::remove_const<IteratorT>::type, ContainerT>(
       const_cast<typename std::remove_const<IteratorT>::type>(iter.base()));
 }
-
-
-// forward decl
-template<typename T, typename EmitPolicyT>
-struct VectorAttributeMixin;
-
-
-template<typename T, typename EmitPolicyT>
-struct VectorValue
-{
-   inline
-   VectorValue(VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin, typename std::vector<T>::iterator iter)
-    : mixin_(mixin)
-    , iter_(iter)
-   {
-      // NOOP
-   }
-
-   T& operator=(const T& t);
-
-   VectorAttributeMixin<std::vector<T>, EmitPolicyT>& mixin_;
-   typename std::vector<T>::iterator iter_;
-};
-
-
-template<typename T, typename EmitPolicyT>
-struct VectorAttributeMixin : BaseAttribute<T>
-{
-public:
-
-   inline
-   VectorAttributeMixin(uint32_t id, std::map<uint32_t, detail::ServerSignalBase*>& _signals)
-    : BaseAttribute<T>(id, _signals)
-   {
-      // NOOP
-   }
-
-   typedef typename T::pointer pointer;
-   typedef typename T::iterator iterator;
-   typedef typename T::const_iterator const_iterator;
-   typedef typename T::value_type value_type;
-
-   template<typename IteratorT>
-   inline
-   void insert(const_iterator where, IteratorT from, IteratorT to)
-   {
-      insert(unconst(where), from, to, bool_<std::is_integral<IteratorT>::value>());
-   }
-
-   inline
-   void insert(const_iterator where, const value_type& value)
-   {
-      this->t_.insert(unconst(where), value);
-      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), 1));
-   }
-
-   inline
-   void erase(const_iterator where)
-   {
-      if (EmitPolicyT::eval(where, this->t_.end()))
-      {
-         this->t_.erase(iterator(const_cast<pointer>(where.base())));
-         emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, where-this->t_.begin(), 1));
-      }
-   }
-
-   inline
-   void erase(const_iterator from, const_iterator to)
-   {
-      if (EmitPolicyT::eval(from, this->t_.end()))
-      {
-         this->t_.erase(unconst(from), unconst(to));
-         emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, from-begin(), to-from));
-      }
-   }
-
-   inline
-   void clear()
-   {
-      erase(begin(), end());
-   }
-
-   inline
-   bool empty() const
-   {
-      return this->t_.empty();
-   }
-
-   inline
-   void push_back(const value_type& val)
-   {
-      this->t_.push_back(val);
-      this->emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, this->t_.size()-1, 1));
-   }
-
-   inline
-   void pop_back()
-   {
-      this->t_.pop_back();
-      this->emit(ServerVectorAttributeUpdate<T>(this->t_, Remove, this->t_.size(), 1));
-   }
-
-   inline
-   size_t size() const
-   {
-      return this->t_.size();
-   }
-
-   inline
-   const_iterator begin() const
-   {
-      return this->t_.begin();
-   }
-
-   inline
-   const_iterator end() const
-   {
-      return this->t_.end();
-   }
-
-   inline
-   VectorValue<value_type, EmitPolicyT> operator[](size_t idx)
-   {
-      return VectorValue<value_type, EmitPolicyT>(*this, this->t_.begin()+idx);
-   }
-
-   template<typename IteratorT>
-   inline
-   void replace(const_iterator where, IteratorT from, IteratorT to)
-   {
-      bool doEmit = false;
-
-      size_t len = std::distance(from, to);
-      for(iterator iter = unconst(where); iter != this->t_.end() && from != to; ++iter, ++from)
-      {
-         this->t_.replace(unconst(where), *from);
-
-         if (EmitPolicyT::eval(*where, *from))
-            doEmit = true;
-      }
-
-      if (from != to)
-      {
-         doEmit = true;
-
-         while(from != to)
-         {
-            this->t_.push_back(*from);
-            ++from;
-         }
-      }
-
-      if (EmitPolicyT::eval(doEmit, false))
-         emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), len));
-   }
-
-   inline
-   void replace(const_iterator where, const value_type& v)
-   {
-      *unconst(where) = v;
-
-      if (EmitPolicyT::eval(*where, v))
-         emit(ServerVectorAttributeUpdate<T>(this->t_, Replace, where-this->t_.begin(), 1));
-   }
-
-protected:
-
-   inline
-   void insert(const_iterator where, size_t count, const value_type& value, tTrueType)
-   {
-      this->t_.insert(unconst(where), count, value);
-      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), count));
-   }
-
-   template<typename IteratorT>
-   inline
-   void insert(const_iterator where, IteratorT from, IteratorT to, tFalseType)
-   {
-      this->t_.insert(unconst(where), from, to);
-      emit(ServerVectorAttributeUpdate<T>(this->t_, Insert, where - this->t_.begin(), std::distance(from, to)));
-   }
-};
-
-
-template<typename T, typename EmitPolicyT>
-inline
-T& VectorValue<T, EmitPolicyT>::operator=(const T& t)
-{
-   mixin_.replace(iter_, t);
-   return *iter_;
-}
+#endif
 
 
 /// a NOOP
@@ -528,12 +304,11 @@ struct CommitMixin<Committed, BaseT> : BaseT
 
 
 template<typename DataT, typename EmitPolicyT>
-struct ServerAttribute
-   : CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>
+struct ServerAttribute : CommitMixin<EmitPolicyT, BaseAttribute<DataT>>
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
-   typedef CommitMixin<EmitPolicyT, typename if_<detail::is_vector<DataT>::value, VectorAttributeMixin<DataT, EmitPolicyT>, BaseAttribute<DataT> >::type>  baseclass;
+   typedef CommitMixin<EmitPolicyT, BaseAttribute<DataT>> baseclass;
 
    inline
    ServerAttribute(const char* name, detail::BasicInterface* iface)
@@ -563,25 +338,6 @@ inline
 void operator>>(simppl::ipc::ServerRequest<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
-}
-
-
-template<typename VectorT>
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& ostream, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>& updt)
-{
-   ostream << (uint32_t)updt.how_;
-   ostream << updt.where_;
-   ostream << updt.len_;
-
-   if (updt.how_ != simppl::ipc::Remove)
-   {
-      for(int i=updt.where_; i<updt.where_+updt.len_; ++i)
-      {
-         ostream << updt.data_[i];
-      }
-   }
-
-   return ostream;
 }
 
 

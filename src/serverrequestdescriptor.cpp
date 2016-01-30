@@ -24,7 +24,14 @@ ServerRequestDescriptor::ServerRequestDescriptor(ServerRequestDescriptor&& rhs)
  : requestor_(rhs.requestor_)
  , msg_(rhs.msg_)
 {
-   rhs.clear();
+   rhs.requestor_ = nullptr;
+   rhs.msg_ = nullptr;
+}
+
+
+ServerRequestDescriptor::~ServerRequestDescriptor()
+{
+   clear();
 }
 
 
@@ -32,21 +39,20 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
 {
    if (this != &rhs)
    {
-      requestor_ = rhs.requestor_;
       msg_ = rhs.msg_;
-            
-      rhs.requestor_ = nullptr;
+      requestor_ = rhs.requestor_;
+      
       rhs.msg_ = nullptr;
+      rhs.requestor_ = nullptr;
    }
-   
+      
    return *this;
 }
 
 
 ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, DBusMessage* msg)
 {
-   if (msg_)
-      dbus_message_unref(msg_);
+   clear();
    
    requestor_ = requestor;
    msg_ = msg;
@@ -60,7 +66,13 @@ ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* request
 
 void ServerRequestDescriptor::clear()
 {
-   set(nullptr, nullptr);
+   if (msg_)
+   {
+      dbus_message_unref(msg_);
+      msg_ = nullptr;
+   }
+   
+   requestor_ = nullptr;
 }
 
 

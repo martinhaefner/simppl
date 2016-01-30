@@ -23,7 +23,6 @@ INTERFACE(AsyncServer)
    Response<double> result;
    Response<int, double> rEcho;
    
-   
    inline
    AsyncServer()
     : INIT_REQUEST(oneway)
@@ -61,7 +60,7 @@ struct Client : simppl::ipc::Stub<AsyncServer>
       EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
       add(42, 777);
       echo(42, 3.1415);
-   }
+    }
    
    
    void handleResult(const simppl::ipc::CallState& s, double d)

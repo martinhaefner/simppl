@@ -195,7 +195,7 @@ struct Dispatcher::Private
 
     void remove_watch(DBusWatch* w)
     {
-        std::cout << "remove_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
+        //std::cout << "remove_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
         /*auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
         if (iter != fds_.end())
         {
@@ -207,7 +207,7 @@ struct Dispatcher::Private
 
     void toggle_watch(DBusWatch* w)
     {
-        std::cout << "toggle_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
+        //std::cout << "toggle_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
      /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
         if (iter != fds_.end())
         {
@@ -227,7 +227,7 @@ struct Dispatcher::Private
         fd.fd = timerfd_create(CLOCK_MONOTONIC, 0);
         fd.events = POLLIN;
 
-        std::cout << "add_timeout fd=" << fd.fd << std::endl;
+        //std::cout << "add_timeout fd=" << fd.fd << std::endl;
 
         if (dbus_timeout_get_enabled(t))
         {
@@ -252,7 +252,7 @@ struct Dispatcher::Private
 
     void remove_timeout(DBusTimeout* t)
     {
-        std::cout << "remove_timeout fd=" << reinterpret_cast<int>(dbus_timeout_get_data(t)) << std::endl;
+        //std::cout << "remove_timeout fd=" << reinterpret_cast<int>(dbus_timeout_get_data(t)) << std::endl;
         auto iter = std::find_if(fds_.begin(), fds_.end(), [t](auto& pfd){ return reinterpret_cast<int>(dbus_timeout_get_data(t)) == pfd.fd; });
         if (iter != fds_.end())
         {
@@ -266,7 +266,7 @@ struct Dispatcher::Private
 
     void toggle_timeout(DBusTimeout* t)
     {
-        std::cout << "toggle_timeout" << std::endl;
+        //std::cout << "toggle_timeout" << std::endl;
         auto iter = std::find_if(fds_.begin(), fds_.end(), [t](auto& pfd){ return reinterpret_cast<int64_t>(dbus_timeout_get_data(t)) == pfd.fd; });
         if (iter != fds_.end())
         {
@@ -317,7 +317,7 @@ struct Dispatcher::Private
                             int64_t data;
                             (void)::read(pfd.fd, &data, sizeof(data));
 
-                            std::cout << "handle timeout" << std::endl;
+//                            std::cout << "handle timeout" << std::endl;
                             dbus_timeout_handle(t_iter->second);
                         }
                     }
@@ -396,14 +396,11 @@ Dispatcher::Dispatcher(const char* busname)
    detail::Deserializer ds(reply);
    ds >> busnames;
 
-   std::for_each(busnames.begin(), busnames.end(), [this](const std::string& busname){
+   for(auto& busname : busnames)
+   {
       if (busname[0] != ':')
-      {
-          if (!strncmp(busname.c_str(), "test.", 5))
-            std::cout << "Having name '" << busname << "'" << std::endl;
          this->busnames_.insert(busname);
-     }
-   });
+   }
 
    dbus_message_unref(msg);
    dbus_message_unref(reply);

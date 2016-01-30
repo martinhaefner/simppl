@@ -22,6 +22,7 @@ struct ServerRequestBase;
 struct ServerRequestDescriptor
 {
    ServerRequestDescriptor();
+   ~ServerRequestDescriptor();
    
    ServerRequestDescriptor(const ServerRequestDescriptor& rhs) = delete;
    ServerRequestDescriptor& operator=(const ServerRequestDescriptor& rhs) = delete;

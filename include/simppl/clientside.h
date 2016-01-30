@@ -141,50 +141,15 @@ struct ClientSignal : ClientSignalBase
 // ---------------------------------------------------------------------------------------------
 
 
-template<typename VectorT>
-struct ClientVectorAttributeUpdate
-{
-   inline
-   ClientVectorAttributeUpdate()
-    : how_(None)
-    , where_(0)
-    , len_(0)
-   {
-      // NOOP
-   }
-
-   VectorT data_;
-   How how_;
-   uint32_t where_;
-   uint32_t len_;
-};
-
-
-namespace detail
-{
-
-template<typename VectorT>
-struct isValidType<ClientVectorAttributeUpdate<VectorT>>
-{
-   enum { value = true };
-};
-
-}   // namespace detail
-
-
-// -----------------------------------------------------------------------------------
-
-
 template<typename DataT, typename EmitPolicyT>
 struct ClientAttribute
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
    typedef typename CallTraits<DataT>::param_type arg_type;
+   typedef std::function<void(arg_type)> function_type;
+   typedef ClientSignal<DataT> signal_type;
 
-   typedef typename if_<detail::is_vector<DataT>::value,
-      std::function<void(arg_type, How, uint32_t, uint32_t)>,
-      std::function<void(arg_type)> >::type function_type;
 
    inline
    ClientAttribute(const char* name, detail::BasicInterface* iface)
@@ -249,72 +214,27 @@ private:
     void eval(DBusPendingCall* pending)
     {
         DBusMessage* msg = dbus_pending_call_steal_reply(pending);
+        
         if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
         {
+            last_update_ = ::time(0);
+            
             detail::Deserializer ds(msg);
-            DataT t;
-            ds >> t;
+            ds >> data_;
 
-            setAndCall(t);
+            if (f_)
+               f_(data_);
         }
     }
 
-   /// vector argument with partial update support
-   typedef typename if_<detail::is_vector<DataT>::value, ClientVectorAttributeUpdate<DataT>, DataT>::type signal_arg_type;
-   typedef ClientSignal<signal_arg_type> signal_type;
 
-   void setAndCall(const ClientVectorAttributeUpdate<DataT>& varg)
-   {
-      switch (varg.how_)
-      {
-      case Full:
-         data_ = varg.data_;
-         break;
-
-      case Remove:
-         data_.erase(data_.begin()+varg.where_, data_.begin() + varg.where_ + varg.len_);
-         break;
-
-      case Insert:
-         data_.insert(data_.begin()+varg.where_, varg.data_.begin(), varg.data_.end());
-         break;
-
-      case Replace:
-         assert(varg.data_.size() == varg.len_);
-
-         for(int i=0; i<varg.len_; ++i)
-         {
-            if (i+varg.where_ < data_.size())
-            {
-               data_[i+varg.where_] = varg.data_[i];
-            }
-            else
-               data_.push_back(varg.data_[i]);
-         }
-         break;
-
-      default:
-         // NOOP
-         break;
-      }
-
-      if (f_)
-         f_(data_, varg.how_, varg.where_, varg.len_);
-   }
-
-   /// normal argument - will not work with vectors and partial update support
-   void setAndCall(arg_type arg)
-   {
-      data_ = arg;
-
-      if (f_)
-         f_(data_);
-   }
-
-   void valueChanged(typename CallTraits<signal_arg_type>::param_type arg)
+   void valueChanged(arg_type arg)
    {
       last_update_ = ::time(0);
-      setAndCall(arg);
+      
+      data_ = arg;
+      if (f_)
+         f_(data_);
    }
 
    signal_type signal_;
@@ -410,15 +330,9 @@ struct ClientResponse : ClientResponseBase
       {
           DBusMessage* msg = dbus_pending_call_steal_reply(pc);
 
-          // FIXME error handling - make it simpler
           if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
-              DBusError err;
-              dbus_error_init(&err);
-
-              dbus_set_error_from_message(&err, msg);
-
-              if (!strcmp(err.name, DBUS_ERROR_FAILED))
+              if (!strcmp(dbus_message_get_error_name(msg), DBUS_ERROR_FAILED))
               {
                   detail::Deserializer d(msg);
                   std::string text;
@@ -435,8 +349,6 @@ struct ClientResponse : ClientResponseBase
                   std::tuple<T...> dummies;
                   detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), dummies);
               }
-
-              dbus_error_free(&err);
           }
           else
           {
@@ -459,27 +371,6 @@ struct ClientResponse : ClientResponseBase
 }   // namespace ipc
 
 }   // namespace simppl
-
-
-template<typename VectorT>
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& istream, simppl::ipc::ClientVectorAttributeUpdate<VectorT>& updt)
-{
-   istream >> (uint32_t&)updt.how_;
-   istream >> updt.where_;
-   istream >> updt.len_;
-
-   if (updt.how_ != simppl::ipc::Remove)
-   {
-      updt.data_.resize(updt.len_);
-
-      for(int i=0; i<updt.len_; ++i)
-      {
-         istream >> updt.data_[i];
-      }
-   }
-
-   return istream;
-}
 
 
 template<typename FunctorT, typename... T>

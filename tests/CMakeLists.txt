@@ -14,7 +14,7 @@ add_executable(unittests
    ipc2_timeout.cpp 
    ipc2_simple.cpp
    ipc2_errors.cpp
-   #ipc2_async_server.cpp
+   ipc2_async_server.cpp
 )
 
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
