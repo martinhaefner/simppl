@@ -412,7 +412,8 @@ Dispatcher::Dispatcher(const char* busname)
 Dispatcher::~Dispatcher()
 {
    dbus_connection_close(conn_);
-
+   dbus_connection_unref(conn_);
+   
    delete d;
    d = 0;
 }
@@ -449,6 +450,7 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
        dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
        assert(!dbus_error_is_set(&err));
 
+// FIXME cleanup signal notifications/matches on bus when stub is removed
        dbus_error_free(&err);
 
        signal_matches_[signalname] = 1;
@@ -473,7 +475,7 @@ void Dispatcher::unregisterSignal(StubBase& stub, ClientSignalBase& sigbase)
 
             std::ostringstream match_string;
             match_string << "type='signal'";
-            match_string << ", sender='" << stub.role() << "'";
+            match_string << ", sender='" << stub.boundname() << "'";
             match_string << ", interface='" << stub.iface() << "'";
             match_string << ", member='" << sigbase.name() << "'";
 
@@ -539,9 +541,6 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            return DBUS_HANDLER_RESULT_HANDLED;
         }
 
-//        std::cout << "Having signal '" << dbus_message_get_interface(msg) << "/" << dbus_message_get_member(msg)
-//            << "' from '" << dbus_message_get_sender(msg) <<  "." << std::endl;
-
         std::string rolename(dbus_message_get_path(msg));
         rolename = rolename.substr(rolename.rfind('/')+1);
 
@@ -557,12 +556,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         return DBUS_HANDLER_RESULT_HANDLED;
     }
-    else if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
-    {
-        // FIXME check for property Get return call...
-        std::cout << "Method return: " << dbus_message_get_interface(msg) << ", " << dbus_message_get_member(msg) << std::endl;
-    }
-
+    
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
@@ -628,6 +622,8 @@ void Dispatcher::removeClient(StubBase& clnt)
    {
       if (&clnt == iter->second)
       {
+         clnt.cleanup();
+         
          stubs_.erase(iter);
          break;
       }

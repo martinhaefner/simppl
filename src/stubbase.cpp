@@ -10,6 +10,7 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
+#include <cassert>
 
 
 using namespace std::literals::chrono_literals;
@@ -29,6 +30,8 @@ StubBase::StubBase(const char* iface, const char* role)
 {
    assert(iface);
    assert(role);
+
+   // FIXME move this code to helper global function
 
    // strip template arguments
    memset(iface_, 0, sizeof(iface_));
@@ -59,8 +62,7 @@ StubBase::~StubBase()
 }
 
 
-// FIXME void return value
-bool StubBase::connect()
+void StubBase::connect()
 {
     std::chrono::milliseconds sum = 0ms;
     auto finish = std::chrono::steady_clock::now();
@@ -83,8 +85,6 @@ bool StubBase::connect()
 
     if (!is_connected())
        throw TransportError(ETIMEDOUT, -1 /* FIXME what's that sequence nr for */);
-       
-   return is_connected();
 }
 
 
@@ -130,7 +130,8 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
 
 
 std::string StubBase::boundname() const
-{
+{ 
+    // FIXME optimize, use C string only and cache result?!
     std::ostringstream bname;
     bname << iface_ << "." << role_;
 
@@ -153,9 +154,11 @@ void StubBase::connection_state_changed(ConnectionState state)
 void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
+   assert(signals_.find(sigbase.name()) == signals_.end());   // signal already attached by this stub
+   
    disp_->registerSignal(*this, sigbase);
 
-   // FIXME handle double attach
+   // FIXME use intrusive container and iterate instead of using a map -> memory efficiency
    signals_[sigbase.name()] = &sigbase;
 }
 
@@ -163,9 +166,27 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
-   disp_->unregisterSignal(*this, sigbase);
+   
+   auto iter = signals_.find(sigbase.name());
+   
+   if (iter != signals_.end())
+   {
+      disp_->unregisterSignal(*this, sigbase);
+      signals_.erase(iter);
+   }
+}
 
-   signals_.erase(sigbase.name());
+
+void StubBase::cleanup()
+{
+   for (auto& sig_entry : signals_)
+   {
+      disp_->unregisterSignal(*this, *sig_entry.second);
+   }
+   
+   signals_.clear();
+   
+   disp_ = nullptr;
 }
 
 
@@ -194,8 +215,6 @@ void StubBase::try_handle_signal(DBusMessage* msg)
    {
        iter->second->eval(msg);
    }
-   else
-      std::cout << "Signal " << dbus_message_get_member(msg) << " not found" << std::endl;
 }
 
 

@@ -95,10 +95,15 @@ public:
        return conn_state_ == ConnectionState::Connected;
    }
 
-   bool connect();
+   /**
+    * Blocking connect. Throws exception on timeout. 
+    */
+   void connect();
 
 
 protected:
+
+   void cleanup();
 
    DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 

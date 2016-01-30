@@ -47,6 +47,7 @@ struct InterfaceBase<ClientRequest> : detail::BasicInterface
 template<>
 struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
+   // FIXME maybe use intrusive container here or take char* from static linkage?!
    std::map<std::string, ServerRequestBase*> methods_;
    std::map<std::string, ServerAttributeBase*> attributes_;
 };

@@ -771,6 +771,9 @@ struct Deserializer // : noncopyable
       Deserializer s(&item_iterator);
       s.read(p.first);
       s.read(p.second);
+      
+      // advance to next element
+      dbus_message_iter_next(iter_);
    }
 
 
@@ -788,6 +791,7 @@ struct Deserializer // : noncopyable
       {
          std::pair<KeyT, ValueT> p;
          s.read(p);
+         
          m.insert(p);
       }
 

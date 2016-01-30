@@ -206,7 +206,6 @@ private:
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
-//        std::cout << "Pending attribute notify" << std::endl;
         ClientAttribute* handler = (ClientAttribute*)user_data;
         handler->eval(pending);
     }
@@ -215,16 +214,14 @@ private:
     {
         DBusMessage* msg = dbus_pending_call_steal_reply(pending);
         
-        if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN)
-        {
-            last_update_ = ::time(0);
-            
-            detail::Deserializer ds(msg);
-            ds >> data_;
+        last_update_ = ::time(0);
+        detail::Deserializer ds(msg);
+        ds >> data_;
+        
+        dbus_message_unref(msg);
 
-            if (f_)
-               f_(data_);
-        }
+        if (f_)
+            f_(data_);        
     }
 
 
