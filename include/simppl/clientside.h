@@ -199,20 +199,22 @@ private:
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
-        ClientAttribute* handler = (ClientAttribute*)user_data;
-        handler->eval(pending);
-    }
-
-    void eval(DBusPendingCall* pending)
-    {
         DBusMessage* msg = dbus_pending_call_steal_reply(pending);
         
-        last_update_ = ::time(0);
-        detail::Deserializer ds(msg);
-        ds >> data_;
+        ClientAttribute* handler = (ClientAttribute*)user_data;
+        handler->eval(*msg);
         
         dbus_message_unref(msg);
+        dbus_pending_call_unref(pending);
+    }
 
+    void eval(DBusMessage& msg)
+    {
+        last_update_ = ::time(0);
+        
+        detail::Deserializer ds(&msg);
+        ds >> data_;
+        
         if (f_)
             f_(data_);        
     }

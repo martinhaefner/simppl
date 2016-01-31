@@ -64,7 +64,7 @@ struct Client : simppl::ipc::Stub<Attributes>
    {
       EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
       props.attach() >> std::bind(&Client::handleProps, this, _1);
-      std::cout << "1" << std::endl;
+
       set(Four, "Four");
    }
 
@@ -75,7 +75,6 @@ struct Client : simppl::ipc::Stub<Attributes>
       
       if (callback_count_ == 1)   // the property Get(...) from the attach
       {
-         std::cout << "2" << std::endl;
          EXPECT_EQ(2, props.size());
          EXPECT_EQ(2, this->props.value().size());
          
@@ -83,7 +82,6 @@ struct Client : simppl::ipc::Stub<Attributes>
       }
       else if (callback_count_ == 2)   // the response on the assignment within the set(...) request
       {
-         std::cout << "3" << std::endl;
          EXPECT_EQ(3, props.size());
          EXPECT_EQ(3, this->props.value().size());
          
