@@ -32,14 +32,7 @@ template<typename> struct InterfaceNamer;
 // FIXME remove these types of interfaces in favour of std::function interface
 struct ClientResponseBase
 {
-    static
-    void pending_notify(DBusPendingCall* pending, void* user_data)
-    {
-        ClientResponseBase* handler = (ClientResponseBase*)user_data;
-        handler->eval(pending);
-    }
-
-   virtual void eval(DBusPendingCall* msg) = 0;
+   virtual void eval(DBusMessage& msg) = 0;
 
 protected:
 
@@ -321,17 +314,15 @@ struct ClientResponse : ClientResponseBase
       f_ = func;
    }
 
-   void eval(DBusPendingCall* pc)
+   void eval(DBusMessage& msg)
    {
       if (f_)
       {
-          DBusMessage* msg = dbus_pending_call_steal_reply(pc);
-
-          if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR)
+          if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
           {
-              if (!strcmp(dbus_message_get_error_name(msg), DBUS_ERROR_FAILED))
+              if (!strcmp(dbus_message_get_error_name(&msg), DBUS_ERROR_FAILED))
               {
-                  detail::Deserializer d(msg);
+                  detail::Deserializer d(&msg);
                   std::string text;
                   d >> text;
                   
@@ -339,23 +330,21 @@ struct ClientResponse : ClientResponseBase
                   int error = strtol(text.c_str(), &end, 10);
                   
                   std::tuple<T...> dummies;
-                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, end+1, dbus_message_get_reply_serial(msg))), dummies);
+                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, end+1, dbus_message_get_reply_serial(&msg))), dummies);
               }
               else
               {
                   std::tuple<T...> dummies;
-                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(msg))), dummies);
+                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(&msg))), dummies);
               }
           }
           else
           {
-             CallState cs(dbus_message_get_reply_serial(msg));
+             CallState cs(dbus_message_get_reply_serial(&msg));
 
-             detail::Deserializer d(msg);
+             detail::Deserializer d(&msg);
              detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
           }
-
-          dbus_message_unref(msg);
       }
       else
          std::cerr << "No response handler installed" << std::endl;

@@ -22,7 +22,6 @@ namespace simppl
 namespace ipc
 {
 
-
 StubBase::StubBase(const char* iface, const char* role)
  : role_(role)
  , conn_state_(ConnectionState::Disconnected)
@@ -59,6 +58,19 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->removeClient(*this);
+}
+
+
+/*static*/
+void StubBase::pending_notify(DBusPendingCall* pc, void* user_data)
+{
+    DBusMessage* msg = dbus_pending_call_steal_reply(pc);
+
+    ClientResponseBase* handler = (ClientResponseBase*)user_data;
+    handler->eval(*msg);
+    
+    dbus_message_unref(msg);
+    dbus_pending_call_unref(pc);
 }
 
 
@@ -117,7 +129,7 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
             timeout = detail::request_specific_timeout.count();
 
         dbus_connection_send_with_reply(disp().conn_, msg, &pending, timeout);
-        dbus_pending_call_set_notify(pending, &ClientResponseBase::pending_notify, req.handler_, 0);
+        dbus_pending_call_set_notify(pending, &StubBase::pending_notify, req.handler_, 0);
     }
     else
        dbus_connection_send(disp().conn_, msg, nullptr);

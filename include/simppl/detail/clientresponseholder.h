@@ -36,6 +36,8 @@ struct ClientResponseHolder
    }
    
    /** 
+    * FIXME still need this?
+    * 
     * Blocking call semantic:
     *  
     * bool rc = (bool)stub.func(42);
