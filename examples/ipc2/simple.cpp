@@ -24,10 +24,13 @@ INTERFACE(Simple)
    Request<std::string> echo;
    Response<std::string> rEcho;
    
+   Signal<> sig;
+   
    Simple()
     : INIT_REQUEST(oneway)
     , INIT_REQUEST(echo)
     , INIT_RESPONSE(rEcho)
+    , INIT_SIGNAL(sig)
    {
       echo >> rEcho;
    }
@@ -38,6 +41,8 @@ INTERFACE(Simple)
 
 // ---------------------------------------------------------------------
 
+//#define BLOCKING_ONEWAY
+#define TEST_SIG
 
 struct Client : spl::Stub<test::Simple>
 {
@@ -50,16 +55,28 @@ struct Client : spl::Stub<test::Simple>
    
    void handle_conn(spl::ConnectionState s)
    {
-      echo("Hallo Welt");
+      if (s == spl::ConnectionState::Connected)
+      {
+#ifdef TEST_SIG      
+         sig.attach() >> std::bind(&Client::handle_sig, this);
+         oneway();
+#else
+         echo("Hallo Welt");
+#endif
+      }
    }
    
    void handle_recho(spl::CallState c, const std::string& str)
    {
       echo("Hallo Welt");
    }
+   
+   void handle_sig()
+   {
+      oneway();  
+   }
 };
 
-//#define BLOCKING_ONEWAY
 
 int client()
 {
@@ -102,6 +119,8 @@ struct SimpleServer : spl::Skeleton<test::Simple>
 
         if (++count % 20 == 0)
            std::cout << "Client saying " << count << std::endl;
+           
+        sig.emit();
     }
     
     
