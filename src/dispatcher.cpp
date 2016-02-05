@@ -3,6 +3,8 @@
 #include <sys/timerfd.h>
 #include <sys/poll.h>
 
+#include <unistd.h>
+
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
 #include "simppl/skeletonbase.h"

@@ -2,16 +2,13 @@
 #define SIMPPL_DETAIL_SERVERHOLDER_H
 
 
-#include "simppl/detail/serversignalbase.h"
-
-
 namespace simppl
 {
 
 namespace ipc
 {
 
-namespace detail
+namespace detxxail
 {
 
 struct ServerHolderBase

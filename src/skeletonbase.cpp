@@ -10,7 +10,6 @@
 #undef SIMPPL_SKELETONBASE_CPP
 
 #include "simppl/detail/util.h"
-#include "simppl/detail/frames.h"
 
 
 namespace simppl
@@ -29,10 +28,11 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 
 
 SkeletonBase::SkeletonBase(const char* iface, const char* role)
- : role_(role)
+ : role_(nullptr)
+ , objectpath_(nullptr)
  , disp_(nullptr)
 {
-   assert(role_);
+   assert(role);
 
    // strip template arguments
    memset(iface_, 0, sizeof(iface_));
@@ -53,12 +53,28 @@ SkeletonBase::SkeletonBase(const char* iface, const char* role)
 
    // terminate
    *writep = '\0';
+      
+   // now objectpath
+   size_t capacity = strlen(role) + strlen(iface_) + 3;
+   
+   objectpath_ = new char[capacity];
+   sprintf(objectpath_, "/%s/%s", iface_, role);
+   
+   readp = objectpath_;
+   
+   while(*(++readp))
+   {
+      if (*readp == '.')
+         *readp = '/';
+   }    
+   
+   role_ = objectpath_ + strlen(objectpath_) - strlen(role);  
 }
 
 
 SkeletonBase::~SkeletonBase()
 {
-   // NOOP
+   delete objectpath_;
 }
 
 

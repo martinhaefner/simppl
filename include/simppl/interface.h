@@ -8,7 +8,6 @@
 
 #include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
-#include "simppl/detail/serversignalbase.h"  // FIXME can be removed probably...
 #include "simppl/detail/serverrequestbasesetter.h"
 
 

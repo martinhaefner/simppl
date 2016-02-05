@@ -16,12 +16,6 @@ namespace simppl
 namespace ipc
 {
 
-namespace detail
-{
-   template<typename> struct ServerHolder;
-}
-
-
 template<template<template<typename...> class, 
                   template<typename...> class,
                   template<typename...> class,
@@ -29,7 +23,6 @@ template<template<template<typename...> class,
 struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
-   template<typename> friend struct detail::ServerHolder;
    
    typedef IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> interface_type;
    
@@ -40,19 +33,8 @@ struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSign
       // NOOP
    }
    
-   /*inline
-   std::string fqn() const
-   {
-      return Dispatcher::fullQualifiedName(InterfaceNamer<interface_type>::name(), role_);
-   }*/
    
 protected:
-   
-   /*bool find(uint32_t funcid, std::map<uint32_t, ServerRequestBase*>::iterator& iter)
-   {
-      iter = ((interface_type*)this)->container_.find(funcid);
-      return iter != ((interface_type*)this)->container_.end();
-   }*/
    
    ServerRequestDescriptor current_request_;
 };

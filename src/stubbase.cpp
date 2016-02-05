@@ -2,7 +2,6 @@
 
 #include "simppl/dispatcher.h"
 
-#include "simppl/detail/frames.h"
 #include "simppl/detail/util.h"
 #include "simppl/clientside.h"
 

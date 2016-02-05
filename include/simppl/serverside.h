@@ -15,12 +15,11 @@
 
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/basicinterface.h"
-#include "simppl/detail/serversignalbase.h"
 #include "simppl/detail/validation.h"
 
 #if !(defined(SIMPPL_SKELETONBASE_H) \
       || defined(SIMPPL_DISPATCHER_CPP) \
-      || defined(SIMPPL_SERVERSIGNALBASE_CPP) \
+      || defined(SIMPPL_SERVERSIDE_CPP) \
       || defined(SIMPPL_SKELETONBASE_CPP) \
       )
 #   error "Don't include this file manually. Include 'skeleton.h' instead".
@@ -85,7 +84,7 @@ protected:
 
 
 template<typename... T>
-struct ServerSignal : detail::ServerSignalBase
+struct ServerSignal 
 {
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
 
@@ -103,7 +102,7 @@ struct ServerSignal : detail::ServerSignalBase
       if (parent_->conn_)
       {
          SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-         DBusMessage* msg = dbus_message_new_signal(skel->objectpath().c_str(), skel->iface(), name_);
+         DBusMessage* msg = dbus_message_new_signal(skel->objectpath(), skel->iface(), name_);
 
          detail::Serializer s(msg);
          serialize(s, args...);

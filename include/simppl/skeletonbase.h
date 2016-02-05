@@ -27,6 +27,9 @@ struct Dispatcher;
 
 struct SkeletonBase
 {
+   SkeletonBase(const SkeletonBase&) = delete;
+   SkeletonBase& operator=(const SkeletonBase&) = delete;
+   
    friend struct Dispatcher;
 
    static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
@@ -66,27 +69,14 @@ struct SkeletonBase
       return role_;
    }
 
-   // FIXME make this function some generic helper.
-   // FIXME either const char* or string return, must be clean all-over
-   std::string objectpath() const
+   inline
+   const char* objectpath() const
    {
-       std::ostringstream opath;
-       opath << "/" << iface() << "." << role();
-
-       std::string objectpath = opath.str();
-
-       std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
-       if (c == '.')
-           c = '/';
-       });
-
-       return objectpath;
+      return objectpath_;
    }
-
+   
 
 protected:
-
-   //virtual bool find(uint32_t funcid, std::map<uint32_t, ServerRequestBase*>::iterator& iter) = 0;
 
    DBusHandlerResult handleRequest(DBusMessage* msg);
 
@@ -94,7 +84,8 @@ protected:
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
 
    char iface_[128];
-   const char* role_;
+   char* role_;
+   char* objectpath_;
 
    Dispatcher* disp_;
    ServerRequestDescriptor current_request_;

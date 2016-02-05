@@ -10,7 +10,6 @@
 #include <atomic>
 #include <queue>
 
-#include "simppl/detail/serverholder.h"
 #include "simppl/detail/constants.h"
 
 // FIXME can this be remroved?
