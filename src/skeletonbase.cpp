@@ -54,21 +54,7 @@ SkeletonBase::SkeletonBase(const char* iface, const char* role)
    // terminate
    *writep = '\0';
       
-   // now objectpath
-   size_t capacity = strlen(role) + strlen(iface_) + 3;
-   
-   objectpath_ = new char[capacity];
-   sprintf(objectpath_, "/%s/%s", iface_, role);
-   
-   readp = objectpath_;
-   
-   while(*(++readp))
-   {
-      if (*readp == '.')
-         *readp = '/';
-   }    
-   
-   role_ = objectpath_ + strlen(objectpath_) - strlen(role);  
+   std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
 }
 
 

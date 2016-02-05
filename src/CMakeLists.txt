@@ -8,4 +8,5 @@ add_library(simppl dispatcher.cpp
    serialization.cpp
    clientresponseholder.cpp
    timeout.cpp
+   util.cpp
    serverrequestdescriptor.cpp)

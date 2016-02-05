@@ -22,9 +22,10 @@ namespace ipc
 {
 
 StubBase::StubBase(const char* iface, const char* role)
- : role_(role)
+ : role_(nullptr)
+ , objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
- , disp_(0)
+ , disp_(nullptr)
 {
    assert(iface);
    assert(role);
@@ -50,6 +51,8 @@ StubBase::StubBase(const char* iface, const char* role)
 
    // terminate
    *writep = '\0';
+
+   std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
 }
 
 
@@ -57,6 +60,8 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->removeClient(*this);
+      
+   delete objectpath_;
 }
 
 
@@ -114,7 +119,7 @@ Dispatcher& StubBase::disp()
 
 DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f)
 {
-    DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath().c_str(), iface(), req.method_name_);
+    DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), iface(), req.method_name_);
     DBusPendingCall* pending = nullptr;
 
     detail::Serializer s(msg);
@@ -203,7 +208,7 @@ void StubBase::cleanup()
 
 void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data)
 {
-   DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath().c_str(), "org.freedesktop.DBus.Properties", "Get");
+   DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get");
    DBusPendingCall* pending = nullptr;
 
    detail::Serializer s(msg);

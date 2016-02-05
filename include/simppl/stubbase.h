@@ -41,6 +41,9 @@ struct StubBase
    template<typename, typename> friend struct ClientAttribute;
    friend struct Dispatcher;
 
+   StubBase(const StubBase&) = delete;
+   StubBase& operator=(const StubBase&) = delete;
+   
 protected:
 
    virtual ~StubBase();
@@ -63,21 +66,10 @@ public:
       return role_;
    }
 
-   // FIXME make this function some generic helper.
-   // FIXME either const char* or string return, must be clean all-over
-   std::string objectpath() const
+   inline
+   const char* objectpath() const
    {
-       std::ostringstream opath;
-       opath << "/" << iface() << "." << role();
-
-       std::string objectpath = opath.str();
-
-       std::for_each(objectpath.begin(), objectpath.end(), [](char& c){
-       if (c == '.')
-           c = '/';
-       });
-
-       return objectpath;
+      return objectpath_;
    }
 
    Dispatcher& disp();
@@ -118,7 +110,8 @@ protected:
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
 
    char iface_[128];
-   const char* role_;
+   char* role_;
+   char* objectpath_;
    ConnectionState conn_state_;
 
    Dispatcher* disp_;
