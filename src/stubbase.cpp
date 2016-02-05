@@ -196,8 +196,6 @@ void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, v
 
 void StubBase::try_handle_signal(DBusMessage* msg)
 {
-   const char *method = dbus_message_get_member(msg);
-
    auto iter = signals_.find(dbus_message_get_member(msg));
    if (iter != signals_.end())
    {
