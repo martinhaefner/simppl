@@ -1,7 +1,5 @@
 #include "simppl/skeletonbase.h"
 
-#include <sstream>
-
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
@@ -28,39 +26,21 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 
 
 SkeletonBase::SkeletonBase(const char* iface, const char* role)
- : role_(nullptr)
+ : iface_(detail::extract_interface(iface))
+ , role_(nullptr)
  , objectpath_(nullptr)
  , disp_(nullptr)
 {
    assert(role);
-
-   // strip template arguments
-   memset(iface_, 0, sizeof(iface_));
-   strncpy(iface_, iface, strstr(iface, "<") - iface);
-
-   // remove '::' separation in favour of '.' separation
-   char *readp = iface_, *writep = iface_;
-   while(*readp)
-   {
-      if (*readp == ':')
-      {
-         *writep++ = '.';
-         readp += 2;
-      }
-      else
-         *writep++ = *readp++;
-   }
-
-   // terminate
-   *writep = '\0';
-      
    std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
 }
 
 
 SkeletonBase::~SkeletonBase()
 {
-   delete objectpath_;
+   delete[] iface_;
+   delete[] objectpath_;
+   role_ = nullptr;
 }
 
 

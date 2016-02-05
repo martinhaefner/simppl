@@ -5,7 +5,6 @@
 #include <cassert>
 #include <functional>
 #include <map>
-#include <sstream>
 #include <iostream>  // FIXME remove this
 
 #include <dbus/dbus.h>
@@ -102,16 +101,21 @@ protected:
  
    DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 
-   std::string boundname() const;
+   inline
+   std::string boundname() const
+   {
+      return busname_;
+   }
 
    void sendSignalRegistration(ClientSignalBase& sigbase);
    void sendSignalUnregistration(ClientSignalBase& sigbase);
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
 
-   char iface_[128];
+   char* iface_;
    char* role_;
    char* objectpath_;
+   std::string busname_;
    ConnectionState conn_state_;
 
    Dispatcher* disp_;

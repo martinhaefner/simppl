@@ -6,9 +6,7 @@
 #include "simppl/clientside.h"
 
 #include <cstring>
-#include <thread>
 #include <chrono>
-#include <sstream>
 #include <cassert>
 
 
@@ -22,37 +20,19 @@ namespace ipc
 {
 
 StubBase::StubBase(const char* iface, const char* role)
- : role_(nullptr)
+ : iface_(detail::extract_interface(iface))
+ , role_(nullptr)
  , objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
 {
-   assert(iface);
    assert(role);
-
-   // FIXME move this code to helper global function
-
-   // strip template arguments
-   memset(iface_, 0, sizeof(iface_));
-   strncpy(iface_, iface, strstr(iface, "<") - iface);
-
-   // remove '::' separation in favour of '.' separation
-   char *readp = iface_, *writep = iface_;
-   while(*readp)
-   {
-      if (*readp == ':')
-      {
-         *writep++ = '.';
-         readp += 2;
-      }
-      else
-         *writep++ = *readp++;
-   }
-
-   // terminate
-   *writep = '\0';
-
    std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
+   
+   busname_.reserve(strlen(this->iface()) + 1 + strlen(this->role()));
+   busname_ = this->iface();
+   busname_ += ".";
+   busname_ += this->role();
 }
 
 
@@ -61,7 +41,9 @@ StubBase::~StubBase()
    if (disp_)
       disp_->removeClient(*this);
       
-   delete objectpath_;
+   delete[] iface_;
+   delete[] objectpath_;
+   role_ = nullptr;
 }
 
 
@@ -142,16 +124,6 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
     return pending;
-}
-
-
-std::string StubBase::boundname() const
-{ 
-    // FIXME optimize, use C string only and cache result?!
-    std::ostringstream bname;
-    bname << iface_ << "." << role_;
-
-    return bname.str();
 }
 
 

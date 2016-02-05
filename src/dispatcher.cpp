@@ -431,6 +431,29 @@ void Dispatcher::notify_clients(const std::string& boundname, ConnectionState st
 }
 
 
+void Dispatcher::addServer(SkeletonBase& serv)
+{
+   DBusError err;
+   dbus_error_init(&err);
+
+   std::ostringstream busname;
+   busname << serv.iface() << '.' << serv.role();
+
+   dbus_bus_request_name(conn_, busname.str().c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
+   assert(!dbus_error_is_set(&err));
+
+   dbus_error_free(&err);
+
+   // isn't this double the information?
+   dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
+
+   // register same path as busname, just with / instead of .
+   dbus_connection_register_object_path(conn_, serv.objectpath(), &stub_v_table, &serv);
+
+   serv.disp_ = this;
+}
+
+
 void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
 {
    DBusError err;
@@ -452,7 +475,6 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
        dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
        assert(!dbus_error_is_set(&err));
 
-// FIXME cleanup signal notifications/matches on bus when stub is removed
        dbus_error_free(&err);
 
        signal_matches_[signalname] = 1;
@@ -500,16 +522,13 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         if (!strcmp(dbus_message_get_member(msg), "notify_client"))
         {
-           // FIXME rename boundname to busname or whatever...
-           std::string boundname;
+           std::string busname;
 
            detail::Deserializer ds(msg);
-           ds >> boundname;
+           ds >> busname;
 
-           //std::cout << "Check for clients with '" << boundname << "'" << std::endl;
-
-           if (busnames_.find(boundname) != busnames_.end())
-            notify_clients(boundname, ConnectionState::Connected);
+           if (busnames_.find(busname) != busnames_.end())
+            notify_clients(busname, ConnectionState::Connected);
         }
         else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
         {
@@ -526,16 +545,12 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            {
                if (old_name.empty())
                {
-                   //std::cout << "Add service '" << bus_name << "'" << std::endl;
                    busnames_.insert(bus_name);
-
                    notify_clients(bus_name, ConnectionState::Connected);
                }
                else if (new_name.empty())
                {
-                   //std::cout << "Drop service: " << bus_name << std::endl;
                    busnames_.erase(bus_name);
-
                    notify_clients(bus_name, ConnectionState::Disconnected);
                }
            }
@@ -543,13 +558,20 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            return DBUS_HANDLER_RESULT_HANDLED;
         }
 
-        std::string rolename(dbus_message_get_path(msg));
-        rolename = rolename.substr(rolename.rfind('/')+1);
-
-        std::string originator(dbus_message_get_interface(msg));
-        originator += ".";
-        originator += rolename;
-
+        // ordinary signals...
+        
+        // here we expect that pathname is the same as busname, just with / instead of .
+        char originator[256];
+        strncpy(originator, dbus_message_get_path(msg)+1, sizeof(originator));
+        originator[sizeof(originator)-1] = '\0';
+        
+        char* p = originator;
+        while(*++p)
+        {
+           if (*p == '/')
+              *p = '.';
+        }
+        
         auto range = stubs_.equal_range(originator);
 
         std::for_each(range.first, range.second, [msg](auto& entry){

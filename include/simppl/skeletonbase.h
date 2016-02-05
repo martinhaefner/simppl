@@ -5,9 +5,7 @@
 
 #include <dbus/dbus.h>
 
-#include <sstream>   // FIXME move to impl
 #include <iostream>  // FIXME remove this
-#include <algorithm> // FIXME move to impl
 
 #include "simppl/error.h"
 #include "simppl/serverrequestdescriptor.h"
@@ -83,7 +81,7 @@ protected:
    /// return a session pointer and destruction function if adequate
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
 
-   char iface_[128];
+   char* iface_;
    char* role_;
    char* objectpath_;
 
