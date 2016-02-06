@@ -64,18 +64,8 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
             template<typename,typename=simppl::dbus::OnChange> class Attribute> \
       struct iface : public simppl::dbus::InterfaceBase<Request>
 
-#define INIT_REQUEST(request) \
-   request(# request, this)
-
-#define INIT_RESPONSE(response) \
-   response(this)
-
-#define INIT_SIGNAL(signal) \
-   signal(# signal, this)
-
-// an attribute is nothing more that an encapsulated signal
-#define INIT_ATTRIBUTE(attr) \
-   attr(# attr, this)
+#define INIT(what) \
+   what(# what, this)
 
 
 template<typename... T, typename... T2>

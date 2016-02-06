@@ -25,9 +25,9 @@ INTERFACE(Timeout)
 
    inline
    Timeout()
-    : INIT_REQUEST(eval)
-    , INIT_REQUEST(oneway)
-    , INIT_RESPONSE(rEval)
+    : INIT(eval)
+    , INIT(oneway)
+    , INIT(rEval)
    {
       eval >> rEval;
    }

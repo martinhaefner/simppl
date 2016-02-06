@@ -25,10 +25,10 @@ INTERFACE(Errors)
    
    inline
    Errors()
-    : INIT_REQUEST(hello)
-    , INIT_REQUEST(hello1)
-    , INIT_RESPONSE(world)
-    , INIT_RESPONSE(world1)
+    : INIT(hello)
+    , INIT(hello1)
+    , INIT(world)
+    , INIT(world1)
    {
       hello >> world;
       hello1 >> world1;

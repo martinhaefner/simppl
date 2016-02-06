@@ -32,15 +32,15 @@ INTERFACE(Simple)
 
    inline
    Simple()
-    : INIT_REQUEST(hello)
-    , INIT_REQUEST(oneway)
-    , INIT_REQUEST(add)
-    , INIT_REQUEST(echo)
-    , INIT_RESPONSE(world)
-    , INIT_RESPONSE(result)
-    , INIT_RESPONSE(rEcho)
-    , INIT_ATTRIBUTE(data)
-    , INIT_SIGNAL(sig)
+    : INIT(hello)
+    , INIT(oneway)
+    , INIT(add)
+    , INIT(echo)
+    , INIT(world)
+    , INIT(result)
+    , INIT(rEcho)
+    , INIT(data)
+    , INIT(sig)
    {
       hello >> world;
       add >> result;

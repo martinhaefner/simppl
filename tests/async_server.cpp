@@ -25,11 +25,11 @@ INTERFACE(AsyncServer)
    
    inline
    AsyncServer()
-    : INIT_REQUEST(oneway)
-    , INIT_REQUEST(add)
-    , INIT_REQUEST(echo)
-    , INIT_RESPONSE(result)
-    , INIT_RESPONSE(rEcho)
+    : INIT(oneway)
+    , INIT(add)
+    , INIT(echo)
+    , INIT(result)
+    , INIT(rEcho)
     {
       add >> result;
       echo >> rEcho;

@@ -33,11 +33,11 @@ INTERFACE(Attributes)
 
    inline
    Attributes()
-    : INIT_REQUEST(set)
-    , INIT_REQUEST(shutdown)
-    , INIT_ATTRIBUTE(data)
-    , INIT_ATTRIBUTE(props)
-    , INIT_SIGNAL(mayShutdown)
+    : INIT(set)
+    , INIT(shutdown)
+    , INIT(data)
+    , INIT(props)
+    , INIT(mayShutdown)
    {
       // NOOP
    }

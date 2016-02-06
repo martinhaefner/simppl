@@ -169,7 +169,7 @@ struct ServerResponse : ServerResponseBase
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
 
    inline
-   ServerResponse(detail::BasicInterface* iface)
+   ServerResponse(const char* /*name*/, detail::BasicInterface* iface)
     : iface_(iface)
    {
       // NOOP
