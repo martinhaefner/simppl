@@ -22,7 +22,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -272,7 +272,7 @@ struct ClientRequest : ClientRequestBase
    {
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::ipc::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
       return detail::ClientResponseHolder(stub->disp(), handler_, stub->sendRequest(*this, f));
    }
 
@@ -356,14 +356,14 @@ struct ClientResponse : ClientResponseBase
 };
 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
 
 template<typename FunctorT, typename... T>
 inline
-simppl::ipc::ClientResponse<T...>& operator>>(simppl::ipc::ClientResponse<T...>& r, const FunctorT& f)
+simppl::dbus::ClientResponse<T...>& operator>>(simppl::dbus::ClientResponse<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
    return r;
@@ -372,7 +372,7 @@ simppl::ipc::ClientResponse<T...>& operator>>(simppl::ipc::ClientResponse<T...>&
 
 template<typename DataT, typename EmitPolicyT, typename FuncT>
 inline
-void operator>>(simppl::ipc::ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
+void operator>>(simppl::dbus::ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
 {
    attr.handledBy(func);
 }
@@ -380,7 +380,7 @@ void operator>>(simppl::ipc::ClientAttribute<DataT,EmitPolicyT>& attr, const Fun
 
 template<typename... T, typename FuncT>
 inline
-void operator>>(simppl::ipc::ClientSignal<T...>& sig, const FuncT& func)
+void operator>>(simppl::dbus::ClientSignal<T...>& sig, const FuncT& func)
 {
    sig.handledBy(func);
 }

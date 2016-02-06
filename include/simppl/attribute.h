@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 /// partial update mode for container attributes of type vector
@@ -62,7 +62,7 @@ struct Committed
    }
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

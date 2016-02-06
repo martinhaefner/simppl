@@ -4,7 +4,7 @@ in the following functional domains:
 
  * generative commandline parser framework
  * generative inifile parser framework
- * generative service-oriented IPC library introducing a C++ embedded DSL for 
+ * generative DBus wrapper introducing a C++ embedded DSL for 
    the definition of service interfaces and serializable data structures.
 
 
@@ -28,13 +28,6 @@ Status:
 
 The parser frameworks should do their work. I use it sucessfully in my own 
 projects.
-
-The IPC library is feature complete and works as far as I already have
-written tests for it. There are certainly some problems with resource 
-cleanup and services shutdown but if you have a project that need IPC 
-and you just once connect your binaries through the simppl library you 
-should get a system that is doing well. I plan to spend some time in 
-resource tracking so one day, it should really become 'production ready'.
 
 
 CopyLeft:

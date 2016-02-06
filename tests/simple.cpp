@@ -56,24 +56,24 @@ using namespace test;
 namespace {
 
 
-struct Client : simppl::ipc::Stub<Simple>
+struct Client : simppl::dbus::Stub<Simple>
 {
    Client()
-    : simppl::ipc::Stub<Simple>("s", "unix:SimpleTest")
+    : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
       world >> std::bind(&Client::handleWorld, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       hello();
    }
 
 
-   void handleWorld(const simppl::ipc::CallState& state)
+   void handleWorld(const simppl::dbus::CallState& state)
    {
       EXPECT_TRUE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -87,45 +87,45 @@ struct Client : simppl::ipc::Stub<Simple>
 };
 
 
-struct DisconnectClient : simppl::ipc::Stub<Simple>
+struct DisconnectClient : simppl::dbus::Stub<Simple>
 {
    DisconnectClient()
-    : simppl::ipc::Stub<Simple>("s", "unix:SimpleTest")
+    : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
    {
       connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(expected_, s);
 
-      if (s == simppl::ipc::ConnectionState::Connected)
+      if (s == simppl::dbus::ConnectionState::Connected)
       {
          oneway(7777);
       }
       else
          disp().stop();
 
-      expected_ = simppl::ipc::ConnectionState::Disconnected;
+      expected_ = simppl::dbus::ConnectionState::Disconnected;
    }
 
-   simppl::ipc::ConnectionState expected_ = simppl::ipc::ConnectionState::Connected;
+   simppl::dbus::ConnectionState expected_ = simppl::dbus::ConnectionState::Connected;
 };
 
 
-struct AttributeClient : simppl::ipc::Stub<Simple>
+struct AttributeClient : simppl::dbus::Stub<Simple>
 {
    AttributeClient()
-    : simppl::ipc::Stub<Simple>("sa", "unix:SimpleTest")
+    : simppl::dbus::Stub<Simple>("sa", "unix:SimpleTest")
    {
       connected >> std::bind(&AttributeClient::handleConnected, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
       // like for signals, attributes must be attached when the client is connected
       data.attach() >> std::bind(&AttributeClient::attributeChanged, this, _1);
@@ -158,18 +158,18 @@ struct AttributeClient : simppl::ipc::Stub<Simple>
 };
 
 
-struct SignalClient : simppl::ipc::Stub<Simple>
+struct SignalClient : simppl::dbus::Stub<Simple>
 {
    SignalClient()
-    : simppl::ipc::Stub<Simple>("ss", "unix:SimpleTest")
+    : simppl::dbus::Stub<Simple>("ss", "unix:SimpleTest")
    {
       connected >> std::bind(&SignalClient::handleConnected, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
       // like for attributes, attributes must be attached when the client is connected
       sig.attach() >> std::bind(&SignalClient::handleSignal, this, _1);
@@ -196,10 +196,10 @@ struct SignalClient : simppl::ipc::Stub<Simple>
 };
 
 
-struct Server : simppl::ipc::Skeleton<Simple>
+struct Server : simppl::dbus::Skeleton<Simple>
 {
    Server(const char* rolename)
-    : simppl::ipc::Skeleton<Simple>(rolename)
+    : simppl::dbus::Skeleton<Simple>(rolename)
    {
       hello >> std::bind(&Server::handleHello, this);
       oneway >> std::bind(&Server::handleOneway, this, _1);
@@ -251,7 +251,7 @@ struct Server : simppl::ipc::Skeleton<Simple>
 
 TEST(Simple, methods)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
 
@@ -264,7 +264,7 @@ TEST(Simple, methods)
 
 TEST(Simple, signal)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    SignalClient c;
    Server s("ss");
 
@@ -279,7 +279,7 @@ TEST(Simple, signal)
 
 TEST(Simple, attribute)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    AttributeClient c;
    Server s("sa");
 
@@ -292,12 +292,12 @@ TEST(Simple, attribute)
 
 TEST(Simple, blocking)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
 
    Server s("sb");
    d.addServer(s);
 
-   simppl::ipc::Stub<Simple> stub("sb", "dbus:session");
+   simppl::dbus::Stub<Simple> stub("sb", "dbus:session");
    d.addClient(stub);
 
    stub.connect();
@@ -333,13 +333,13 @@ TEST(Simple, blocking)
 
 TEST(Simple, disconnect)
 {
-   simppl::ipc::Dispatcher clientd;
+   simppl::dbus::Dispatcher clientd;
 
    DisconnectClient c;
    clientd.addClient(c);
 
    {
-      simppl::ipc::Dispatcher* serverd = new simppl::ipc::Dispatcher("dbus:session");
+      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("dbus:session");
       Server* s = new Server("s");
       serverd->addServer(*s);
 

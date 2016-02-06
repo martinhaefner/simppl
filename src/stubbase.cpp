@@ -16,7 +16,7 @@ using namespace std::literals::chrono_literals;
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 StubBase::StubBase(const char* iface, const char* role)
@@ -204,7 +204,7 @@ void StubBase::try_handle_signal(DBusMessage* msg)
 }
 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

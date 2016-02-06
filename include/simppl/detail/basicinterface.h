@@ -9,7 +9,7 @@ struct DBusConnection;
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -31,7 +31,7 @@ struct BasicInterface
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

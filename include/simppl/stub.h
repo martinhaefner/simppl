@@ -16,7 +16,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -48,7 +48,7 @@ public:
    }
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
@@ -59,7 +59,7 @@ public:
 /// for storing a function in the connected function object
 template<typename CallableT>
 inline
-void operator>> (std::function<void(simppl::ipc::ConnectionState)>& func, const CallableT& callable)
+void operator>> (std::function<void(simppl::dbus::ConnectionState)>& func, const CallableT& callable)
 {
    func = callable;
 }

@@ -43,10 +43,10 @@ using namespace test;
 namespace {
    
 
-struct Client : simppl::ipc::Stub<Errors>
+struct Client : simppl::dbus::Stub<Errors>
 {
    Client()   
-    : simppl::ipc::Stub<Errors>("s", "unix:ErrorsTest")    
+    : simppl::dbus::Stub<Errors>("s", "unix:ErrorsTest")    
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
       
@@ -55,14 +55,14 @@ struct Client : simppl::ipc::Stub<Errors>
    }
    
    
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       hello();
    }
    
    
-   void handleWorld(const simppl::ipc::CallState& state)
+   void handleWorld(const simppl::dbus::CallState& state)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -73,7 +73,7 @@ struct Client : simppl::ipc::Stub<Errors>
    }
    
    
-   void handleWorld1(const simppl::ipc::CallState& state, int)
+   void handleWorld1(const simppl::dbus::CallState& state, int)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -85,10 +85,10 @@ struct Client : simppl::ipc::Stub<Errors>
 };
 
 
-struct Server : simppl::ipc::Skeleton<Errors>
+struct Server : simppl::dbus::Skeleton<Errors>
 {
    Server(const char* rolename)
-    : simppl::ipc::Skeleton<Errors>(rolename)
+    : simppl::dbus::Skeleton<Errors>(rolename)
    {
       hello >> std::bind(&Server::handleHello, this);
       hello1 >> std::bind(&Server::handleHello1, this, _1);
@@ -96,12 +96,12 @@ struct Server : simppl::ipc::Skeleton<Errors>
    
    void handleHello()
    {
-      respondWith(simppl::ipc::RuntimeError(-1, "Shit happens"));
+      respondWith(simppl::dbus::RuntimeError(-1, "Shit happens"));
    }
    
    void handleHello1(int i)
    {
-      respondWith(simppl::ipc::RuntimeError(-2, "Also shit"));
+      respondWith(simppl::dbus::RuntimeError(-2, "Also shit"));
    }
 };
 
@@ -111,7 +111,7 @@ struct Server : simppl::ipc::Skeleton<Errors>
 
 TEST(Errors, methods) 
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
    
@@ -124,12 +124,12 @@ TEST(Errors, methods)
 
 TEST(Errors, blocking) 
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    
    Server s("s");
    d.addServer(s);
    
-   simppl::ipc::Stub<Errors> stub("s", "unix:ErrorsTest");
+   simppl::dbus::Stub<Errors> stub("s", "unix:ErrorsTest");
    d.addClient(stub);
    
    stub.connect();
@@ -141,7 +141,7 @@ TEST(Errors, blocking)
       // never reach
       ASSERT_FALSE(true);
    }
-   catch(const simppl::ipc::RuntimeError& e)
+   catch(const simppl::dbus::RuntimeError& e)
    {
       EXPECT_EQ(0, strcmp(e.what(), "Shit happens"));
    }
@@ -158,7 +158,7 @@ TEST(Errors, blocking)
       // never reach
       ASSERT_FALSE(true);
    }
-   catch(const simppl::ipc::RuntimeError& e)
+   catch(const simppl::dbus::RuntimeError& e)
    {
       EXPECT_EQ(0, strcmp(e.what(), "Also shit"));
    }

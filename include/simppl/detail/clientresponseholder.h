@@ -14,7 +14,7 @@ struct DBusPendingCall;
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -52,7 +52,7 @@ struct ClientResponseHolder
 
 } // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

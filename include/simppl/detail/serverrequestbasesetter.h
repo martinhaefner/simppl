@@ -5,7 +5,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
 namespace detail
@@ -25,7 +25,7 @@ struct ServerRequestBaseSetter
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

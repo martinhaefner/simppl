@@ -5,7 +5,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
 struct Dispatcher;
@@ -18,35 +18,35 @@ namespace detail
 template<typename T>
 struct BlockingResponseHandler
 {
-   BlockingResponseHandler(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<T>& r, T& t);
+   BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t);
    
-   void operator()(const simppl::ipc::CallState& state, typename CallTraits<T>::param_type t);
+   void operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type t);
    
 private:
 
    T& t_;
-   simppl::ipc::Dispatcher& disp_;
-   simppl::ipc::ClientResponse<T>& r_;
+   simppl::dbus::Dispatcher& disp_;
+   simppl::dbus::ClientResponse<T>& r_;
 };
 
 
 template<typename... T>
 struct BlockingResponseHandlerN
 {
-   BlockingResponseHandlerN(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<T...>& r, std::tuple<T...>& t);
+   BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t);
    
-   void operator()(const simppl::ipc::CallState& state, typename CallTraits<T>::param_type... t);
+   void operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type... t);
    
 private:
 
    std::tuple<T...>& t_;
-   simppl::ipc::Dispatcher& disp_;
-   simppl::ipc::ClientResponse<T...>& r_;
+   simppl::dbus::Dispatcher& disp_;
+   simppl::dbus::ClientResponse<T...>& r_;
 };
 
 }   // namespace detail 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
@@ -57,7 +57,7 @@ private:
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
    
@@ -93,7 +93,7 @@ namespace detail
 
 template<typename T>
 inline
-BlockingResponseHandler<T>::BlockingResponseHandler(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<T>& r, T& t)
+BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t)
  : t_(t)
  , disp_(disp)
  , r_(r)
@@ -103,7 +103,7 @@ BlockingResponseHandler<T>::BlockingResponseHandler(simppl::ipc::Dispatcher& dis
 
 
 template<typename T>
-void BlockingResponseHandler<T>::operator()(const simppl::ipc::CallState& state, typename CallTraits<T>::param_type t)
+void BlockingResponseHandler<T>::operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type t)
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());
@@ -119,7 +119,7 @@ void BlockingResponseHandler<T>::operator()(const simppl::ipc::CallState& state,
 
 template<typename... T>
 inline
-BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<T...>& r, std::tuple<T...>& t)
+BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t)
  : t_(t)
  , disp_(disp)
  , r_(r)
@@ -129,7 +129,7 @@ BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::ipc::Dispatcher
 
 
 template<typename... T>
-void BlockingResponseHandlerN<T...>::operator()(const simppl::ipc::CallState& state, typename CallTraits<T>::param_type... t)
+void BlockingResponseHandlerN<T...>::operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type... t)
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());
@@ -143,7 +143,7 @@ void BlockingResponseHandlerN<T...>::operator()(const simppl::ipc::CallState& st
 
 }   // namespace detail 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
@@ -158,7 +158,7 @@ void BlockingResponseHandlerN<T...>::operator()(const simppl::ipc::CallState& st
  * bool rc = stub.func() >> ret;
  */
 inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::nullptr_t)
+void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::nullptr_t)
 {
    holder.dispatcher_.waitForResponse(holder);   
 }
@@ -172,7 +172,7 @@ void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::nullptr_t
  */
 template<typename T>
 inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
+void operator>>(simppl::dbus::detail::ClientResponseHolder holder, T& rArg)
 {
    holder.dispatcher_.waitForResponse(holder, rArg);
 }
@@ -186,7 +186,7 @@ void operator>>(simppl::ipc::detail::ClientResponseHolder holder, T& rArg)
  */
 template<typename... T>
 inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
+void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::tuple<T...>& rArgs)
 {
    holder.dispatcher_.waitForResponse(holder, rArgs);
 }
@@ -201,7 +201,7 @@ void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T..
  */
 template<typename... T>
 inline
-void operator>>(simppl::ipc::detail::ClientResponseHolder holder, std::tuple<T&...> rArgs)
+void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::tuple<T&...> rArgs)
 {
    std::tuple<T...> t;
    holder.dispatcher_.waitForResponse(holder, t);

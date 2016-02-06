@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
  
 struct request_specific_timeout_helper
@@ -36,7 +36,7 @@ extern __thread std::chrono::milliseconds request_specific_timeout;
 
 }   // namespace simppl
 
-}   // namespace ipc
+}   // namespace dbus
 
 
 #endif   // SIMPPL_DETAIL_TIMEOUT_H

@@ -15,7 +15,7 @@ struct DBusMessage;
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -46,7 +46,7 @@ struct ServerResponseHolder
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

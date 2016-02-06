@@ -9,7 +9,7 @@
 namespace simppl
 {
  
-namespace ipc
+namespace dbus
 {
  
  
@@ -28,6 +28,6 @@ ServerAttributeBase::ServerAttributeBase(const char* name, detail::BasicInterfac
 }
  
  
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

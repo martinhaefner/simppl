@@ -29,7 +29,7 @@ struct inotify_event;
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 extern DBusObjectPathVTable stub_v_table;
@@ -139,7 +139,7 @@ private:
 };
 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

@@ -13,7 +13,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 template<template<template<typename...> class, 
@@ -39,7 +39,7 @@ protected:
    ServerRequestDescriptor current_request_;
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

@@ -13,7 +13,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 
@@ -261,6 +261,6 @@ std::tuple<void*,void(*)(void*)> SkeletonBase::clientAttached()
    return std::tuple<void*,void(*)(void*)>(nullptr, nullptr);   // the default does not create any session data
 }
 */
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

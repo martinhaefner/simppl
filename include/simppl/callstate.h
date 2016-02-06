@@ -11,7 +11,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 struct CallState
@@ -100,7 +100,7 @@ private:
    uint32_t sequence_nr_;
 };
 
-}   // namespace ipc
+}   // namespace dbus
    
 }   // namespace simppl
 

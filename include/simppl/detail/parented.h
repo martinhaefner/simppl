@@ -12,7 +12,7 @@ struct Dispatcher;
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
 struct StubBase;
@@ -23,8 +23,8 @@ namespace detail
 
 struct Parented
 {
-   friend struct simppl::ipc::StubBase;
-   friend struct simppl::ipc::Dispatcher;
+   friend struct simppl::dbus::StubBase;
+   friend struct simppl::dbus::Dispatcher;
    
 protected:
  
@@ -54,7 +54,7 @@ protected:
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

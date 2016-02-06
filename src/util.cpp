@@ -7,7 +7,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -66,6 +66,6 @@ char* extract_interface(const char* mangled_iface)
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

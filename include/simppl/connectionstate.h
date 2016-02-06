@@ -5,7 +5,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 
@@ -18,7 +18,7 @@ enum struct ConnectionState
 };
 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

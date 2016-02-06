@@ -10,7 +10,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -82,7 +82,7 @@ namespace boost_adapter
 template<typename T>
 struct isValidType
 {
-   typedef typename boost::mpl::if_c<simppl::ipc::detail::isValidType<T>::value, boost::mpl::true_, boost::mpl::false_>::type type;
+   typedef typename boost::mpl::if_c<simppl::dbus::detail::isValidType<T>::value, boost::mpl::true_, boost::mpl::false_>::type type;
 };
 
 }   // namespace boost_adapter
@@ -218,7 +218,7 @@ struct isValidType
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

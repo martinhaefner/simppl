@@ -5,7 +5,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 namespace detxxail
@@ -62,7 +62,7 @@ struct ServerHolder : ServerHolderBase
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

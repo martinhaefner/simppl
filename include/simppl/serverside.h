@@ -29,7 +29,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -187,7 +187,7 @@ private:
    inline
    detail::ServerResponseHolder __impl(tTrueType, typename CallTraits<T>::param_type... t)
    {
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::ipc::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
       return detail::ServerResponseHolder(*this, f);
    }
    
@@ -312,14 +312,14 @@ struct ServerAttribute : CommitMixin<EmitPolicyT, BaseAttribute<DataT>>
    }
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
 
 template<typename FunctorT, typename... T>
 inline
-void operator>>(simppl::ipc::ServerRequest<T...>& r, const FunctorT& f)
+void operator>>(simppl::dbus::ServerRequest<T...>& r, const FunctorT& f)
 {
    r.handledBy(f);
 }

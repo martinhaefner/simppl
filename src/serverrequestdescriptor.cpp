@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 
@@ -82,7 +82,7 @@ ServerRequestDescriptor::operator const void*() const
 }
 
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

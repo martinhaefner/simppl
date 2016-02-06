@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 template<typename... T>
@@ -18,7 +18,7 @@ struct make_serializer
    typedef typename detail::make_serializer_imp<type__>::type type;
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

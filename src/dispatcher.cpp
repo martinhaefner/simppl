@@ -34,7 +34,7 @@ get_lookup_duetime()
 struct BlockingResponseHandler0
 {
    inline
-   BlockingResponseHandler0(simppl::ipc::Dispatcher& disp, simppl::ipc::ClientResponse<>& r)
+   BlockingResponseHandler0(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<>& r)
     : disp_(disp)
     , r_(r)
    {
@@ -42,7 +42,7 @@ struct BlockingResponseHandler0
    }
 
    inline
-   void operator()(const simppl::ipc::CallState& state)
+   void operator()(const simppl::dbus::CallState& state)
    {
       disp_.stop();
       r_.handledBy(std::nullptr_t());
@@ -51,14 +51,14 @@ struct BlockingResponseHandler0
          disp_.propagate(state);
    }
 
-   simppl::ipc::Dispatcher& disp_;
-   simppl::ipc::ClientResponse<>& r_;
+   simppl::dbus::Dispatcher& disp_;
+   simppl::dbus::ClientResponse<>& r_;
 };
 
 
 DBusHandlerResult signal_filter(DBusConnection* /*connection*/, DBusMessage* msg, void *user_data)
 {
-    simppl::ipc::Dispatcher* disp = (simppl::ipc::Dispatcher*)user_data;
+    simppl::dbus::Dispatcher* disp = (simppl::dbus::Dispatcher*)user_data;
     return disp->try_handle_signal(msg);
 }
 
@@ -102,7 +102,7 @@ int make_dbus_flags(short events)
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 struct Dispatcher::Private
@@ -110,37 +110,37 @@ struct Dispatcher::Private
     static
     dbus_bool_t add_watch(DBusWatch *watch, void *data)
     {
-        return ((simppl::ipc::Dispatcher::Private*)data)->add_watch(watch);
+        return ((simppl::dbus::Dispatcher::Private*)data)->add_watch(watch);
     }
 
     static
     void remove_watch(DBusWatch *watch, void *data)
     {
-        ((simppl::ipc::Dispatcher::Private*)data)->remove_watch(watch);
+        ((simppl::dbus::Dispatcher::Private*)data)->remove_watch(watch);
     }
 
     static
     void toggle_watch(DBusWatch *watch, void *data)
     {
-        ((simppl::ipc::Dispatcher::Private*)data)->toggle_watch(watch);
+        ((simppl::dbus::Dispatcher::Private*)data)->toggle_watch(watch);
     }
 
     static
     dbus_bool_t add_timeout(DBusTimeout *timeout, void *data)
     {
-        return ((simppl::ipc::Dispatcher::Private*)data)->add_timeout(timeout);
+        return ((simppl::dbus::Dispatcher::Private*)data)->add_timeout(timeout);
     }
 
     static
     void remove_timeout(DBusTimeout *timeout, void *data)
     {
-        ((simppl::ipc::Dispatcher::Private*)data)->remove_timeout(timeout);
+        ((simppl::dbus::Dispatcher::Private*)data)->remove_timeout(timeout);
     }
 
     static
     void toggle_timeout(DBusTimeout *timeout, void *data)
     {
-        ((simppl::ipc::Dispatcher::Private*)data)->toggle_timeout(timeout);
+        ((simppl::dbus::Dispatcher::Private*)data)->toggle_timeout(timeout);
     }
 
 
@@ -704,6 +704,6 @@ int Dispatcher::run()
    }
 }
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

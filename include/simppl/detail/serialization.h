@@ -28,7 +28,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 // forward decls
@@ -601,14 +601,14 @@ public:
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
 
 #define MAKE_SERIALIZER(type) \
 inline \
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, type t) \
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, type t) \
 { \
    return s.write(t); \
 }
@@ -635,12 +635,12 @@ MAKE_SERIALIZER(const std::string&)
 
 // forward decl
 template<typename VectorT>
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer&, const simppl::ipc::ServerVectorAttributeUpdate<VectorT>&);
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer&, const simppl::dbus::ServerVectorAttributeUpdate<VectorT>&);
 
 
 template<typename T>
 inline
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::vector<T>& v)
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::vector<T>& v)
 {
    return s.write(v);
 }
@@ -648,7 +648,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
 
 template<typename KeyT, typename ValueT>
 inline
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::map<KeyT, ValueT>& m)
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::map<KeyT, ValueT>& m)
 {
    return s.write(m);
 }
@@ -656,7 +656,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
 
 template<typename StructT>
 inline
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const StructT& st)
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const StructT& st)
 {
    return s.write(st);
 }
@@ -664,7 +664,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
 
 template<typename... T>
 inline
-simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, const std::tuple<T...>& t)
+simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::tuple<T...>& t)
 {
    return s.write(t);
 }
@@ -673,7 +673,7 @@ simppl::ipc::detail::Serializer& operator<<(simppl::ipc::detail::Serializer& s, 
 template<typename SerializerT>
 template<typename T>
 inline
-void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
+void simppl::dbus::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
     s_ << t;
 }
@@ -685,7 +685,7 @@ void simppl::ipc::detail::TupleSerializer<SerializerT>::operator()(const T& t)  
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -848,14 +848,14 @@ public:   // FIXME friend?
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
 
 #define MAKE_DESERIALIZER(type) \
 inline \
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, type& t) \
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, type& t) \
 { \
    return s.read(t); \
 }
@@ -882,32 +882,32 @@ MAKE_DESERIALIZER(std::string)
 
 // forward decl
 template<typename VectorT>
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&, simppl::ipc::ClientVectorAttributeUpdate<VectorT>&);
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer&, simppl::dbus::ClientVectorAttributeUpdate<VectorT>&);
 
 template<typename T>
 inline
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::vector<T>& v)
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::vector<T>& v)
 {
    return s.read(v);
 }
 
 template<typename KeyT, typename ValueT>
 inline
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::map<KeyT, ValueT>& m)
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::map<KeyT, ValueT>& m)
 {
    return s.read(m);
 }
 
 template<typename StructT>
 inline
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, StructT& st)
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, StructT& st)
 {
    return s.read(st);
 }
 
 template<typename... T>
 inline
-simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer& s, std::tuple<T...>& t)
+simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::tuple<T...>& t)
 {
    return s.read(t);
 }
@@ -916,7 +916,7 @@ simppl::ipc::detail::Deserializer& operator>>(simppl::ipc::detail::Deserializer&
 template<typename DeserializerT>
 template<typename T>
 inline
-void simppl::ipc::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
+void simppl::dbus::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 {
    s_ >> t;
 }
@@ -928,7 +928,7 @@ void simppl::ipc::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -1037,7 +1037,7 @@ struct DeserializeAndCall : simppl::NonInstantiable
 
    template<typename FunctorT>
    static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const simppl::ipc::CallState& cs)
+   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       std::tuple<T...> tuple;
 
@@ -1060,7 +1060,7 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
 
    template<typename FunctorT>
    static inline
-   void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::ipc::CallState& cs)
+   void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       f(cs);
    }
@@ -1075,7 +1075,7 @@ struct GetCaller : simppl::NonInstantiable
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 namespace detail
@@ -29,7 +29,7 @@ struct is_vector<std::vector<T> >
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

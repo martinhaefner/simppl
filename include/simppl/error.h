@@ -11,7 +11,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 /// Base class for all IPC related exceptions.
@@ -115,7 +115,7 @@ private:
 
 }   // namespace simppl
    
-}   // namespace ipc
+}   // namespace dbus
 
 
 #endif   // SIMPPL_ERROR_H

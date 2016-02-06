@@ -6,7 +6,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
 namespace detail
@@ -50,6 +50,6 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
 
 }   // namespace detail
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

@@ -8,7 +8,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
 
 RuntimeError::RuntimeError(int error)
@@ -85,6 +85,6 @@ const char* TransportError::what() const throw()
    return buf_;
 }
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

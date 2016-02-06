@@ -18,7 +18,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 // forward decls
@@ -122,7 +122,7 @@ protected:
    std::map<std::string, ClientSignalBase*> signals_;
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 

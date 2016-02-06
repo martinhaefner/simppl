@@ -4,7 +4,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 detail::Serializer::Serializer(DBusMessage* msg)
@@ -88,6 +88,6 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
    return *this;
 }
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl

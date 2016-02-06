@@ -51,18 +51,18 @@ using namespace test;
 namespace {
 
 
-struct Client : simppl::ipc::Stub<Attributes>
+struct Client : simppl::dbus::Stub<Attributes>
 {
    Client()
-    : simppl::ipc::Stub<Attributes>("s")
+    : simppl::dbus::Stub<Attributes>("s")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       props.attach() >> std::bind(&Client::handleProps, this, _1);
 
       set(Four, "Four");
@@ -111,19 +111,19 @@ struct Client : simppl::ipc::Stub<Attributes>
 };
 
 
-struct MultiClient : simppl::ipc::Stub<Attributes>
+struct MultiClient : simppl::dbus::Stub<Attributes>
 {
    MultiClient(bool attach)
-    : simppl::ipc::Stub<Attributes>("s")
+    : simppl::dbus::Stub<Attributes>("s")
     , attach_(attach)
    {
       connected >> std::bind(&MultiClient::handleConnected, this, _1);
    }
 
 
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       
       if (attach_)
       {
@@ -160,10 +160,10 @@ struct MultiClient : simppl::ipc::Stub<Attributes>
 };
 
 
-struct Server : simppl::ipc::Skeleton<Attributes>
+struct Server : simppl::dbus::Skeleton<Attributes>
 {
    Server(const char* rolename)
-    : simppl::ipc::Skeleton<Attributes>(rolename)
+    : simppl::dbus::Skeleton<Attributes>(rolename)
    {
       shutdown >> std::bind(&Server::handleShutdown, this);
       set >> std::bind(&Server::handleSet, this, _1, _2);
@@ -201,7 +201,7 @@ struct Server : simppl::ipc::Skeleton<Attributes>
 
 TEST(Attributes, attr)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
 
@@ -217,7 +217,7 @@ TEST(Attributes, attr)
 
 TEST(Attributes, multiple_attach)
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    MultiClient c1(true);
    MultiClient c2(false);
    Server s("s");

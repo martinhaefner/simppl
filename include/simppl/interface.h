@@ -14,7 +14,7 @@
 namespace simppl
 {
    
-namespace ipc
+namespace dbus
 {
    
 // forward decls
@@ -51,7 +51,7 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    std::map<std::string, ServerAttributeBase*> attributes_;
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
@@ -61,8 +61,8 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \
-            template<typename,typename=simppl::ipc::OnChange> class Attribute> \
-      struct iface : public simppl::ipc::InterfaceBase<Request>
+            template<typename,typename=simppl::dbus::OnChange> class Attribute> \
+      struct iface : public simppl::dbus::InterfaceBase<Request>
 
 #define INIT_REQUEST(request) \
    request(# request, this)
@@ -80,7 +80,7 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
 
 template<typename... T, typename... T2>
 inline
-void operator>> (simppl::ipc::ClientRequest<T...>& request, simppl::ipc::ClientResponse<T2...>& response)
+void operator>> (simppl::dbus::ClientRequest<T...>& request, simppl::dbus::ClientResponse<T2...>& response)
 {
    assert(!request.handler_);
    request.handler_ = &response;
@@ -89,11 +89,11 @@ void operator>> (simppl::ipc::ClientRequest<T...>& request, simppl::ipc::ClientR
 
 template<typename... T, typename... T2>
 inline
-void operator>> (simppl::ipc::ServerRequest<T...>& request, simppl::ipc::ServerResponse<T2...>& response)
+void operator>> (simppl::dbus::ServerRequest<T...>& request, simppl::dbus::ServerResponse<T2...>& response)
 {
    assert(!request.hasResponse());
    
-   simppl::ipc::detail::ServerRequestBaseSetter::setHasResponse(request);
+   simppl::dbus::detail::ServerRequestBaseSetter::setHasResponse(request);
    response.allowedRequests_.insert(&request);   
 }
 

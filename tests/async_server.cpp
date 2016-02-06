@@ -44,10 +44,10 @@ using namespace test;
 namespace {
    
 
-struct Client : simppl::ipc::Stub<AsyncServer>
+struct Client : simppl::dbus::Stub<AsyncServer>
 {
    Client()   
-    : simppl::ipc::Stub<AsyncServer>("s", "unix:AServerTest")    
+    : simppl::dbus::Stub<AsyncServer>("s", "unix:AServerTest")    
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
       result >> std::bind(&Client::handleResult, this, _1, _2);
@@ -55,22 +55,22 @@ struct Client : simppl::ipc::Stub<AsyncServer>
    }
    
    
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
-      EXPECT_EQ(simppl::ipc::ConnectionState::Connected, s);
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       add(42, 777);
       echo(42, 3.1415);
     }
    
    
-   void handleResult(const simppl::ipc::CallState& s, double d)
+   void handleResult(const simppl::dbus::CallState& s, double d)
    {
       EXPECT_TRUE((bool)s);
       oneway(42);
    }
    
    
-   void handleEcho(const simppl::ipc::CallState& s, int i, double d)
+   void handleEcho(const simppl::dbus::CallState& s, int i, double d)
    {
       EXPECT_TRUE((bool)s);
       haveEcho_ = true;
@@ -80,32 +80,32 @@ struct Client : simppl::ipc::Stub<AsyncServer>
 };
 
 
-struct ShutdownClient : simppl::ipc::Stub<AsyncServer>
+struct ShutdownClient : simppl::dbus::Stub<AsyncServer>
 {
    ShutdownClient()   
-    : simppl::ipc::Stub<AsyncServer>("s", "unix:AServerTest")    
+    : simppl::dbus::Stub<AsyncServer>("s", "unix:AServerTest")    
    {
       connected >> std::bind(&ShutdownClient::handleConnected, this, _1);
       result >> std::bind(&ShutdownClient::handleResult, this, _1, _2);
    }
    
    
-   void handleConnected(simppl::ipc::ConnectionState s)
+   void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(expected_, s);
       
-      if (s == simppl::ipc::ConnectionState::Connected)
+      if (s == simppl::dbus::ConnectionState::Connected)
       {
          add(42, 777);
          oneway(42);
       }
       
-      expected_ = simppl::ipc::ConnectionState::Disconnected;
+      expected_ = simppl::dbus::ConnectionState::Disconnected;
       ++count_;
    }
    
    
-   void handleResult(const simppl::ipc::CallState& s, double d)
+   void handleResult(const simppl::dbus::CallState& s, double d)
    {
       EXPECT_FALSE((bool)s);
       EXPECT_TRUE(s.isTransportError());
@@ -113,15 +113,15 @@ struct ShutdownClient : simppl::ipc::Stub<AsyncServer>
       disp().stop();
    }
    
-   simppl::ipc::ConnectionState expected_ = simppl::ipc::ConnectionState::Connected;
+   simppl::dbus::ConnectionState expected_ = simppl::dbus::ConnectionState::Connected;
    int count_ = 0;
 };
 
 
-struct Server : simppl::ipc::Skeleton<AsyncServer>
+struct Server : simppl::dbus::Skeleton<AsyncServer>
 {
    Server(const char* rolename)
-    : simppl::ipc::Skeleton<AsyncServer>(rolename)
+    : simppl::dbus::Skeleton<AsyncServer>(rolename)
    {
       oneway >> std::bind(&Server::handleOneway, this, _1);
       add >> std::bind(&Server::handleAdd, this, _1, _2);
@@ -144,7 +144,7 @@ struct Server : simppl::ipc::Skeleton<AsyncServer>
       respondOn(req_, result(d));
    }
    
-   simppl::ipc::ServerRequestDescriptor req_;
+   simppl::dbus::ServerRequestDescriptor req_;
 };
 
 
@@ -154,7 +154,7 @@ struct Server : simppl::ipc::Skeleton<AsyncServer>
 /// one response can overtake another
 TEST(AServer, trivial) 
 {
-   simppl::ipc::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("dbus:session");
    Client c;
    Server s("s");
    
@@ -171,8 +171,8 @@ TEST(AServer, trivial)
 /// with a transport error
 TEST(AServer, outstanding)
 {
-   std::unique_ptr<simppl::ipc::Dispatcher> sd(new simppl::ipc::Dispatcher("dbus:session"));
-   simppl::ipc::Dispatcher cd;
+   std::unique_ptr<simppl::dbus::Dispatcher> sd(new simppl::dbus::Dispatcher("dbus:session"));
+   simppl::dbus::Dispatcher cd;
    
    ShutdownClient c;
    std::unique_ptr<Server> s(new Server("s"));

@@ -4,7 +4,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 __thread request_specific_timeout_helper timeout = {};
@@ -19,4 +19,4 @@ __thread std::chrono::milliseconds request_specific_timeout = std::chrono::milli
 
 }   // namespace simppl
 
-}   // namespace ipc
+}   // namespace dbus

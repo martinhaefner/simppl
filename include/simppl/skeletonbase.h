@@ -16,7 +16,7 @@
 namespace simppl
 {
 
-namespace ipc
+namespace dbus
 {
 
 // forward decl
@@ -89,7 +89,7 @@ protected:
    ServerRequestDescriptor current_request_;
 };
 
-}   // namespace ipc
+}   // namespace dbus
 
 }   // namespace simppl
 
