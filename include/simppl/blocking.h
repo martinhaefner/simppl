@@ -152,10 +152,9 @@ void BlockingResponseHandlerN<T...>::operator()(const simppl::dbus::CallState& s
    
 
 /**
- * Call semantics for blocking calls:
+ * Call semantics for blocking calls without return value:
  * 
- * int ret;
- * bool rc = stub.func() >> ret;
+ * bool rc = stub.func() >> std::nullptr_t();
  */
 inline
 void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::nullptr_t)
@@ -165,7 +164,7 @@ void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::nullptr_
 
 
 /**
- * Call semantics for blocking calls:
+ * Call semantics for blocking calls with exactly one return value:
  * 
  * int ret;
  * bool rc = stub.func() >> ret;
@@ -179,7 +178,7 @@ void operator>>(simppl::dbus::detail::ClientResponseHolder holder, T& rArg)
 
 
 /**
- * Call semantics for blocking calls:
+ * Call semantics for blocking calls with multiple return values:
  * 
  * std::tuple<int> ret;
  * bool rc = stub.func() >> ret;
@@ -193,7 +192,7 @@ void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::tuple<T.
 
 
 /**
- * Call semantics for blocking calls:
+ * Alternative call semantics for blocking calls with multiple return values:
  * 
  * int i;
  * double d;
