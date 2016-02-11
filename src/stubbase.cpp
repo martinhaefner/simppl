@@ -118,8 +118,11 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
         dbus_pending_call_set_notify(pending, &StubBase::pending_notify, req.handler_, 0);
     }
     else
+    {
        dbus_connection_send(disp().conn_, msg, nullptr);
-
+       dbus_connection_flush(disp().conn_);
+    }
+    
     dbus_message_unref(msg);
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
