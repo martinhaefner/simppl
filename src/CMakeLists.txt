@@ -1,7 +1,7 @@
-add_library(simppl dispatcher.cpp 
+add_library(simppl
+   dispatcher.cpp 
    error.cpp 
    serverresponseholder.cpp 
-   #sessiondata.cpp 
    skeletonbase.cpp 
    serverside.cpp
    stubbase.cpp
