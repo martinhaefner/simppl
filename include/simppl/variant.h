@@ -57,16 +57,12 @@ struct Max<TypeList<HeadT, NilType>, FuncT>
 // ----------------------------------------------------------------------------------------------
 
 
-template<typename T1, typename T2, typename T3 = NilType, typename T4 = NilType>
+template<typename... T>
 struct Variant
 {    
    // FIXME make sure not to be able to add the same type multiple times
    
-    typedef TypeList<T1, TypeList<T2, NilType> > tl1__;
-    typedef typename if_<std::is_same<T3, NilType>::value, tl1__, typename PushBack<tl1__, T3>::type>::type tl2__;
-    typedef typename if_<std::is_same<T4, NilType>::value, tl2__, typename PushBack<tl2__, T4>::type>::type tl3__;
-
-    typedef tl3__ typelist_type;
+   typedef typename make_typelist<T...>::type typelist_type;
 
    enum { size = Max<typelist_type, SizeFunc>::value };
    enum { alignment = Max<typelist_type, AlignFunc>::value };
@@ -80,60 +76,60 @@ struct Variant
       // NOOP
    }
 
-   template<typename T>
+   template<typename _T>
    inline
-   Variant(const T& t)             // FIXME use calltraits here
-    : idx_(Find<T, typelist_type>::value)
+   Variant(const _T& t)             // FIXME use calltraits here
+    : idx_(Find<_T, typelist_type>::value)
    {
-      static_assert(!std::is_same<T1, NilType>::value && !std::is_same<T2, NilType>::value, "a_variant_must_contain_at_least_two_elements");
-      static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
-      ::new(&data_) T(t);
+      static_assert(Size<typelist_type>::value >= 0, "variant with size 0 invalid");
+      static_assert(Find<_T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
+      ::new(&data_) _T(t);
    }
 
    // FIXME implement copy constructor, inplace factories and assignment operator
 
    // NO INLINE, TOO LONG
-   template<typename T>
-   Variant& operator=(const T& t)            // FIXME use calltraits here
+   template<typename _T>
+   Variant& operator=(const _T& t)            // FIXME use calltraits here
    {
-      static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
+      static_assert(Find<_T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
-      if (idx_ == Find<T, typelist_type>::value)
+      if (idx_ == Find<_T, typelist_type>::value)
       {
-          *get<T>() = t;
+          *get<_T>() = t;
       }
       else
       {
          try_destroy();
-         idx_ = Find<T, typelist_type>::value;
-         ::new(&data_) T(t);
+         idx_ = Find<_T, typelist_type>::value;
+         ::new(&data_) _T(t);
       }
 
       return *this;
    }
 
-   template<typename T>
+   template<typename _T>
    inline
-   T* const get()
+   _T* const get()
    {
-       static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
+       static_assert(Find<_T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
-      if (Find<T, typelist_type>::value != idx_)
+      if (Find<_T, typelist_type>::value != idx_)
          return 0;
 
-      return (T*)(&data_);
+      return (_T*)(&data_);
    }
 
-   template<typename T>
+   template<typename _T>
    inline
-   const T* const get() const
+   const _T* const get() const
    {
-       static_assert(Find<T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
+       static_assert(Find<_T, typelist_type>::value >= 0, "given_type_is_not_element_of_variant_maybe_use_explicit_cast");
 
-       if (Find<T, typelist_type>::value != idx_)
+       if (Find<_T, typelist_type>::value != idx_)
            return 0;
 
-       return (T*)(&data_);
+       return (_T*)(&data_);
    }
 
 // private
@@ -142,11 +138,12 @@ struct Variant
    static inline
    void variant_destroy(void* t)
    {
-       typedef typename RelaxedTypeAt<N, typelist_type>::type T;
-       ((T*)t)->~T();
+       typedef typename RelaxedTypeAt<N, typelist_type>::type _T;
+       ((_T*)t)->~_T();
    }
 
    // NON INLINE - too long!!!
+   // FIXME write with recursive function instead
    void try_destroy()
    {      
       // Beware that the direction of types in the typelist is in reverse order!!!
@@ -203,6 +200,7 @@ typename VisitorT::return_type staticVisit(const VisitorT& visitor, VariantT& va
 {
    VisitorT& the_visitor = const_cast<VisitorT&>(visitor);
    // FIXME subsitute switch with static function table
+   // FIXME recursive iterate
    switch(variant.idx_)
    {
    case 0:

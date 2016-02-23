@@ -16,6 +16,7 @@ add_executable(unittests
    errors.cpp
    async_server.cpp
    attributes.cpp
+   variant.cpp
 )
 
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
