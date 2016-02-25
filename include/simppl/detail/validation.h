@@ -9,7 +9,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -24,9 +24,9 @@ struct isValidType;
 
 
 template<typename T>
-struct isValidTuple 
-{ 
-   enum { value = false }; 
+struct isValidTuple
+{
+   enum { value = false };
 };
 
 // forward decl
@@ -42,20 +42,20 @@ struct isValidTuple<std::tuple<T...> >
 
 template<typename T>
 struct isValidSerializerTuple
-{ 
-   enum { value = false }; 
+{
+   enum { value = false };
 };
 
 template<typename T1, typename T2>
-struct isValidSerializerTuple<SerializerTuple<T1, T2> > 
-{ 
-   enum { value = isValidType<T1>::value && isValidType<T2>::value }; 
+struct isValidSerializerTuple<SerializerTuple<T1, T2> >
+{
+   enum { value = isValidType<T1>::value && isValidType<T2>::value };
 };
 
 template<typename T>
-struct isValidSerializerTuple<SerializerTuple<T, NilType> > 
-{ 
-   enum { value = isValidType<T>::value }; 
+struct isValidSerializerTuple<SerializerTuple<T, NilType> >
+{
+   enum { value = isValidType<T>::value };
 };
 
 
@@ -78,7 +78,7 @@ struct TupleValidator<T, 1>
 #ifdef SIMPPL_HAVE_BOOST_FUSION
 namespace boost_adapter
 {
-   
+
 template<typename T>
 struct isValidType
 {
@@ -94,22 +94,22 @@ struct isValidStruct
 {
    template<typename U>
    static int senseless(typename U::serializer_type*);
-   
+
    template<typename U>
    static char senseless(...);
-      
-   enum { value = TupleValidator<T, sizeof(senseless<T>(0))>::value 
+
+   enum { value = TupleValidator<T, sizeof(senseless<T>(0))>::value
 #ifdef SIMPPL_HAVE_BOOST_FUSION
-      || ( boost::fusion::traits::is_sequence<T>::type::value 
+      || ( boost::fusion::traits::is_sequence<T>::type::value
          && std::is_same<
             typename boost::mpl::find_if<
-               T, 
+               T,
                boost::mpl::not_<boost_adapter::isValidType<boost::mpl::_> >
-            >::type, 
+            >::type,
             typename boost::mpl::end<T>::type
-         >::value )         
-#endif      
-   };   
+         >::value )
+#endif
+   };
 };
 
 
@@ -162,7 +162,7 @@ struct isMap
    template<typename U, typename V>
    static int senseless(const std::map<U, V>*);
    static char senseless(...);
-   
+
    enum { value = InternalMapValidator<T, sizeof(senseless((const T*)0))>::value };
 };
 
@@ -171,6 +171,20 @@ template<typename T>
 struct isString
 {
    enum { value = std::is_same<T, std::string>::value };
+};
+
+
+// variant
+template<typename T>
+struct isVariant
+{
+   enum { value = false };
+};
+
+template<typename... T>
+struct isVariant<Variant<T...>>
+{
+   enum { value = isValidType<T...>::value };
 };
 
 
@@ -194,15 +208,16 @@ struct isValidType<>
 template<typename T>
 struct isValidType<T>
 {
-   enum { 
+   enum {
       value =
-         isPod<T>::value 
-      || isValidStruct<T>::value 
-      || isVector<T>::value 
-      || isMap<T>::value 
+         isPod<T>::value
+      || isValidStruct<T>::value
+      || isVector<T>::value
+      || isMap<T>::value
       || isString<T>::value
       || isValidTuple<T>::value
       || isValidSerializerTuple<T>::value
+      || isVariant<T>::value
    };
 };
 

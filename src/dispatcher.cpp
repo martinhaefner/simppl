@@ -255,7 +255,7 @@ struct Dispatcher::Private
     void remove_timeout(DBusTimeout* t)
     {
         //std::cout << "remove_timeout fd=" << reinterpret_cast<int>(dbus_timeout_get_data(t)) << std::endl;
-        auto iter = std::find_if(fds_.begin(), fds_.end(), [t](auto& pfd){ return reinterpret_cast<int>(dbus_timeout_get_data(t)) == pfd.fd; });
+        auto iter = std::find_if(fds_.begin(), fds_.end(), [t](auto& pfd){ return reinterpret_cast<int64_t>(dbus_timeout_get_data(t)) == pfd.fd; });
         if (iter != fds_.end())
         {
             tm_handlers_.erase(iter->fd);
@@ -415,7 +415,7 @@ Dispatcher::~Dispatcher()
 {
    dbus_connection_close(conn_);
    dbus_connection_unref(conn_);
-   
+
    delete d;
    d = 0;
 }
@@ -559,19 +559,19 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         }
 
         // ordinary signals...
-        
+
         // here we expect that pathname is the same as busname, just with / instead of .
         char originator[256];
         strncpy(originator, dbus_message_get_path(msg)+1, sizeof(originator));
         originator[sizeof(originator)-1] = '\0';
-        
+
         char* p = originator;
         while(*++p)
         {
            if (*p == '/')
               *p = '.';
         }
-        
+
         auto range = stubs_.equal_range(originator);
 
         std::for_each(range.first, range.second, [msg](auto& entry){
@@ -580,7 +580,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         return DBUS_HANDLER_RESULT_HANDLED;
     }
-    
+
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
@@ -647,7 +647,7 @@ void Dispatcher::removeClient(StubBase& clnt)
       if (&clnt == iter->second)
       {
          clnt.cleanup();
-         
+
          stubs_.erase(iter);
          break;
       }
@@ -665,17 +665,17 @@ int Dispatcher::step_ms(int timeout_ms)
 {
 #ifdef USE_POLL
     d->poll(timeout_ms);
-    
+
     int rc;
-    do 
+    do
     {
        rc = dbus_connection_dispatch(conn_);
-       
+
        if (!exceptions_.empty())
        {
           CallState st(std::move(exceptions_.front()));
           exceptions_.pop();
-          
+
           st.throw_exception();
        }
     }

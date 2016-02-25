@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 include_directories(. ../include)
 
-  
+
 add_subdirectory(${GTEST_ROOT} gtest)
 
 enable_testing()
@@ -10,13 +10,13 @@ enable_testing()
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 
-add_executable(unittests 
-   timeout.cpp 
+add_executable(unittests
+   #timeout.cpp
    simple.cpp
-   errors.cpp
-   async_server.cpp
-   attributes.cpp
-   variant.cpp
+   #errors.cpp
+   #async_server.cpp
+   #attributes.cpp
+   #variant.cpp
 )
 
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+// just check if we get compilation errors with validation...
+#define SIMPPL_HAVE_VALIDATION 1
+
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
@@ -24,10 +27,10 @@ INTERFACE(Attributes)
 {
    Request<int, std::string> set;
    Request<> shutdown;
-   
+
    Attribute<int> data;
    Attribute<std::map<int, std::string>> props;
-   
+
    // FIXME without arg possible?
    Signal<int> mayShutdown;
 
@@ -72,26 +75,26 @@ struct Client : simppl::dbus::Stub<Attributes>
    void handleProps(const std::map<int, std::string>& props)
    {
       ++callback_count_;
-      
+
       if (callback_count_ == 1)   // the property Get(...) from the attach
       {
          EXPECT_EQ(2, props.size());
          EXPECT_EQ(2, this->props.value().size());
-         
+
          EXPECT_TRUE(props.find(Four) == props.end());
       }
       else if (callback_count_ == 2)   // the response on the assignment within the set(...) request
       {
          EXPECT_EQ(3, props.size());
          EXPECT_EQ(3, this->props.value().size());
-         
+
          EXPECT_TRUE(props.find(Four) != props.end());
-         
+
          // no more signals on this client
          this->props.detach();
-         
+
          mayShutdown.attach() >> std::bind(&Client::aboutToShutdown, this, _1);
-      
+
          // one more roundtrip to see if further signals arrive...
          set(Five, "Five");
          set(Six, "Six");
@@ -100,12 +103,12 @@ struct Client : simppl::dbus::Stub<Attributes>
 
 
    void aboutToShutdown(int)
-   {      
+   {
       if (++count_ == 2)
          shutdown();
    }
-   
-   
+
+
    int callback_count_ = 0;
    int count_ = 0;
 };
@@ -124,7 +127,7 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      
+
       if (attach_)
       {
          props.attach() >> std::bind(&MultiClient::handleProps, this, _1);
@@ -136,25 +139,25 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
    void handleProps(const std::map<int, std::string>& props)
    {
       ++callback_count_;
-      
+
       if (callback_count_ == 1)
       {
          EXPECT_EQ(2, props.size());
          EXPECT_EQ(2, this->props.value().size());
-         
+
          EXPECT_TRUE(props.find(Four) == props.end());
       }
       else if (callback_count_ == 2)
       {
          EXPECT_EQ(3, props.size());
          EXPECT_EQ(3, this->props.value().size());
-         
+
          EXPECT_TRUE(props.find(Four) != props.end());
-       
+
          shutdown();
       }
    }
-   
+
    bool attach_;
    int callback_count_ = 0;
 };
@@ -167,13 +170,13 @@ struct Server : simppl::dbus::Skeleton<Attributes>
    {
       shutdown >> std::bind(&Server::handleShutdown, this);
       set >> std::bind(&Server::handleSet, this, _1, _2);
-      
+
       // initialize attribute
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
    }
 
-   
+
    void handleShutdown()
    {
       disp().stop();
@@ -183,15 +186,15 @@ struct Server : simppl::dbus::Skeleton<Attributes>
    void handleSet(int id, const std::string& str)
    {
       ++calls_;
-      
+
       auto new_props = props.value();
       new_props[id] = str;
-      
+
       props = new_props;
-      
+
       mayShutdown.emit(42);
    }
-   
+
    int calls_ = 0;
 };
 
@@ -209,7 +212,7 @@ TEST(Attributes, attr)
    d.addServer(s);
 
    d.run();
-   
+
    EXPECT_EQ(2, c.callback_count_);   // one for the attach, then one more update
    EXPECT_EQ(3, s.calls_);
 }
@@ -227,7 +230,7 @@ TEST(Attributes, multiple_attach)
    d.addServer(s);
 
    d.run();
-   
+
    EXPECT_EQ(2, c1.callback_count_);
    EXPECT_EQ(0, c2.callback_count_);
 }

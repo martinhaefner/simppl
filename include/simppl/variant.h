@@ -3,7 +3,7 @@
 
 
 #include "simppl/typelist.h"
-   
+
 #include <type_traits>
 
 
@@ -59,19 +59,19 @@ struct Max<TypeList<HeadT, NilType>, FuncT>
 
 template<typename... T>
 struct Variant
-{    
+{
    // FIXME make sure not to be able to add the same type multiple times
-   
+
    typedef typename make_typelist<T...>::type typelist_type;
 
    enum { size = Max<typelist_type, SizeFunc>::value };
    enum { alignment = Max<typelist_type, AlignFunc>::value };
-   
-   /*private*/ enum { unset = -1 };   
-      
+
+   /*private*/ enum { unset = -1 };
+
    inline
    Variant()
-    : idx_(unset)  
+    : idx_(unset)
    {
       // NOOP
    }
@@ -145,7 +145,7 @@ struct Variant
    // NON INLINE - too long!!!
    // FIXME write with recursive function instead
    void try_destroy()
-   {      
+   {
       // Beware that the direction of types in the typelist is in reverse order!!!
        typedef void(*func_type)(void*);
        static func_type funcs[] = {
@@ -157,7 +157,7 @@ struct Variant
        };
        if (idx_ >= 0 && idx_ < Size<typelist_type>::value)
            funcs[idx_](&data_);
-   }  
+   }
 
    // with an ordinary union only simple data types could be stored in here
    typename std::aligned_storage<size, alignment>::type data_;
@@ -216,7 +216,7 @@ typename VisitorT::return_type staticVisit(const VisitorT& visitor, VariantT& va
        return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(the_visitor, variant);
 
    default:
-      std::cerr << "Hey, ugly!" << std::endl;
+      //std::cerr << "Hey, ugly!" << std::endl;
       throw;
    }
 }

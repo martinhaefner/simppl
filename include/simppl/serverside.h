@@ -12,6 +12,7 @@
 #include "simppl/attribute.h"
 #include "simppl/skeletonbase.h"
 #include "simppl/serverrequestdescriptor.h"
+#include "simppl/variant.h"
 
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/basicinterface.h"
@@ -84,7 +85,7 @@ protected:
 
 
 template<typename... T>
-struct ServerSignal 
+struct ServerSignal
 {
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
 
@@ -180,17 +181,17 @@ struct ServerResponse : ServerResponseBase
    {
       return __impl(bool_<(sizeof...(t) > 0)>(), t...);
    }
-   
-   
+
+
 private:
-   
+
    inline
    detail::ServerResponseHolder __impl(tTrueType, typename CallTraits<T>::param_type... t)
    {
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
       return detail::ServerResponseHolder(*this, f);
    }
-   
+
    inline
    detail::ServerResponseHolder __impl(tFalseType, typename CallTraits<T>::param_type... t)
    {
@@ -245,8 +246,9 @@ struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
       DBusMessage* response = dbus_message_new_method_return(msg);
 
       detail::Serializer s(response);
-      serialize(s, t_);
-      
+      Variant<DataT> v(t_);   // FIXME this copy is overhead, just somehow wrap it...
+      serialize(s, v);
+
       dbus_connection_send(this->parent_->conn_, response, nullptr);
    }
 

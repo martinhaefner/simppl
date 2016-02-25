@@ -213,7 +213,12 @@ private:
         last_update_ = ::time(0);
         
         detail::Deserializer ds(&msg);
-        ds >> data_;
+        
+        // FIXME check type of variant and set error flag on stream?!
+        Variant<DataT> v;
+        ds >> v;
+        
+        data_ = *v.template get<DataT>();
         
         if (f_)
             f_(data_);        
