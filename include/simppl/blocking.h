@@ -15,6 +15,21 @@ namespace detail
 {
 
 
+template<typename AttributeT>
+struct BlockingAttributeResponseHandler
+{
+   BlockingAttributeResponseHandler(simppl::dbus::Dispatcher& disp, AttributeT& a, typename AttributeT::data_type& t);
+   
+   void operator()(typename AttributeT::arg_type t);
+   
+private:
+
+   typename AttributeT::data_type& t_;
+   simppl::dbus::Dispatcher& disp_;
+   AttributeT& a_;
+};
+
+
 template<typename T>
 struct BlockingResponseHandler
 {
@@ -52,6 +67,7 @@ private:
 
 
 #include "simppl/dispatcher.h"
+#include "simppl/stubbase.h"
 
 
 namespace simppl
@@ -59,6 +75,16 @@ namespace simppl
    
 namespace dbus
 {
+
+
+template<typename T, int Flags>
+void Dispatcher::waitForResponse(ClientAttribute<T, Flags>& attr, T& t)
+{
+   assert(!isRunning());
+   
+   detail::BlockingAttributeResponseHandler<ClientAttribute<T, Flags>> handler(*this, attr, t);
+   loop();
+}
    
    
 template<typename T>
@@ -73,6 +99,7 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, T& t)
    detail::BlockingResponseHandler<T> handler(*this, *r, t);
    loop();
 }
+
 
 template<typename... T>
 void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t)
@@ -91,6 +118,28 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, std::
 namespace detail
 {
 
+
+template<typename AttributeT>
+inline
+BlockingAttributeResponseHandler<AttributeT>::BlockingAttributeResponseHandler(simppl::dbus::Dispatcher& disp, AttributeT& a, typename AttributeT::data_type& t)
+ : t_(t)
+ , disp_(disp)
+ , a_(a)
+{
+   a_.handledBy(std::ref(*this));
+}
+   
+
+template<typename AttributeT>
+inline
+void BlockingAttributeResponseHandler<AttributeT>::operator()(typename AttributeT::arg_type t)
+{
+   disp_.stop();
+   a_.handledBy(std::nullptr_t());
+   t_ = t;
+}
+
+   
 template<typename T>
 inline
 BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t)
@@ -174,6 +223,17 @@ inline
 void operator>>(simppl::dbus::detail::ClientResponseHolder holder, T& rArg)
 {
    holder.dispatcher_.waitForResponse(holder, rArg);
+}
+
+
+/**
+ * same for attributes get
+ */
+template<typename T, int Flags>
+inline
+void operator>>(simppl::dbus::ClientAttribute<T, Flags>& attr, T& rArg)
+{
+   attr.stub().disp().waitForResponse(attr, rArg);
 }
 
 

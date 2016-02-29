@@ -86,8 +86,12 @@ struct Variant
       ::new(&data_) _T(t);
    }
 
-   // FIXME implement copy constructor, inplace factories and assignment operator
 
+   // FIXME implement inplace factories and assignment operator
+   
+   Variant(const Variant& rhs);
+   Variant& operator=(const Variant& rhs);
+   
    // NO INLINE, TOO LONG
    template<typename _T>
    Variant& operator=(const _T& t)            // FIXME use calltraits here
@@ -196,30 +200,134 @@ struct Callfunc<NilType>
 
 
 template<typename VisitorT, typename VariantT>
-typename VisitorT::return_type staticVisit(const VisitorT& visitor, VariantT& variant)
+typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
 {
-   VisitorT& the_visitor = const_cast<VisitorT&>(visitor);
    // FIXME subsitute switch with static function table
    // FIXME recursive iterate
    switch(variant.idx_)
    {
    case 0:
-       return Callfunc<typename RelaxedTypeAt<0, typename VariantT::typelist_type>::type>::eval(the_visitor, variant);
+       return Callfunc<typename RelaxedTypeAt<0, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    case 1:
-       return Callfunc<typename RelaxedTypeAt<1, typename VariantT::typelist_type>::type>::eval(the_visitor, variant);
+       return Callfunc<typename RelaxedTypeAt<1, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    case 2:
-       return Callfunc<typename RelaxedTypeAt<2, typename VariantT::typelist_type>::type>::eval(the_visitor, variant);
+       return Callfunc<typename RelaxedTypeAt<2, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    case 3:
-       return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(the_visitor, variant);
+       return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    default:
       //std::cerr << "Hey, ugly!" << std::endl;
       throw;
    }
 }
+
+
+// FIXME make visitor a first class object
+template<typename VisitorT, typename VariantT>
+typename VisitorT::return_type staticVisit(VisitorT& visitor, const VariantT& variant)
+{
+   // FIXME subsitute switch with static function table
+   // FIXME recursive iterate
+   switch(variant.idx_)
+   {
+   case 0:
+       return Callfunc<typename RelaxedTypeAt<0, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 1:
+       return Callfunc<typename RelaxedTypeAt<1, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 2:
+       return Callfunc<typename RelaxedTypeAt<2, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 3:
+       return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   default:
+      //std::cerr << "Hey, ugly!" << std::endl;
+      throw;
+   }
+}
+
+
+namespace detail
+{
+   template<typename VariantT>
+   struct ConstructionVisitor : StaticVisitor<>
+   {
+      ConstructionVisitor(VariantT& v)
+       : v_(v)
+      {
+         // NOOP
+      }
+      
+      template<typename T>
+      void operator()(const T& t)
+      {
+         ::new(&v_.data_) T(t);
+      }
+      
+      VariantT& v_;
+   };
+   
+   
+   template<typename VariantT>
+   struct AssignmentVisitor : StaticVisitor<>
+   {
+      AssignmentVisitor(VariantT& v)
+       : v_(v)
+      {
+         // NOOP
+      }
+      
+      template<typename T>
+      void operator()(const T& t)
+      {
+         *v_.template get<T>() = t;
+      }
+      
+      VariantT& v_;
+   };
+}
+
+
+template<typename... T>
+Variant<T...>::Variant(const Variant<T...>& rhs)
+ : idx_(rhs.idx_)
+{
+   if (idx_ != unset)
+   {
+      detail::ConstructionVisitor<Variant<T...>> v(*this);
+      staticVisit(v, rhs);
+   }
+}
+
+
+template<typename... T>
+Variant<T...>& Variant<T...>::operator=(const Variant<T...>& rhs)
+{
+   if (this != &rhs)
+   {
+      if (idx_ != rhs.idx_)
+      {
+         // need to call copy constructor
+         try_destroy();
+         
+         idx_ = rhs.idx_;
+         detail::ConstructionVisitor<Variant<T...>> v(*this);
+         staticVisit(v, rhs);
+      }
+      else
+      {   
+         detail::AssignmentVisitor<Variant<T...>> v(*this);
+         staticVisit(v, rhs);
+      }
+   }
+   
+   return *this;
+}   
 
 }   // namespace simppl
 

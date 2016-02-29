@@ -37,7 +37,9 @@ struct StubBase
 {
    template<typename... T> friend struct ClientSignal;
    template<typename... T> friend struct ClientRequest;
-   template<typename, typename> friend struct ClientAttribute;
+   template<typename, int> friend struct ClientAttribute;
+   template<typename, typename> friend struct ClientAttributeWritableMixin;
+   
    friend struct Dispatcher;
 
    StubBase(const StubBase&) = delete;
@@ -111,7 +113,8 @@ protected:
    void sendSignalUnregistration(ClientSignalBase& sigbase);
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
-
+   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
+   
    char* iface_;
    char* role_;
    char* objectpath_;

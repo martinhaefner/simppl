@@ -327,6 +327,11 @@ TEST(Simple, blocking)
    EXPECT_GT(0.51, std::get<1>(rslt));
    EXPECT_LT(0.49, std::get<1>(rslt));
 
+   int dv = -1;
+   stub.data.get() >> dv;
+   EXPECT_EQ(4711, dv);
+   EXPECT_EQ(4711, stub.data.value());
+   
    EXPECT_EQ(3, s.count_oneway_);
 }
 

@@ -211,6 +211,7 @@ struct isValidType<T>
    enum {
       value =
          isPod<T>::value
+      || (std::is_enum<T>::value && sizeof(T) == sizeof(int))
       || isValidStruct<T>::value
       || isVector<T>::value
       || isMap<T>::value

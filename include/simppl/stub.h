@@ -26,7 +26,7 @@ template<typename> struct InterfaceNamer;
 template<template<template<typename...> class, 
                   template<typename...> class,
                   template<typename...> class,
-                  template<typename,typename> class> 
+                  template<typename,int> class> 
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
 {   

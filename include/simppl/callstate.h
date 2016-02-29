@@ -8,6 +8,9 @@
 #include "simppl/error.h"
 
 
+struct DBusMessage;
+
+
 namespace simppl
 {
    
@@ -39,6 +42,8 @@ struct CallState
    {
       // NOOP
    }
+   
+   CallState(DBusMessage&);
 
    // FIXME why is this necessary, we are not copyable by design?!
    CallState(const CallState& st)
@@ -85,13 +90,7 @@ struct CallState
       return *ex_;
    }
    
-   /// FIXME not inline
-   inline
-   void throw_exception() const
-   {
-      assert(ex_);
-      ex_->_throw();
-   }
+   void throw_exception() const;
    
    
 private:

@@ -1,4 +1,5 @@
 add_library(simppl
+   callstate.cpp
    dispatcher.cpp 
    error.cpp 
    serverresponseholder.cpp 
@@ -6,7 +7,7 @@ add_library(simppl
    serverside.cpp
    stubbase.cpp
    serialization.cpp
-   clientresponseholder.cpp
+   #clientresponseholder.cpp
    timeout.cpp
    util.cpp
    serverrequestdescriptor.cpp)

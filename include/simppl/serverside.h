@@ -18,6 +18,7 @@
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/validation.h"
 
+
 #if !(defined(SIMPPL_SKELETONBASE_H) \
       || defined(SIMPPL_DISPATCHER_CPP) \
       || defined(SIMPPL_SERVERSIDE_CPP) \
@@ -211,6 +212,7 @@ struct ServerAttributeBase
    ServerAttributeBase(const char* name, detail::BasicInterface* iface);
 
    virtual void eval(DBusMessage* msg) = 0;
+   virtual void evalSet(detail::Deserializer& ds) = 0;
 
 protected:
 
@@ -241,64 +243,28 @@ struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
       return t_;
    }
 
-   void eval(DBusMessage* msg)
+   void eval(DBusMessage* response)
    {
-      DBusMessage* response = dbus_message_new_method_return(msg);
-
       detail::Serializer s(response);
+      
       Variant<DataT> v(t_);   // FIXME this copy is overhead, just somehow wrap it...
       serialize(s, v);
-
-      dbus_connection_send(this->parent_->conn_, response, nullptr);
    }
-
+   
 protected:
 
    DataT t_;
 };
 
 
-/// a NOOP
-template<typename EmitPolicyT, typename BaseT>
-struct CommitMixin : BaseT
-{
-   inline
-   CommitMixin(const char* name, detail::BasicInterface* iface)
-    : BaseT(name, iface)
-   {
-      // NOOP
-   }
-};
-
-
-/// add a commit function to actively transfer the attribute data
-template<typename BaseT>
-struct CommitMixin<Committed, BaseT> : BaseT
-{
-   inline
-   CommitMixin(const char* name, detail::BasicInterface* iface)
-    : BaseT(name, iface)
-   {
-      // NOOP
-   }
-
-   void commit()
-   {
-      this->emit(this->t_);
-   }
-};
-
-
-template<typename DataT, typename EmitPolicyT>
-struct ServerAttribute : CommitMixin<EmitPolicyT, BaseAttribute<DataT>>
+template<typename DataT, int Flags>
+struct ServerAttribute : BaseAttribute<DataT>
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
-   typedef CommitMixin<EmitPolicyT, BaseAttribute<DataT>> baseclass;
-
    inline
    ServerAttribute(const char* name, detail::BasicInterface* iface)
-    : baseclass(name, iface)
+    : BaseAttribute<DataT>(name, iface)
    {
       // NOOP
    }
@@ -306,13 +272,25 @@ struct ServerAttribute : CommitMixin<EmitPolicyT, BaseAttribute<DataT>>
    inline
    ServerAttribute& operator=(const DataT& data)
    {
-      if (EmitPolicyT::eval(this->t_, data))
-         this->emit(data);
+      // FIXME if emitting...
+      this->emit(data);
 
       this->t_ = data;
       return *this;
    }
+   
+protected:
+
+   // FIXME only do something if readwrite enabled!
+   void evalSet(detail::Deserializer& ds)
+   {
+      Variant<DataT> v;
+      ds >> v;
+
+      *this = *v.template get<DataT>();
+   }
 };
+
 
 }   // namespace dbus
 

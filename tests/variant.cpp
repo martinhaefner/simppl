@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <map>
+
 #include "simppl/variant.h"
+
 
 namespace {
    
@@ -45,4 +48,37 @@ TEST(Variant, basic)
    
    EXPECT_EQ(2, constructs);
    EXPECT_EQ(2, destructs);
+}
+
+
+TEST(Variant, map)
+{
+   simppl::Variant<std::map<int, std::string> > v;
+   
+   std::map<int, std::string> m {
+      { 1, "Hallo" }, 
+      { 2, "Welt" }
+   };
+   
+   v = m;
+   EXPECT_EQ(2, (v.get<std::map<int, std::string>>()->size()));
+   
+   int i=0;
+   for(auto& e : *v.get<std::map<int, std::string>>())
+   {
+      if (i == 0)
+      {
+         EXPECT_EQ(1, e.first);
+         EXPECT_EQ(std::string("Hallo"), e.second);
+      }
+      else if (i == 1)
+      {
+         EXPECT_EQ(2, e.first);
+         EXPECT_EQ(std::string("Welt"), e.second);
+      }
+      
+      ++i;
+   }
+   
+   EXPECT_EQ(2, i);
 }

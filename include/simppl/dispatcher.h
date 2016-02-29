@@ -72,10 +72,14 @@ struct Dispatcher
 
    /// at least one argument version - will throw exception on error
    template<typename T>
-   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);
+   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);   
 
+   /// more than one argument version
    template<typename... T>
    void waitForResponse(const detail::ClientResponseHolder& resp, std::tuple<T...>& t);
+
+   template<typename T, int Flags>
+   void waitForResponse(ClientAttribute<T, Flags>& resp, T& t);
 
    template<typename RepT, typename PeriodT>
    inline

@@ -89,6 +89,9 @@ template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_
 template<typename... T>
 struct dbus_type_code<std::tuple<T...>>              { enum { value = DBUS_TYPE_STRUCT }; };
 
+template<typename... T>
+struct dbus_type_code<Variant<T...>>                 { enum { value = DBUS_TYPE_VARIANT }; };
+
 
 // forward decl
 template<typename T>
@@ -364,7 +367,7 @@ struct make_type_signature
 {
    static inline std::ostream& eval(std::ostream& os)
    {
-      make_type_signature<T>::helper(os, bool_<isPod<T>::value>());
+      make_type_signature<T>::helper(os, bool_<isPod<T>::value || std::is_enum<T>::value>());
       return os;
    }
 
@@ -487,6 +490,58 @@ struct VariantSerializer : StaticVisitor<>
 };
 
 
+template<typename... T>
+struct VariantDeserializer;
+
+template<typename T1, typename... T>
+struct VariantDeserializer<T1, T...>
+{
+   template<typename DeserializerT, typename VariantT>
+   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   {
+      std::ostringstream buf;
+      make_type_signature<T1>::eval(buf);
+
+      if (!strcmp(buf.str().c_str(), sig))
+      {
+         v = T1();
+         s >> *v.template get<T1>();
+         
+         return true;
+      }
+      else
+         return VariantDeserializer<T...>::eval(s, v, sig);
+   }
+};
+
+
+template<typename T>
+struct VariantDeserializer<T>
+{
+   template<typename DeserializerT, typename VariantT>
+   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   {
+      std::ostringstream buf;
+      make_type_signature<T>::eval(buf);
+
+      if (!strcmp(buf.str().c_str(), sig))
+      {
+         v = T();
+         s >> *v.template get<T>();
+         
+         return true;
+      }
+      
+      // stop recursion
+      return false;
+   }
+};
+
+
+template<typename DeserializerT, typename... T>
+bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig);
+
+
 // ---------------------------------------------------------------------
 
 
@@ -502,7 +557,7 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(const T& t)
    {
-      return write(t, bool_<isPod<T>::value || std::is_pointer<T>::value>());
+      return write(t, bool_<isPod<T>::value || std::is_pointer<T>::value || std::is_enum<T>::value>());
    }
 
    template<typename T>
@@ -551,8 +606,7 @@ struct Serializer // : noncopyable
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-      for (auto& t : v)
-      {
+      for (auto& t : v) {
          s.write(t);
       }
 
@@ -564,15 +618,15 @@ struct Serializer // : noncopyable
    template<typename KeyT, typename ValueT>
    Serializer& write(const std::map<KeyT, ValueT>& m)
    {
-      DBusMessageIter iter;
       std::ostringstream buf;
       make_type_signature<std::pair<KeyT, ValueT>>::eval(buf);
 
+      DBusMessageIter iter;
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-      for (auto& e : m)
-      {
+      
+      for (auto& e : m) {
          s.write(e);
       }
 
@@ -718,10 +772,10 @@ void simppl::dbus::detail::VariantSerializer<SerializerT>::operator()(const T& t
 
     DBusMessageIter iter;
     dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
-
+    
     SerializerT s(&iter);
     s << t;
-
+    
     dbus_message_iter_close_container(orig_.iter_, &iter);
 }
 
@@ -756,7 +810,7 @@ struct Deserializer // : noncopyable
    inline
    Deserializer& read(T& t)
    {
-      return read(t, bool_<isPod<T>::value>());
+      return read(t, bool_<isPod<T>::value || std::is_enum<T>::value>());
    }
 
    template<typename T>
@@ -790,72 +844,10 @@ struct Deserializer // : noncopyable
    {
        DBusMessageIter iter;
        dbus_message_iter_recurse(iter_, &iter);
+       Deserializer s(&iter);
        
-       int8_t idx = Variant<T...>::unset;
-       
-       // FIXME better:
-       // iterate over variant, check signature of data type vs. dbus_message_iter_get_signature
-       // -> if match, deserialize into current signature...
-       // need unroled loop on types, not normal foreach loop!!!
-       // thereby, we may support much more different types but still
-       // may get into faulty situations if e.g. struct signatures do not
-       // differ for different types of structs -> could this be checked 
-       // at compile time?!
-       switch(dbus_message_iter_get_arg_type(&iter))
-       {
-       case DBUS_TYPE_BYTE:
-           idx = Find<char, typename Variant<T...>::typelist_type>::value;
-           break;
-           
-       case DBUS_TYPE_BOOLEAN:
-           idx = Find<bool, typename Variant<T...>::typelist_type>::value;
-           break;
-           
-       case DBUS_TYPE_INT16:
-           idx = Find<int16_t, typename Variant<T...>::typelist_type>::value;
-           break;
-           
-       case DBUS_TYPE_UINT16:
-           idx = Find<uint16_t, typename Variant<T...>::typelist_type>::value;
-           break;
-           
-       case DBUS_TYPE_INT32:
-           idx = Find<int32_t, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       case DBUS_TYPE_UINT32:
-           idx = Find<uint32_t, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       case DBUS_TYPE_INT64:
-           idx = Find<int64_t, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       case DBUS_TYPE_UINT64:
-           idx = Find<uint32_t, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       case DBUS_TYPE_DOUBLE:
-           idx = Find<double, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       case DBUS_TYPE_STRING:
-           idx = Find<std::string, typename Variant<T...>::typelist_type>::value;
-           break;
-       
-       //case DBUS_TYPE_ARRAY:
-       // FIXME !!!
-       //case DBUS_TYPE_STRUCT:
-       
-       default:
-           throw;
-       }
-       
-       if (idx != Variant<T...>::unset)
-       {
-           Deserializer s(&iter);
-           s >> v;
-       }
+       if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
+         std::cerr << "Invalid variant type detected" << std::endl;
        
        dbus_message_iter_next(iter_);
    }
@@ -1045,6 +1037,13 @@ void simppl::dbus::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 }
 
 
+template<typename DeserializerT, typename... T>
+bool simppl::dbus::detail::try_deserialize(DeserializerT& d, simppl::Variant<T...>& v, const char* sig)
+{
+   return simppl::dbus::detail::VariantDeserializer<T...>::eval(d, v, sig);
+}
+
+
 // ------------------------------------------------------------------------
 
 
@@ -1065,7 +1064,7 @@ Serializer& serialize(Serializer& s)
 
 template<typename T1, typename... T>
 inline
-Serializer& serialize(Serializer& s, T1 t1, T... t)
+Serializer& serialize(Serializer& s, const T1& t1, const T&... t)
 {
    s << t1;
    return serialize(s, t...);
@@ -1073,7 +1072,7 @@ Serializer& serialize(Serializer& s, T1 t1, T... t)
 
 template<typename... T>
 inline
-void serializeN(Serializer& s, T... t)
+void serializeN(Serializer& s, const T&... t)
 {
    serialize(s, t...);
 }

@@ -21,12 +21,12 @@ namespace dbus
 template<typename...> struct ClientRequest;
 template<typename...> struct ClientResponse;
 template<typename...> struct ClientSignal;
-template<typename, typename> struct ClientAttribute;
+template<typename, int> struct ClientAttribute;
 
 template<typename...> struct ServerRequest;
 template<typename...> struct ServerResponse;
 template<typename...> struct ServerSignal;
-template<typename, typename> struct ServerAttribute;
+template<typename, int> struct ServerAttribute;
 
 struct ServerRequestBase;
 struct ServerAttributeBase;
@@ -61,7 +61,7 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \
-            template<typename,typename=simppl::dbus::OnChange> class Attribute> \
+            template<typename, int Flags=simppl::dbus::Notifying|simppl::dbus::ReadOnly> class Attribute> \
       struct iface : public simppl::dbus::InterfaceBase<Request>
 
 #define INIT(what) \

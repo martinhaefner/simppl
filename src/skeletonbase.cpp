@@ -166,7 +166,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    }
    else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
    {
-       if (!strcmp(method, "Get"))
+       if (!strcmp(method, "Get") || !strcmp(method, "Set"))
        {
           auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
 
@@ -176,20 +176,27 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
           detail::Deserializer ds(msg);
           ds >> interface >> attribute;
 
-    //      std::cout << "Get: interface=" << interface << ", attribute=" << attribute << std::endl;
-
           auto iter = attributes.find(attribute);
           if (iter != attributes.end())
           {
-             iter->second->eval(msg);
-
+             if (method[0] == 'G')
+             {
+                DBusMessage* response = dbus_message_new_method_return(msg);
+                iter->second->eval(response);
+                
+                dbus_connection_send(disp_->conn_, response, nullptr);
+                dbus_message_unref(response);
+             }
+             else
+                iter->second->evalSet(ds);
+             
              return DBUS_HANDLER_RESULT_HANDLED;
           }
           else
              std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
        }
        else
-          std::cerr << "unsupported call" << std::endl;
+          std::cerr << "unsupported Properties call method '" << method << "'" << std::endl;
    }
    else
    {

@@ -134,11 +134,38 @@ struct ClientSignal : ClientSignalBase
 // ---------------------------------------------------------------------------------------------
 
 
-template<typename DataT, typename EmitPolicyT>
-struct ClientAttribute
+template<typename AttributeT, typename DataT>
+struct ClientAttributeWritableMixin
+{
+   typedef DataT data_type;
+   typedef typename CallTraits<DataT>::param_type arg_type;
+   
+   
+   void set(arg_type t)
+   {
+      AttributeT* that = (AttributeT*)this;
+      that->data_ = t;
+      
+      Variant<data_type> vt(t);
+      
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<const Variant<data_type>&>, std::placeholders::_1, vt));
+      that->stub().setProperty(that->signal_.name(), f);
+   }
+};
+
+
+struct NoopMixin
+{
+};
+
+
+template<typename DataT, int Flags = Notifying|ReadOnly>
+struct ClientAttribute 
+ : if_<(Flags & ReadWrite), ClientAttributeWritableMixin<ClientAttribute<DataT, Flags>, DataT>, NoopMixin>::type
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
+   typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(arg_type)> function_type;
    typedef ClientSignal<DataT> signal_type;
@@ -147,18 +174,9 @@ struct ClientAttribute
    inline
    ClientAttribute(const char* name, detail::BasicInterface* iface)
     : signal_(name, iface)
-    , data_()
-    , last_update_(0)
    {
       // NOOP
    }
-
-   inline
-   const DataT& value() const
-   {
-      return data_;
-   }
-
 
    template<typename FunctorT>
    inline
@@ -166,17 +184,43 @@ struct ClientAttribute
    {
       f_ = func;
    }
+   
+   StubBase& stub()
+   {
+      return *dynamic_cast<StubBase*>(signal_.iface_);
+   }
 
    /// only call this after the server is connected.
    inline
    ClientAttribute& attach()
    {
-      signal_.handledBy(std::bind(&ClientAttribute<DataT, EmitPolicyT>::valueChanged, this, std::placeholders::_1));
+      signal_.handledBy(std::bind(&ClientAttribute<DataT, Flags>::valueChanged, this, std::placeholders::_1));
 
       (void)signal_.attach();
 
-      dynamic_cast<StubBase*>(signal_.iface_)->getProperty(signal_.name(), &pending_notify, this);
+      stub().getProperty(signal_.name(), &pending_notify, this);
 
+      return *this;
+   }
+   
+   inline
+   const DataT& value() const
+   {
+      return data_;
+   }
+   
+   // FIXME implement GetAll in Stub needs to store attributesbase in interface  
+   // in a similar way as it is done on server side...
+   ClientAttribute& get()
+   {
+      stub().getProperty(signal_.name(), &pending_notify, this);
+      return *this;
+   }
+   
+   
+   ClientAttribute& operator=(arg_type t)
+   {
+      this->set(t);
       return *this;
    }
 
@@ -188,13 +232,7 @@ struct ClientAttribute
       return *this;
    }
 
-   inline
-   time_t lastUpdate() const
-   {
-      return last_update_;
-   }
-
-private:
+//FIXME protected:
 
     static
     void pending_notify(DBusPendingCall* pending, void* user_data)
@@ -210,8 +248,6 @@ private:
 
     void eval(DBusMessage& msg)
     {
-        last_update_ = ::time(0);
-        
         detail::Deserializer ds(&msg);
         
         // FIXME check type of variant and set error flag on stream?!
@@ -221,24 +257,21 @@ private:
         data_ = *v.template get<DataT>();
         
         if (f_)
-            f_(data_);        
+            f_(*v.template get<DataT>());        
     }
 
 
    void valueChanged(arg_type arg)
    {
-      last_update_ = ::time(0);
-      
       data_ = arg;
+      
       if (f_)
-         f_(data_);
+         f_(arg);
    }
 
    signal_type signal_;
-   DataT data_;
-   time_t last_update_;
-
    function_type f_;
+   DataT data_;
 };
 
 
@@ -278,7 +311,9 @@ struct ClientRequest : ClientRequestBase
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
-      return detail::ClientResponseHolder(stub->disp(), handler_, stub->sendRequest(*this, f));
+      stub->sendRequest(*this, f);
+      
+      return detail::ClientResponseHolder(stub->disp(), handler_);
    }
 
    inline
@@ -325,30 +360,15 @@ struct ClientResponse : ClientResponseBase
    {
       if (f_)
       {
-          if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
+          CallState cs(msg);
+
+          if (!cs)
           {
-              if (!strcmp(dbus_message_get_error_name(&msg), DBUS_ERROR_FAILED))
-              {
-                  detail::Deserializer d(&msg);
-                  std::string text;
-                  d >> text;
-                  
-                  char* end;
-                  int error = strtol(text.c_str(), &end, 10);
-                  
-                  std::tuple<T...> dummies;
-                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new RuntimeError(error, end+1, dbus_message_get_reply_serial(&msg))), dummies);
-              }
-              else
-              {
-                  std::tuple<T...> dummies;
-                  detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, CallState(new TransportError(EIO, dbus_message_get_reply_serial(&msg))), dummies);
-              }
+              std::tuple<T...> dummies;
+              detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(f_, cs, dummies);
           }
           else
           {
-             CallState cs(dbus_message_get_reply_serial(&msg));
-
              detail::Deserializer d(&msg);
              detail::GetCaller<T...>::type::template evalResponse(d, f_, cs);
           }
@@ -375,9 +395,9 @@ simppl::dbus::ClientResponse<T...>& operator>>(simppl::dbus::ClientResponse<T...
 }
 
 
-template<typename DataT, typename EmitPolicyT, typename FuncT>
+template<typename DataT, int Flags, typename FuncT>
 inline
-void operator>>(simppl::dbus::ClientAttribute<DataT,EmitPolicyT>& attr, const FuncT& func)
+void operator>>(simppl::dbus::ClientAttribute<DataT, Flags>& attr, const FuncT& func)
 {
    attr.handledBy(func);
 }

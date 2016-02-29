@@ -19,7 +19,7 @@ namespace dbus
 template<template<template<typename...> class, 
                   template<typename...> class,
                   template<typename...> class,
-                  template<typename,typename> class> class IfaceT>
+                  template<typename,int> class> class IfaceT>
 struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;

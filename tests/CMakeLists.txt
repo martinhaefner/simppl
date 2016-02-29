@@ -11,12 +11,12 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 
 add_executable(unittests
-   #timeout.cpp
+   timeout.cpp
    simple.cpp
-   #errors.cpp
-   #async_server.cpp
-   #attributes.cpp
-   #variant.cpp
+   errors.cpp
+   async_server.cpp
+   attributes.cpp
+   variant.cpp
 )
 
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)

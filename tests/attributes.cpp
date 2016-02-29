@@ -17,7 +17,7 @@ using namespace std::placeholders;
 
 namespace test
 {
-// FIXME make enums work
+
 enum ident_t {
    One=1, Two, Three, Four, Five, Six
 };
@@ -28,9 +28,9 @@ INTERFACE(Attributes)
    Request<int, std::string> set;
    Request<> shutdown;
 
-   Attribute<int> data;
-   Attribute<std::map<int, std::string>> props;
-
+   Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
+   Attribute<std::map<ident_t, std::string>> props;
+   
    // FIXME without arg possible?
    Signal<int> mayShutdown;
 
@@ -72,7 +72,7 @@ struct Client : simppl::dbus::Stub<Attributes>
    }
 
 
-   void handleProps(const std::map<int, std::string>& props)
+   void handleProps(const std::map<ident_t, std::string>& props)
    {
       ++callback_count_;
 
@@ -136,7 +136,7 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
    }
 
 
-   void handleProps(const std::map<int, std::string>& props)
+   void handleProps(const std::map<ident_t, std::string>& props)
    {
       ++callback_count_;
 
@@ -159,6 +159,43 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
    }
 
    bool attach_;
+   int callback_count_ = 0;
+};
+
+
+struct SetterClient : simppl::dbus::Stub<Attributes>
+{
+   SetterClient()
+    : simppl::dbus::Stub<Attributes>("s")
+   {
+      connected >> std::bind(&SetterClient::handleConnected, this, _1);
+   }
+
+
+   void handleConnected(simppl::dbus::ConnectionState s)
+   {
+      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+      data.attach() >> std::bind(&SetterClient::handleData, this, _1);
+
+      data = 5555;
+   }
+
+
+   void handleData(int i)
+   {
+      ++callback_count_;
+
+      if (callback_count_ == 1)   // the property Get(...) from the attach
+      {
+         EXPECT_EQ(4711, i);
+      }
+      else if (callback_count_ == 2)   // the response on the assignment
+      {
+         EXPECT_EQ(5555, i);
+         disp().stop();
+      }
+   }
+
    int callback_count_ = 0;
 };
 
@@ -188,7 +225,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       ++calls_;
 
       auto new_props = props.value();
-      new_props[id] = str;
+      new_props[(ident_t)id] = str;
 
       props = new_props;
 
@@ -233,4 +270,17 @@ TEST(Attributes, multiple_attach)
 
    EXPECT_EQ(2, c1.callback_count_);
    EXPECT_EQ(0, c2.callback_count_);
+}
+
+
+TEST(Attributes, set)
+{
+   simppl::dbus::Dispatcher d("dbus:session");
+   SetterClient c;
+   Server s("s");
+
+   d.addClient(c);
+   d.addServer(s);
+   
+   d.run();
 }
