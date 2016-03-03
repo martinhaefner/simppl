@@ -10,6 +10,55 @@
 #include "simppl/detail/util.h"
 
 
+#if 0
+namespace org
+{
+   namespace freedesktop
+   {
+      namespace DBus
+      {
+         INTERFACE(Introspectable)
+         {
+            //typedef tTrueType introspectable;
+            
+            Request<> Introspect;
+            Response<std::string> rIntrospect;
+            
+            Introspectable()
+             : INIT(Introspect)
+             , INIT(rIntrospect)
+            {
+               Introspect >> rIntrospect;
+               
+               //describe_arguments(rIntrospect, "data");
+            }
+         };
+         
+         INTERFACE(Properties)
+         {
+            Request<std::string, std::string> Get;
+            Request<std::string, std::string, Variant<int>> Set;  // FIXME need type any instead!
+            
+            Response<Variant<int>> rGet;
+            
+            Properties()
+             : INIT(Get)
+             , INIT(Set)
+             , INIT(rGet)
+            {
+               Get >> rGet;
+               
+               //describe_arguments(Get, "interface_name", "property_name");
+               //describe_arguments(rGet, "value");
+               //describe_arguments(Set, "interface_name", "property_name", "value");
+            }
+         };
+      }
+   }
+}
+#endif
+
+
 namespace simppl
 {
 
@@ -145,19 +194,50 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    {
       if (!strcmp(method, "Introspect"))
       {
-         static char* buf = new char[512];
+         std::ostringstream oss;
 
-         sprintf(buf, "<?xml version=\"1.0\" ?>"
-             "<node name=\"%s\">"
-             "<interface name=\"%s\"></interface>"
-             "<interface name=\"org.freedesktop.DBus.Introspectable\"></interface>"
-             "<interface name=\"org.freedesktop.DBus.Properties\"></interface>"
-             "</node>", role(), iface());
+         oss << "<?xml version=\"1.0\" ?>\n"
+             "<node name=\""<< role() << "\">\n"
+             "  <interface name=\""<< iface() << "\">\n";
+             
+         auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+         for(auto& method : methods)
+         {
+            method.second->introspect(oss);
+         }
+         
+         auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
+         for(auto& attribute : attributes)
+         {
+            attribute.second->introspect(oss);
+         }
+         
+         // FIXME signals
+             
+         oss << "  </interface>\n"
+             "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
+             "    <method name=\"Introspect\">\n"
+             "      <arg name=\"data\" type=\"s\" direction=\"out\"/>\n"
+             "    </method>\n"
+             "  </interface>\n"
+             "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
+             "    <method name=\"Get\">\n"
+             "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
+             "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
+             "      <arg name=\"value\" type=\"v\" direction=\"out\"/>\n"
+             "    </method>\n"
+             "    <method name=\"Set\">\n"
+             "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
+             "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
+             "      <arg name=\"value\" type=\"v\" direction=\"in\"/>\n"
+             "    </method>\n"
+             "  </interface>\n"
+             "</node>\n";
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
          detail::Serializer s(reply);
-         s << buf;
+         s << oss.str();
 
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
@@ -223,56 +303,9 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
-   //std::cout << "Skeleton::handleRequest '" << funcid << "'" << std::endl;
-   /*std::map<uint32_t, ServerRequestBase*>::iterator iter;
-
-   if (find(funcid, iter))
-   {
-      try
-      {
-         current_request_.set(iter->second, fd, sequence_nr, sessionid);
-         iter->second->eval(payload, length);
-
-         // current_request_ is only valid if no response handler was called
-         if (current_request_)
-         {
-             // in that case the request must not have a reponse
-            assert(!current_request_.requestor_->hasResponse());
-            current_request_.clear();
-         }
-      }
-      catch(const RuntimeError& err)
-      {
-         if (current_request_.requestor_->hasResponse())
-         {
-            respondWith(err);
-            current_request_.clear();
-         }
-      }
-      catch(...)
-      {
-         if (current_request_.requestor_->hasResponse())
-         {
-            RuntimeError err(-1, "Unknown unhandled exception occured on server");
-            respondWith(err);
-         }
-
-         current_request_.clear();
-         throw;
-      }
-   }
-   else
-      std::cerr << "Unknown request '" << funcid << "' with payload size=" << length << std::endl;
-      */
 }
 
-/*
-std::tuple<void*,void(*)(void*)> SkeletonBase::clientAttached()
-{
-   return std::tuple<void*,void(*)(void*)>(nullptr, nullptr);   // the default does not create any session data
-}
-*/
+
 }   // namespace dbus
 
 }   // namespace simppl

@@ -46,6 +46,7 @@ struct ServerRequestBase
    friend struct detail::ServerRequestBaseSetter;
 
    virtual void eval(DBusMessage* msg) = 0;
+   virtual void introspect(std::ostream& os) = 0;
 
    inline
    bool hasResponse() const
@@ -157,6 +158,14 @@ struct ServerRequest : ServerRequestBase
       else
          assert(false);    // no response handler registered
    }
+   
+   void introspect(std::ostream& os)
+   {
+      os << "    <method name=\"" << this->name_ << "\">";
+      std::tuple<T...> t;   // FIXME remove tuple here, only the type is needed!
+      detail::introspect_args(t, os);
+      os << "    </method>\n";
+   }
 
    function_type f_;
 };
@@ -213,6 +222,7 @@ struct ServerAttributeBase
 
    virtual void eval(DBusMessage* msg) = 0;
    virtual void evalSet(detail::Deserializer& ds) = 0;
+   virtual void introspect(std::ostream& os) = 0;
 
 protected:
 
@@ -288,6 +298,14 @@ protected:
       ds >> v;
 
       *this = *v.template get<DataT>();
+   }
+   
+   void introspect(std::ostream& os)
+   {
+      // FIXME name_ seems to be here multiple times: signal and ABase
+      os << "    <property name=\"" << ServerAttributeBase::name_ << "\" type=\"";
+      detail::make_type_signature<DataT>::eval(os);
+      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n"; 
    }
 };
 

@@ -470,6 +470,44 @@ struct make_type_signature<std::map<KeyT, ValueT>>
 };
 
 
+// --- introspection stuff ---------------------------------------------
+
+
+struct ArgumentsIntrospector
+{
+   ArgumentsIntrospector(std::ostream& os)
+    : os_(os)
+    , i_(0)
+   {
+      // NOOP
+   }
+   
+   template<typename T>
+   void operator()(const T&)
+   {
+      os_ << "<arg name=\"arg" << i_++ << "\" type=\"";
+      make_type_signature<T>::eval(os_);
+      os_ << "\" direction=\"in\"/>\n";
+   }
+   
+   std::ostream& os_;
+   int i_;
+};
+
+template<typename... T>
+void introspect_args(const std::tuple<T...>& t, std::ostream& os)
+{
+   detail::ArgumentsIntrospector inspector(os);
+   std_tuple_for_each(t, inspector);
+}
+
+inline
+void introspect_args(const std::tuple<>&, std::ostream& os)
+{
+   // NOOP
+}
+
+
 // --- variant stuff ---------------------------------------------------
 
 
