@@ -192,6 +192,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 
    if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
    {
+#if SIMPPL_HAVE_INTROSPECTION
       if (!strcmp(method, "Introspect"))
       {
          std::ostringstream oss;
@@ -213,13 +214,17 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          }
          
          // FIXME signals
-             
+         
+         // introspectable
          oss << "  </interface>\n"
              "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
              "    <method name=\"Introspect\">\n"
              "      <arg name=\"data\" type=\"s\" direction=\"out\"/>\n"
              "    </method>\n"
-             "  </interface>\n"
+             "  </interface>\n";
+
+         // attributes
+         oss <<
              "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
              "    <method name=\"Get\">\n"
              "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
@@ -243,6 +248,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 
          return DBUS_HANDLER_RESULT_HANDLED;
       }
+#endif   // #if SIMPPL_HAVE_INTROSPECTION 
    }
    else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
    {
