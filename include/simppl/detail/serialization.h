@@ -383,8 +383,8 @@ private:
    // struct helper
    static inline void helper(std::ostream& os, tFalseType)
    {
-      T::serializer_type::write_signature(os << "(");
-      os << ")";
+      T::serializer_type::write_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
+      os << DBUS_STRUCT_END_CHAR_AS_STRING;
    }
 };
 
@@ -413,12 +413,23 @@ struct make_type_signature<std::tuple<T...>>
    static inline
    std::ostream& eval(std::ostream& os)
    {
-      os << "(";
+      os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
       std::tuple<T...> t;   // FIXME make this a type based version only, no value based iteration
       std_tuple_for_each(t, helper(os));
-      os << ")";
+      os << DBUS_STRUCT_END_CHAR_AS_STRING;
 
       return os;
+   }
+};
+
+
+template<typename... T>
+struct make_type_signature<simppl::Variant<T...>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_VARIANT_AS_STRING;
    }
 };
 
@@ -429,7 +440,7 @@ struct make_type_signature<std::vector<T>>
    static inline
    std::ostream& eval(std::ostream& os)
    {
-      return make_type_signature<T>::eval(os << "a");
+      return make_type_signature<T>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
    }
 };
 
@@ -440,7 +451,7 @@ struct make_type_signature<std::string>
    static inline
    std::ostream& eval(std::ostream& os)
    {
-      return os << "s";
+      return os << DBUS_TYPE_STRING_AS_STRING;
    }
 };
 
@@ -451,10 +462,10 @@ struct make_type_signature<std::pair<KeyT, ValueT>>
    static inline
    std::ostream& eval(std::ostream& os)
    {
-      os << "{";
+      os << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING;
       make_type_signature<KeyT>::eval(os);
       make_type_signature<ValueT>::eval(os);
-      return os << "}";
+      return os << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
    }
 };
 
@@ -465,7 +476,7 @@ struct make_type_signature<std::map<KeyT, ValueT>>
    static inline
    std::ostream& eval(std::ostream& os)
    {
-      return make_type_signature<std::pair<typename std::decay<KeyT>::type, ValueT>>::eval(os << "a");
+      return make_type_signature<std::pair<typename std::decay<KeyT>::type, ValueT>>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
    }
 };
 
@@ -631,6 +642,7 @@ struct Serializer // : noncopyable
    {
        VariantSerializer<Serializer> s(*this);
        staticVisit(s, const_cast<Variant<T...>&>(v));   // FIXME need const visitor
+       return *this;
    }
 
    template<typename T>
@@ -663,7 +675,7 @@ struct Serializer // : noncopyable
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-      
+   
       for (auto& e : m) {
          s.write(e);
       }
@@ -812,7 +824,7 @@ void simppl::dbus::detail::VariantSerializer<SerializerT>::operator()(const T& t
     dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
     
     SerializerT s(&iter);
-    s << t;
+    s.write(t);
     
     dbus_message_iter_close_container(orig_.iter_, &iter);
 }
@@ -888,6 +900,7 @@ struct Deserializer // : noncopyable
          std::cerr << "Invalid variant type detected" << std::endl;
        
        dbus_message_iter_next(iter_);
+       return *this;
    }
 
    template<typename T>
@@ -1076,7 +1089,7 @@ void simppl::dbus::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 
 
 template<typename DeserializerT, typename... T>
-bool simppl::dbus::detail::try_deserialize(DeserializerT& d, simppl::Variant<T...>& v, const char* sig)
+bool simppl::dbus::detail::try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig)
 {
    return simppl::dbus::detail::VariantDeserializer<T...>::eval(d, v, sig);
 }
