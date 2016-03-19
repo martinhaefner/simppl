@@ -99,7 +99,6 @@ struct ServerSignal
       // NOOP
    }
 
-   inline
    void emit(typename CallTraits<T>::param_type... args)
    {
       if (parent_->conn_)
@@ -279,7 +278,6 @@ struct ServerAttribute : BaseAttribute<DataT>
       // NOOP
    }
 
-   inline
    ServerAttribute& operator=(const DataT& data)
    {
       // FIXME if emitting...

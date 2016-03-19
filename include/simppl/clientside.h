@@ -59,7 +59,7 @@ struct ClientSignalBase
       // NOOP
    }
 
-
+   inline
    const char* name() const
    {
        return name_;
@@ -191,7 +191,6 @@ struct ClientAttribute
    }
 
    /// only call this after the server is connected.
-   inline
    ClientAttribute& attach()
    {
       signal_.handledBy(std::bind(&ClientAttribute<DataT, Flags>::valueChanged, this, std::placeholders::_1));
@@ -305,7 +304,6 @@ struct ClientRequest : ClientRequestBase
       // NOOP
    }
 
-   inline
    detail::ClientResponseHolder operator()(typename CallTraits<T>::param_type... t)
    {
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
@@ -316,7 +314,6 @@ struct ClientRequest : ClientRequestBase
       return detail::ClientResponseHolder(stub->disp(), handler_);
    }
 
-   inline
    ClientRequest& operator[](int flags)
    {
       assert(handler_);   // no oneway requests
