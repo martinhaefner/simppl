@@ -167,7 +167,7 @@ struct ClientAttribute
 
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   typedef std::function<void(arg_type)> function_type;
+   typedef std::function<void(CallState, arg_type)> function_type;
    typedef ClientSignal<DataT> signal_type;
 
 
@@ -256,7 +256,7 @@ struct ClientAttribute
         data_ = *v.template get<DataT>();
         
         if (f_)
-            f_(*v.template get<DataT>());        
+            f_(CallState(msg), *v.template get<DataT>());        
     }
 
 
@@ -265,7 +265,7 @@ struct ClientAttribute
       data_ = arg;
       
       if (f_)
-         f_(arg);
+         f_(CallState(42), arg);
    }
 
    signal_type signal_;
@@ -338,7 +338,7 @@ struct ClientResponse : ClientResponseBase
 {
    static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
 
-   typedef std::function<void(const CallState&, typename CallTraits<T>::param_type...)> function_type;
+   typedef std::function<void(CallState, typename CallTraits<T>::param_type...)> function_type;
 
    inline
    ClientResponse(const char* /*name*/, void*)

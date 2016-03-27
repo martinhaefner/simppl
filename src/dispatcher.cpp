@@ -688,7 +688,7 @@ int Dispatcher::step_ms(int timeout_ms)
 }
 
 
-void Dispatcher::propagate(const CallState& st)
+void Dispatcher::propagate(CallState st)
 {
    exceptions_.push(st);
 }

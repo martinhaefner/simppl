@@ -119,7 +119,7 @@ struct Dispatcher
    }
    
    /// propagate exception
-   void propagate(const CallState& state);
+   void propagate(CallState state);
 
 private:
 

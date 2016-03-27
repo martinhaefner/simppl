@@ -77,7 +77,7 @@ namespace {
          getData();
       }
       
-      void handleGetData(const simppl::dbus::CallState& state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping)
+      void handleGetData(simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping)
       {
          EXPECT_EQ(3, mapping.size());
          

@@ -66,13 +66,13 @@ struct Client : simppl::dbus::Stub<Attributes>
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      props.attach() >> std::bind(&Client::handleProps, this, _1);
+      props.attach() >> std::bind(&Client::handleProps, this, _1, _2);
 
       set(Four, "Four");
    }
 
 
-   void handleProps(const std::map<ident_t, std::string>& props)
+   void handleProps(simppl::dbus::CallState, const std::map<ident_t, std::string>& props)
    {
       ++callback_count_;
 
@@ -130,13 +130,13 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
 
       if (attach_)
       {
-         props.attach() >> std::bind(&MultiClient::handleProps, this, _1);
+         props.attach() >> std::bind(&MultiClient::handleProps, this, _1, _2);
          set(Four, "Four");
       }
    }
 
 
-   void handleProps(const std::map<ident_t, std::string>& props)
+   void handleProps(simppl::dbus::CallState, const std::map<ident_t, std::string>& props)
    {
       ++callback_count_;
 
@@ -175,13 +175,13 @@ struct SetterClient : simppl::dbus::Stub<Attributes>
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      data.attach() >> std::bind(&SetterClient::handleData, this, _1);
+      data.attach() >> std::bind(&SetterClient::handleData, this, _1, _2);
 
       data = 5555;
    }
 
 
-   void handleData(int i)
+   void handleData(simppl::dbus::CallState, int i)
    {
       ++callback_count_;
 

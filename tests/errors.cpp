@@ -62,7 +62,7 @@ struct Client : simppl::dbus::Stub<Errors>
    }
    
    
-   void handleWorld(const simppl::dbus::CallState& state)
+   void handleWorld(simppl::dbus::CallState state)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -73,7 +73,7 @@ struct Client : simppl::dbus::Stub<Errors>
    }
    
    
-   void handleWorld1(const simppl::dbus::CallState& state, int)
+   void handleWorld1(simppl::dbus::CallState state, int)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());

@@ -67,7 +67,7 @@ struct Client : simppl::dbus::Stub<Timeout>
    }
 
 
-   void handleEval(const simppl::dbus::CallState& state, double)
+   void handleEval(simppl::dbus::CallState state, double)
    {
       EXPECT_FALSE((bool)state);
 
@@ -110,7 +110,7 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
    }
 
 
-   void handleEval(const simppl::dbus::CallState& state, double)
+   void handleEval(simppl::dbus::CallState state, double)
    {
       EXPECT_FALSE((bool)state);
 

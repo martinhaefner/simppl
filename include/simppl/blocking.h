@@ -20,7 +20,7 @@ struct BlockingAttributeResponseHandler
 {
    BlockingAttributeResponseHandler(simppl::dbus::Dispatcher& disp, AttributeT& a, typename AttributeT::data_type& t);
    
-   void operator()(typename AttributeT::arg_type t);
+   void operator()(simppl::dbus::CallState state, typename AttributeT::arg_type t);
    
 private:
 
@@ -35,7 +35,7 @@ struct BlockingResponseHandler
 {
    BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t);
    
-   void operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type t);
+   void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type t);
    
 private:
 
@@ -50,7 +50,7 @@ struct BlockingResponseHandlerN
 {
    BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t);
    
-   void operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type... t);
+   void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type... t);
    
 private:
 
@@ -132,10 +132,14 @@ BlockingAttributeResponseHandler<AttributeT>::BlockingAttributeResponseHandler(s
 
 template<typename AttributeT>
 inline
-void BlockingAttributeResponseHandler<AttributeT>::operator()(typename AttributeT::arg_type t)
+void BlockingAttributeResponseHandler<AttributeT>::operator()(CallState state, typename AttributeT::arg_type t)
 {
    disp_.stop();
    a_.handledBy(std::nullptr_t());
+   
+   if (!state)
+      disp_.propagate(state);
+      
    t_ = t;
 }
 
@@ -152,7 +156,7 @@ BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& di
 
 
 template<typename T>
-void BlockingResponseHandler<T>::operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type t)
+void BlockingResponseHandler<T>::operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type t)
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());
@@ -178,7 +182,7 @@ BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::dbus::Dispatche
 
 
 template<typename... T>
-void BlockingResponseHandlerN<T...>::operator()(const simppl::dbus::CallState& state, typename CallTraits<T>::param_type... t)
+void BlockingResponseHandlerN<T...>::operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type... t)
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());

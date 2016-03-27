@@ -73,7 +73,7 @@ struct Client : simppl::dbus::Stub<Simple>
    }
 
 
-   void handleWorld(const simppl::dbus::CallState& state)
+   void handleWorld(simppl::dbus::CallState state)
    {
       EXPECT_TRUE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -128,12 +128,14 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
       // like for signals, attributes must be attached when the client is connected
-      data.attach() >> std::bind(&AttributeClient::attributeChanged, this, _1);
+      data.attach() >> std::bind(&AttributeClient::attributeChanged, this, _1, _2);
    }
 
 
-   void attributeChanged(int new_value)
+   void attributeChanged(simppl::dbus::CallState state, int new_value)
    {
+      EXPECT_TRUE((bool)state);
+      
       if (first_)
       {
          // first you get the current value

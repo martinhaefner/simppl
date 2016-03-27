@@ -63,14 +63,14 @@ struct Client : simppl::dbus::Stub<AsyncServer>
     }
    
    
-   void handleResult(const simppl::dbus::CallState& s, double d)
+   void handleResult(simppl::dbus::CallState s, double d)
    {
       EXPECT_TRUE((bool)s);
       oneway(42);
    }
    
    
-   void handleEcho(const simppl::dbus::CallState& s, int i, double d)
+   void handleEcho(simppl::dbus::CallState s, int i, double d)
    {
       EXPECT_TRUE((bool)s);
       haveEcho_ = true;
@@ -105,7 +105,7 @@ struct ShutdownClient : simppl::dbus::Stub<AsyncServer>
    }
    
    
-   void handleResult(const simppl::dbus::CallState& s, double d)
+   void handleResult(simppl::dbus::CallState s, double d)
    {
       EXPECT_FALSE((bool)s);
       EXPECT_TRUE(s.isTransportError());
