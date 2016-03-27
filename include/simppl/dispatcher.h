@@ -120,6 +120,12 @@ struct Dispatcher
    
    /// propagate exception
    void propagate(CallState state);
+   
+   inline
+   DBusConnection& connection()
+   {
+      return *conn_;
+   }
 
 private:
 

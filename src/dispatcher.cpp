@@ -72,6 +72,9 @@ short make_poll_events(int flags)
     if (flags & DBUS_WATCH_WRITABLE)
         rc |= POLLOUT;
 
+    // do not expect to have read and write simultaneously from DBus API
+    assert(flags | (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE) != (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE));
+    
     return rc;
 }
 
@@ -155,41 +158,15 @@ struct Dispatcher::Private
 
     dbus_bool_t add_watch(DBusWatch* w)
     {
-        auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
-        if (iter == fds_.end())
-        {
-            pollfd fd = { 0 };
+        pollfd fd = { 0 };
 
-            fd.fd = dbus_watch_get_unix_fd(w);
+        fd.fd = dbus_watch_get_unix_fd(w);
 
-            if (dbus_watch_get_enabled(w))
-                fd.events = make_poll_events(dbus_watch_get_flags(w));
+        if (dbus_watch_get_enabled(w))
+            fd.events = make_poll_events(dbus_watch_get_flags(w));
 
-            fds_.push_back(fd);
-
-            DBusWatch* rd = 0;
-            DBusWatch* wr = 0;
-
-            if (fd.events & POLLIN)
-            {
-                rd = w;
-            }
-            else
-                wr = w;
-
-            watch_handlers_[fd.fd] = std::make_tuple(rd, wr);
-        }
-        else
-        {
-            iter->events |= make_poll_events(dbus_watch_get_flags(w));
-
-            if (dbus_watch_get_flags(w) == DBUS_WATCH_READABLE)
-            {
-                std::get<0>(watch_handlers_[iter->fd]) = w;
-            }
-            else
-                std::get<1>(watch_handlers_[iter->fd]) = w;
-        }
+        fds_.push_back(fd);
+        watch_handlers_.insert(std::make_pair(fd.fd, w));
 
         return TRUE;
     }
@@ -197,19 +174,30 @@ struct Dispatcher::Private
 
     void remove_watch(DBusWatch* w)
     {
-        //std::cout << "remove_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
-        /*auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
-        if (iter != fds_.end())
-        {
-            watch_handlers_.erase(iter->fd);
-            fds_.erase(iter);
-        }*/
+       auto result = watch_handlers_.equal_range(dbus_watch_get_unix_fd(w));
+       
+       for(auto iter = result.first; iter != result.second; ++iter)
+       {
+          if (iter->second == w)
+          {
+             auto pfditer = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ 
+                return dbus_watch_get_unix_fd(w) == pfd.fd
+                    && pfd.revents & make_poll_events(dbus_watch_get_flags(w)); 
+             });
+             
+             if (pfditer != fds_.end())
+                 fds_.erase(pfditer);
+             
+             watch_handlers_.erase(iter);
+             break;
+          }
+       }
     }
 
 
     void toggle_watch(DBusWatch* w)
     {
-        //std::cout << "toggle_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
+        std::cout << "toggle_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
      /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
         if (iter != fds_.end())
         {
@@ -298,19 +286,25 @@ struct Dispatcher::Private
             {
                 if (pfd.revents)
                 {
-                    auto iter = watch_handlers_.find(pfd.fd);
-
-                    if (iter != watch_handlers_.end())
+                    auto result = watch_handlers_.equal_range(pfd.fd);
+                    bool handled = false;
+                    
+                    for(auto iter = result.first; iter != result.second; ++iter)
                     {
-                        int fd = pfd.fd;
+                       handled = true;   // ok, fd found...
+                       
+                       if (pfd.revents & make_poll_events(dbus_watch_get_flags(iter->second)))
+                       {
+                           int fd = pfd.fd;
 
-                        //std::cout << "handle watch" << std::endl;
-                        if (pfd.revents & POLLIN)
-                            dbus_watch_handle(std::get<0>(iter->second), make_dbus_flags(pfd.revents));
-                        else
-                            dbus_watch_handle(std::get<1>(iter->second), make_dbus_flags(pfd.revents));
+                           //std::cout << "handle watch" << std::endl;
+                           dbus_watch_handle(iter->second, make_dbus_flags(pfd.revents));
+                           break;
+                        }
                     }
-                    else
+                    
+                    // must be a timeout
+                    if (!handled)
                     {
                         auto t_iter = tm_handlers_.find(pfd.fd);
 
@@ -323,7 +317,7 @@ struct Dispatcher::Private
                             dbus_timeout_handle(t_iter->second);
                         }
                     }
-
+                  
                     break;
                 }
             }
@@ -335,7 +329,7 @@ struct Dispatcher::Private
 
     std::vector<pollfd> fds_;
 
-    std::map<int, std::tuple<DBusWatch*, DBusWatch*>> watch_handlers_;
+    std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
 };
 
