@@ -11,3 +11,6 @@ add_library(simppl
    timeout.cpp
    util.cpp
    serverrequestdescriptor.cpp)
+
+
+install(TARGETS simppl DESTINATION lib)
