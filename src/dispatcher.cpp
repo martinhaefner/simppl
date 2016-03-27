@@ -158,14 +158,19 @@ struct Dispatcher::Private
 
     dbus_bool_t add_watch(DBusWatch* w)
     {
+       //std::cout << "add_watch" << std::endl;
         pollfd fd = { 0 };
 
         fd.fd = dbus_watch_get_unix_fd(w);
 
         if (dbus_watch_get_enabled(w))
+        {
             fd.events = make_poll_events(dbus_watch_get_flags(w));
-
-        fds_.push_back(fd);
+            fds_.push_back(fd);
+        }
+        //else
+          // std::cout << "Not enabled" << std::endl;
+        
         watch_handlers_.insert(std::make_pair(fd.fd, w));
 
         return TRUE;
@@ -174,6 +179,7 @@ struct Dispatcher::Private
 
     void remove_watch(DBusWatch* w)
     {
+       //std::cout << "remove_watch" << std::endl;
        auto result = watch_handlers_.equal_range(dbus_watch_get_unix_fd(w));
        
        for(auto iter = result.first; iter != result.second; ++iter)
@@ -186,8 +192,10 @@ struct Dispatcher::Private
              });
              
              if (pfditer != fds_.end())
+             {
+                std::cout << "ok found" << std::endl;
                  fds_.erase(pfditer);
-             
+             }
              watch_handlers_.erase(iter);
              break;
           }
@@ -197,8 +205,8 @@ struct Dispatcher::Private
 
     void toggle_watch(DBusWatch* w)
     {
-        std::cout << "toggle_watch fd=" << dbus_watch_get_unix_fd(w) << std::endl;
-     /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
+       assert(false);   // not implemented
+        /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
         if (iter != fds_.end())
         {
             if (dbus_watch_get_enabled(w))
