@@ -30,6 +30,7 @@ template<typename, int> struct ServerAttribute;
 
 struct ServerRequestBase;
 struct ServerAttributeBase;
+struct ServerSignalBase;
 struct ServerRequestBaseSetter;
 
 
@@ -49,6 +50,10 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    // FIXME maybe use intrusive container here or take char* from static linkage?!
    std::map<std::string, ServerRequestBase*> methods_;
    std::map<std::string, ServerAttributeBase*> attributes_;
+
+#if SIMPPL_HAVE_INTROSPECTION
+   std::map<std::string, ServerSignalBase*> signals_;
+#endif
 };
 
 }   // namespace dbus

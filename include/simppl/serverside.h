@@ -46,7 +46,10 @@ struct ServerRequestBase
    friend struct detail::ServerRequestBaseSetter;
 
    virtual void eval(DBusMessage* msg) = 0;
+
+#if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
+#endif
 
    inline
    bool hasResponse() const
@@ -86,15 +89,34 @@ protected:
 // ----------------------------------------------------------------------------------
 
 
+struct ServerSignalBase
+{
+   ServerSignalBase(const char* name, detail::BasicInterface* iface);
+   
+#if SIMPPL_HAVE_INTROSPECTION
+   virtual void introspect(std::ostream& os) = 0;
+#endif 
+
+protected:
+
+   inline ~ServerSignalBase() 
+   {
+      // NOOP
+   }
+
+   const char* name_;
+   detail::BasicInterface* parent_;
+};
+
+
 template<typename... T>
-struct ServerSignal
+struct ServerSignal : ServerSignalBase
 {
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
 
    inline
    ServerSignal(const char* name, detail::BasicInterface* iface)
-    : name_(name)
-    , parent_(iface)
+    : ServerSignalBase(name, iface)
    {
       // NOOP
    }
@@ -113,12 +135,16 @@ struct ServerSignal
          dbus_message_unref(msg);
       }
    }
-
-
-protected:
-
-   const char* name_;
-   detail::BasicInterface* parent_;
+   
+#if SIMPPL_HAVE_INTROSPECTION
+   void introspect(std::ostream& os)
+   {
+      os << "    <signal name=\"" << this->name_ << "\">";
+      std::tuple<T...> t;   // FIXME remove tuple here, only the type is needed!
+      detail::introspect_args(t, os, false);
+      os << "    </signal>\n";
+   }
+#endif
 };
 
 
@@ -158,13 +184,15 @@ struct ServerRequest : ServerRequestBase
          assert(false);    // no response handler registered
    }
    
+#if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
       os << "    <method name=\"" << this->name_ << "\">";
       std::tuple<T...> t;   // FIXME remove tuple here, only the type is needed!
-      detail::introspect_args(t, os);
+      detail::introspect_args(t, os, true);
       os << "    </method>\n";
    }
+#endif
 
    function_type f_;
 };
@@ -221,7 +249,10 @@ struct ServerAttributeBase
 
    virtual void eval(DBusMessage* msg) = 0;
    virtual void evalSet(detail::Deserializer& ds) = 0;
+   
+#if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
+#endif
 
 protected:
 
@@ -298,6 +329,7 @@ protected:
       *this = *v.template get<DataT>();
    }
    
+#if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
       // FIXME name_ seems to be here multiple times: signal and ABase
@@ -305,6 +337,7 @@ protected:
       detail::make_type_signature<DataT>::eval(os);
       os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n"; 
    }
+#endif
 };
 
 

@@ -213,7 +213,11 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
             attribute.second->introspect(oss);
          }
          
-         // FIXME signals
+         auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
+         for(auto& sig : signals)
+         {
+            sig.second->introspect(oss);
+         }
          
          // introspectable
          oss << "  </interface>\n"

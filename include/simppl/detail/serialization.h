@@ -486,9 +486,10 @@ struct make_type_signature<std::map<KeyT, ValueT>>
 
 struct ArgumentsIntrospector
 {
-   ArgumentsIntrospector(std::ostream& os)
+   ArgumentsIntrospector(std::ostream& os, bool dir)
     : os_(os)
     , i_(0)
+    , dir_(dir)
    {
       // NOOP
    }
@@ -498,22 +499,26 @@ struct ArgumentsIntrospector
    {
       os_ << "<arg name=\"arg" << i_++ << "\" type=\"";
       make_type_signature<T>::eval(os_);
-      os_ << "\" direction=\"in\"/>\n";
+      os_ << "\" ";
+      if (dir_)
+         os_ << "direction=\"in\"";
+      os_ << "/>\n";
    }
    
    std::ostream& os_;
    int i_;
+   bool dir_;
 };
 
 template<typename... T>
-void introspect_args(const std::tuple<T...>& t, std::ostream& os)
+void introspect_args(const std::tuple<T...>& t, std::ostream& os, bool dir)
 {
-   detail::ArgumentsIntrospector inspector(os);
+   detail::ArgumentsIntrospector inspector(os, dir);
    std_tuple_for_each(t, inspector);
 }
 
 inline
-void introspect_args(const std::tuple<>&, std::ostream& os)
+void introspect_args(const std::tuple<>&, std::ostream&, bool)
 {
    // NOOP
 }

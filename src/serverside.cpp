@@ -26,6 +26,16 @@ ServerAttributeBase::ServerAttributeBase(const char* name, detail::BasicInterfac
 {
    dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->attributes_[name_] = this;
 }
+
+
+ServerSignalBase::ServerSignalBase(const char* name, detail::BasicInterface* iface)
+ : name_(name)
+ , parent_(iface)
+{
+#if SIMPPL_HAVE_INTROSPECTION
+   dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->signals_[name_] = this;
+#endif
+}
  
  
 }   // namespace dbus
