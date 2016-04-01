@@ -139,15 +139,15 @@ struct ClientAttributeWritableMixin
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   
-   
+
+
    void set(arg_type t)
    {
       AttributeT* that = (AttributeT*)this;
       that->data_ = t;
-      
+
       Variant<data_type> vt(t);
-      
+
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<const Variant<data_type>&>, std::placeholders::_1, vt));
       that->stub().setProperty(that->signal_.name(), f);
    }
@@ -160,7 +160,7 @@ struct NoopMixin
 
 
 template<typename DataT, int Flags = Notifying|ReadOnly>
-struct ClientAttribute 
+struct ClientAttribute
  : if_<(Flags & ReadWrite), ClientAttributeWritableMixin<ClientAttribute<DataT, Flags>, DataT>, NoopMixin>::type
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
@@ -184,7 +184,7 @@ struct ClientAttribute
    {
       f_ = func;
    }
-   
+
    StubBase& stub()
    {
       return *dynamic_cast<StubBase*>(signal_.iface_);
@@ -201,22 +201,22 @@ struct ClientAttribute
 
       return *this;
    }
-   
+
    inline
    const DataT& value() const
    {
       return data_;
    }
-   
-   // FIXME implement GetAll in Stub needs to store attributesbase in interface  
+
+   // FIXME implement GetAll in Stub needs to store attributesbase in interface
    // in a similar way as it is done on server side...
    ClientAttribute& get()
    {
       stub().getProperty(signal_.name(), &pending_notify, this);
       return *this;
    }
-   
-   
+
+
    ClientAttribute& operator=(arg_type t)
    {
       this->set(t);
@@ -237,10 +237,10 @@ struct ClientAttribute
     void pending_notify(DBusPendingCall* pending, void* user_data)
     {
         DBusMessage* msg = dbus_pending_call_steal_reply(pending);
-        
+
         ClientAttribute* handler = (ClientAttribute*)user_data;
         handler->eval(*msg);
-        
+
         dbus_message_unref(msg);
         dbus_pending_call_unref(pending);
     }
@@ -248,22 +248,22 @@ struct ClientAttribute
     void eval(DBusMessage& msg)
     {
         detail::Deserializer ds(&msg);
-        
+
         // FIXME check type of variant and set error flag on stream?!
         Variant<DataT> v;
         ds >> v;
-        
+
         data_ = *v.template get<DataT>();
-        
+
         if (f_)
-            f_(CallState(msg), *v.template get<DataT>());        
+            f_(CallState(msg), *v.template get<DataT>());
     }
 
 
    void valueChanged(arg_type arg)
    {
       data_ = arg;
-      
+
       if (f_)
          f_(CallState(42), arg);
    }
@@ -286,8 +286,8 @@ struct ClientRequestBase
        // NOOP
    }
 
-   ClientResponseBase* handler_;
    const char* method_name_;
+   ClientResponseBase* handler_;
 };
 
 
@@ -310,7 +310,7 @@ struct ClientRequest : ClientRequestBase
 
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
       stub->sendRequest(*this, f);
-      
+
       return detail::ClientResponseHolder(stub->disp(), handler_);
    }
 

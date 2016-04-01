@@ -74,7 +74,7 @@ short make_poll_events(int flags)
 
     // do not expect to have read and write simultaneously from DBus API
     assert(flags | (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE) != (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE));
-    
+
     return rc;
 }
 
@@ -170,7 +170,7 @@ struct Dispatcher::Private
         }
         //else
           // std::cout << "Not enabled" << std::endl;
-        
+
         watch_handlers_.insert(std::make_pair(fd.fd, w));
 
         return TRUE;
@@ -181,19 +181,19 @@ struct Dispatcher::Private
     {
        //std::cout << "remove_watch" << std::endl;
        auto result = watch_handlers_.equal_range(dbus_watch_get_unix_fd(w));
-       
+
        for(auto iter = result.first; iter != result.second; ++iter)
        {
           if (iter->second == w)
           {
-             auto pfditer = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ 
+             auto pfditer = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){
                 return dbus_watch_get_unix_fd(w) == pfd.fd
-                    && pfd.revents & make_poll_events(dbus_watch_get_flags(w)); 
+                    && pfd.revents & make_poll_events(dbus_watch_get_flags(w));
              });
-             
+
              if (pfditer != fds_.end())
              {
-                std::cout << "ok found" << std::endl;
+                //std::cout << "ok found" << std::endl;
                  fds_.erase(pfditer);
              }
              watch_handlers_.erase(iter);
@@ -296,11 +296,11 @@ struct Dispatcher::Private
                 {
                     auto result = watch_handlers_.equal_range(pfd.fd);
                     bool handled = false;
-                    
+
                     for(auto iter = result.first; iter != result.second; ++iter)
                     {
                        handled = true;   // ok, fd found...
-                       
+
                        if (pfd.revents & make_poll_events(dbus_watch_get_flags(iter->second)))
                        {
                            int fd = pfd.fd;
@@ -310,7 +310,7 @@ struct Dispatcher::Private
                            break;
                         }
                     }
-                    
+
                     // must be a timeout
                     if (!handled)
                     {
@@ -325,7 +325,7 @@ struct Dispatcher::Private
                             dbus_timeout_handle(t_iter->second);
                         }
                     }
-                  
+
                     break;
                 }
             }
@@ -442,7 +442,11 @@ void Dispatcher::addServer(SkeletonBase& serv)
    busname << serv.iface() << '.' << serv.role();
 
    dbus_bus_request_name(conn_, busname.str().c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-   assert(!dbus_error_is_set(&err));
+   if (dbus_error_is_set(&err))
+   {
+       std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
+   }
+   //assert(!dbus_error_is_set(&err));
 
    dbus_error_free(&err);
 
@@ -663,11 +667,8 @@ void Dispatcher::loop()
 }
 
 
-int Dispatcher::step_ms(int timeout_ms)
+void Dispatcher::dispatch()
 {
-#ifdef USE_POLL
-    d->poll(timeout_ms);
-
     int rc;
     do
     {
@@ -682,6 +683,14 @@ int Dispatcher::step_ms(int timeout_ms)
        }
     }
     while(rc != DBUS_DISPATCH_COMPLETE);
+}
+
+
+int Dispatcher::step_ms(int timeout_ms)
+{
+#ifdef USE_POLL
+    d->poll(timeout_ms);
+    dispatch();
 #else
     dbus_connection_read_write_dispatch(conn_, 100);
 #endif

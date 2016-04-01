@@ -92,14 +92,14 @@ protected:
 struct ServerSignalBase
 {
    ServerSignalBase(const char* name, detail::BasicInterface* iface);
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
-#endif 
+#endif
 
 protected:
 
-   inline ~ServerSignalBase() 
+   inline ~ServerSignalBase()
    {
       // NOOP
    }
@@ -121,7 +121,7 @@ struct ServerSignal : ServerSignalBase
       // NOOP
    }
 
-   void emit(typename CallTraits<T>::param_type... args)
+   void emit_(typename CallTraits<T>::param_type... args)
    {
       if (parent_->conn_)
       {
@@ -135,7 +135,7 @@ struct ServerSignal : ServerSignalBase
          dbus_message_unref(msg);
       }
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
@@ -183,7 +183,7 @@ struct ServerRequest : ServerRequestBase
       else
          assert(false);    // no response handler registered
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
@@ -249,7 +249,7 @@ struct ServerAttributeBase
 
    virtual void eval(DBusMessage* msg) = 0;
    virtual void evalSet(detail::Deserializer& ds) = 0;
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
 #endif
@@ -286,11 +286,11 @@ struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
    void eval(DBusMessage* response)
    {
       detail::Serializer s(response);
-      
+
       Variant<DataT> v(t_);   // FIXME this copy is overhead, just somehow wrap it...
       serialize(s, v);
    }
-   
+
 protected:
 
    DataT t_;
@@ -312,12 +312,12 @@ struct ServerAttribute : BaseAttribute<DataT>
    ServerAttribute& operator=(const DataT& data)
    {
       // FIXME if emitting...
-      this->emit(data);
+      this->emit_(data);
 
       this->t_ = data;
       return *this;
    }
-   
+
 protected:
 
    // FIXME only do something if readwrite enabled!
@@ -328,14 +328,14 @@ protected:
 
       *this = *v.template get<DataT>();
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
       // FIXME name_ seems to be here multiple times: signal and ABase
       os << "    <property name=\"" << ServerAttributeBase::name_ << "\" type=\"";
       detail::make_type_signature<DataT>::eval(os);
-      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n"; 
+      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }
 #endif
 };

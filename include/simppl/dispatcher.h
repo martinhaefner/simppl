@@ -66,13 +66,13 @@ struct Dispatcher
 
    /// add a server
    void addServer(SkeletonBase& server);
-   
+
    /// no arguments version - will throw exception or error
    void waitForResponse(const detail::ClientResponseHolder& resp);
 
    /// at least one argument version - will throw exception on error
    template<typename T>
-   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);   
+   void waitForResponse(const detail::ClientResponseHolder& resp, T& t);
 
    /// more than one argument version
    template<typename... T>
@@ -117,15 +117,17 @@ struct Dispatcher
    {
       return request_timeout_;
    }
-   
+
    /// propagate exception
    void propagate(CallState state);
-   
+
    inline
    DBusConnection& connection()
    {
       return *conn_;
    }
+
+   void dispatch();
 
 private:
 
