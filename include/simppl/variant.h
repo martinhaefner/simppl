@@ -4,6 +4,7 @@
 
 #include "simppl/typelist.h"
 
+//#include <iostream>
 #include <type_traits>
 
 
@@ -156,7 +157,11 @@ struct Variant
             &variant_destroy<0>,
             &variant_destroy<1>,
             &variant_destroy<2>,
-            &variant_destroy<3>
+            &variant_destroy<3>,
+            &variant_destroy<4>,
+            &variant_destroy<5>,
+            &variant_destroy<6>,
+            &variant_destroy<7>
             // append if necessary
        };
        if (idx_ >= 0 && idx_ < Size<typelist_type>::value)
@@ -206,6 +211,9 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
    // FIXME recursive iterate
    switch(variant.idx_)
    {
+   // FIXME case -1:
+
+
    case 0:
        return Callfunc<typename RelaxedTypeAt<0, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
@@ -217,6 +225,18 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
 
    case 3:
        return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 4:
+       return Callfunc<typename RelaxedTypeAt<4, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 5:
+       return Callfunc<typename RelaxedTypeAt<5, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 6:
+       return Callfunc<typename RelaxedTypeAt<6, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+    case 7:
+       return Callfunc<typename RelaxedTypeAt<7, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    default:
       //std::cerr << "Hey, ugly!" << std::endl;
@@ -244,6 +264,18 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, const VariantT& va
 
    case 3:
        return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+    case 4:
+       return Callfunc<typename RelaxedTypeAt<4, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+    case 5:
+       return Callfunc<typename RelaxedTypeAt<5, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+    case 6:
+       return Callfunc<typename RelaxedTypeAt<6, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+    case 7:
+       return Callfunc<typename RelaxedTypeAt<7, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    default:
       //std::cerr << "Hey, ugly!" << std::endl;

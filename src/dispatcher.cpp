@@ -42,7 +42,7 @@ struct BlockingResponseHandler0
    }
 
    inline
-   void operator()(const simppl::dbus::CallState& state)
+   void operator()(simppl::dbus::CallState state)
    {
       disp_.stop();
       r_.handledBy(std::nullptr_t());

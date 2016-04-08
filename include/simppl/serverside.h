@@ -121,7 +121,7 @@ struct ServerSignal : ServerSignalBase
       // NOOP
    }
 
-   void emit_(typename CallTraits<T>::param_type... args)
+   void notify(typename CallTraits<T>::param_type... args)
    {
       if (parent_->conn_)
       {
@@ -312,7 +312,7 @@ struct ServerAttribute : BaseAttribute<DataT>
    ServerAttribute& operator=(const DataT& data)
    {
       // FIXME if emitting...
-      this->emit_(data);
+      this->notify(data);
 
       this->t_ = data;
       return *this;

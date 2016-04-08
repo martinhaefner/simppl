@@ -371,7 +371,8 @@ struct ClientResponse : ClientResponseBase
           }
       }
       else
-         std::cerr << "No response handler installed" << std::endl;
+         abort();   // this is a programming error
+         //std::cerr << "No response handler installed" << std::endl;
    }
 
    function_type f_;

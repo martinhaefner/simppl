@@ -30,7 +30,7 @@ INTERFACE(Attributes)
 
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
-   
+
    // FIXME without arg possible?
    Signal<int> mayShutdown;
 
@@ -229,7 +229,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 
       props = new_props;
 
-      mayShutdown.emit(42);
+      mayShutdown.notify(42);
    }
 
    int calls_ = 0;
@@ -281,6 +281,6 @@ TEST(Attributes, set)
 
    d.addClient(c);
    d.addServer(s);
-   
+
    d.run();
 }

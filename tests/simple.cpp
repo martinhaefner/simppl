@@ -135,7 +135,7 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
    void attributeChanged(simppl::dbus::CallState state, int new_value)
    {
       EXPECT_TRUE((bool)state);
-      
+
       if (first_)
       {
          // first you get the current value
@@ -231,7 +231,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
          data = 42;
       }
       else
-         sig.emit(i);
+         sig.notify(i);
    }
 
    void handleAdd(int i, double d)
@@ -333,7 +333,7 @@ TEST(Simple, blocking)
    stub.data.get() >> dv;
    EXPECT_EQ(4711, dv);
    EXPECT_EQ(4711, stub.data.value());
-   
+
    EXPECT_EQ(3, s.count_oneway_);
 }
 

@@ -40,7 +40,7 @@ else()
 endif()
 
 add_subdirectory(src)
-
+add_subdirectory(examples)
 
 # gtest environment 
 if(NOT GTEST_ROOT)

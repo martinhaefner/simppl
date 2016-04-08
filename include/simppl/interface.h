@@ -6,6 +6,7 @@
 #include <vector>
 #include <map>
 
+#include "simppl/attribute.h"
 #include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/serverrequestbasesetter.h"
@@ -13,10 +14,10 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
+
 // forward decls
 template<typename...> struct ClientRequest;
 template<typename...> struct ClientResponse;
@@ -66,8 +67,8 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
    template<template<typename...> class Request, \
             template<typename...> class Response, \
             template<typename...> class Signal, \
-            template<typename, int Flags=simppl::dbus::Notifying|simppl::dbus::ReadOnly> class Attribute> \
-      struct iface : public simppl::dbus::InterfaceBase<Request>
+            template<typename, int Flags=::simppl::dbus::Notifying|::simppl::dbus::ReadOnly> class Attribute> \
+      struct iface : public ::simppl::dbus::InterfaceBase<Request>
 
 #define INIT(what) \
    what(# what, this)
@@ -87,9 +88,9 @@ inline
 void operator>> (simppl::dbus::ServerRequest<T...>& request, simppl::dbus::ServerResponse<T2...>& response)
 {
    assert(!request.hasResponse());
-   
+
    simppl::dbus::detail::ServerRequestBaseSetter::setHasResponse(request);
-   response.allowedRequests_.insert(&request);   
+   response.allowedRequests_.insert(&request);
 }
 
 #endif   // SIMPPL_INTERFACE_H
