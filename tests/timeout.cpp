@@ -207,7 +207,7 @@ struct Server : simppl::dbus::Skeleton<Timeout>
 
 void runServer()
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    gbl_disp = &d;
 
 try{
@@ -284,7 +284,7 @@ TEST(Timeout, request_specific)
 {
    std::thread serverthread(&runServer);
 
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    simppl::dbus::Stub<Timeout> stub("tm", "unix:TimeoutTest");
 
    // default timeout
@@ -309,7 +309,7 @@ TEST(Timeout, request_specific)
    {
       EXPECT_EQ(EIO, err.getErrno());
    }
-   
+
    int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
    EXPECT_GE(millis, 700);
    EXPECT_LT(millis, 750);

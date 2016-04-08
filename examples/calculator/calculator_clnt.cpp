@@ -47,7 +47,7 @@ int main(int argc, char** argv)
    if (argc > 1)
       rolename = argv[1];
 
-    spl::Dispatcher disp("dbus:session");
+    spl::Dispatcher disp("tcp:host=192.168.200.70,port=8877");
 
     CalculatorClient calc(rolename);
     disp.addClient(calc);

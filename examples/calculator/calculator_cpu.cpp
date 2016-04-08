@@ -46,7 +46,7 @@ int main(int argc, char** argv)
    if (argc > 1)
       role = argv[1];
 
-   spl::Dispatcher disp("dbus:session");
+   spl::Dispatcher disp("bus:system");
 
    CalculatorImpl calc(role);
    disp.addServer(calc);

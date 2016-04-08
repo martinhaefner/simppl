@@ -253,7 +253,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
 
 TEST(Simple, methods)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c;
    Server s("s");
 
@@ -266,7 +266,7 @@ TEST(Simple, methods)
 
 TEST(Simple, signal)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    SignalClient c;
    Server s("ss");
 
@@ -281,7 +281,7 @@ TEST(Simple, signal)
 
 TEST(Simple, attribute)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    AttributeClient c;
    Server s("sa");
 
@@ -294,12 +294,12 @@ TEST(Simple, attribute)
 
 TEST(Simple, blocking)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    Server s("sb");
    d.addServer(s);
 
-   simppl::dbus::Stub<Simple> stub("sb", "dbus:session");
+   simppl::dbus::Stub<Simple> stub("sb", "bus:session");
    d.addClient(stub);
 
    stub.connect();
@@ -346,7 +346,7 @@ TEST(Simple, disconnect)
    clientd.addClient(c);
 
    {
-      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("dbus:session");
+      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("bus:session");
       Server* s = new Server("s");
       serverd->addServer(*s);
 

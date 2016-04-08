@@ -25,6 +25,13 @@ find_path(DBUS_ARCHDEPS_INCLUDE_DIR
     NO_DEFAULT_PATH
 )
 
+find_path(DBUS_LIBDIR
+    libdbus-1.so
+    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
+    ONLY_CMAKE_FIND_ROOT_PATH
+    NO_DEFAULT_PATH
+)
+
 if(DBUS_INCLUDE_DIR)
     message("Found DBus include dir under '${DBUS_INCLUDE_DIR}'")
     include_directories(${DBUS_INCLUDE_DIR})
@@ -39,13 +46,20 @@ else()
     message(FATAL_ERROR "Didn't find dbus arch-deps directory")
 endif()
 
+if(DBUS_LIBDIR)
+    message("Found DBus library in '${DBUS_LIBDIR}'")
+    link_directories(${DBUS_LIBDIR})
+else()
+    message(FATAL_ERROR "Didn't find dbus-1 shared library")
+endif()
+
 add_subdirectory(src)
 add_subdirectory(examples)
 
-# gtest environment 
+# gtest environment
 if(NOT GTEST_ROOT)
    message("Searching for gtest installation...")
-   
+
    find_path(GTEST_ROOT
        include/gtest/gtest.h
        PATHS $ENV{HOME}/*

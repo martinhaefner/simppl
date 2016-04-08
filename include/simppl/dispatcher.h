@@ -51,7 +51,9 @@ struct Dispatcher
    Dispatcher& operator=(const Dispatcher&) = delete;
 
    /**
-    * @param busname the busname to use, e.g. "dbus:session" or "dbus:system. nullptr means session.
+    * @param busname the busname to use, e.g. "bus:session" or "bus:system. nullptr means session.
+    *                Attaching to TCP is done via "tcp:host=<ip>,port=<port>" Any other dbus compatible
+    *                format may be used.
     */
    Dispatcher(const char* busname = nullptr);
 

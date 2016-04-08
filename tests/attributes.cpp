@@ -241,7 +241,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 
 TEST(Attributes, attr)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c;
    Server s("s");
 
@@ -257,7 +257,7 @@ TEST(Attributes, attr)
 
 TEST(Attributes, multiple_attach)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    MultiClient c1(true);
    MultiClient c2(false);
    Server s("s");
@@ -275,7 +275,7 @@ TEST(Attributes, multiple_attach)
 
 TEST(Attributes, set)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    SetterClient c;
    Server s("s");
 

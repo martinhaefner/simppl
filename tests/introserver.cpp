@@ -176,7 +176,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 
 int main()
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Server s("s");
 
    d.addServer(s);

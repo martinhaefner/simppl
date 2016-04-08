@@ -357,17 +357,35 @@ Dispatcher::Dispatcher(const char* busname)
    DBusError err;
    dbus_error_init(&err);
 
-   assert(!busname || !strncmp(busname, "dbus:", 5));
-
-   if (!busname || !strcmp(busname, "dbus:session"))
+   if (!busname || !strcmp(busname, "bus:session"))
    {
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
    else
-      conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+   {
+       if (!strcmp(busname, "bus:system"))
+       {
+          conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+       }
+       else
+       {
+          conn_ = dbus_connection_open_private(busname, &err);
+
+          if (conn_)
+          {
+             dbus_error_init(&err);
+             dbus_bus_register(conn_, &err);
+          }
+       }
+   }
+
+   if (dbus_error_is_set(&err))
+      std::cerr << err.name << ": " << err.message << std::endl;
 
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
+
+   assert(conn_);
 
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 
@@ -375,6 +393,10 @@ Dispatcher::Dispatcher(const char* busname)
    // response is (name, old, new)
    dbus_error_init(&err);
    dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
+
+   if (dbus_error_is_set(&err))
+      std::cerr << err.name << ": " << err.message << std::endl;
+
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
 
@@ -384,6 +406,10 @@ Dispatcher::Dispatcher(const char* busname)
        << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
 
    dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
+
+   if (dbus_error_is_set(&err))
+      std::cerr << err.name << ": " << err.message << std::endl;
+
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
 

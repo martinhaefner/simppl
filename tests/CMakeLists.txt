@@ -20,17 +20,17 @@ add_executable(unittests
 )
 
 
-target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
+target_link_libraries(unittests gtest gtest_main simppl dbus-1)
 
 # This is so you can do 'make test' to see all your tests run, instead of
 # manually running the executable runUnitTests to see those specific tests.
 add_test(name "simpple unit tests" command unittests)
 
 
-# not a test, just an introspection example  
+# not a test, just an introspection example
 add_executable(introserver
    introserver.cpp
 )
 
 
-target_link_libraries(introserver simppl rt dbus-1)
+target_link_libraries(introserver simppl dbus-1)
