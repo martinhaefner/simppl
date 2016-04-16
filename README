@@ -47,7 +47,9 @@ First steps
 DBus uses an XML document for interface definition. This is rather tricky
 to read and typically source code is generated in order to provide
 these interfaces in the native programming language of a project.
-simppl/dbus does provide a binding written entirely in C++ itself.
+simppl/dbus does provide a binding written entirely in C++ itself. 
+Anyhow, introspection is available for simppl services. 
+
 DBus provides many possibilities to map services (interfaces) to busnames
 and objectpaths. Simppl currently makes some assumptions and therefore
 looses some generality which is no problem for pure simppl projects but
@@ -189,7 +191,7 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
       simppl::dbus::Dispatcher disp("bus::session");
       MyEcho instance;
 
-      disp.addClient(instance);
+      disp.addServer(instance);
       disp.run();
 
       return EXIT_SUCCESS;
@@ -279,7 +281,7 @@ is as simple as in the blocking example:
    }
 
 
-Easy, isn't it? But with simppl/dbus it is also possible to model signals
+But with simppl/dbus it is also possible to model signals
 and attributes. Moreover, any complex data can be passed between client
 and server. See the following example:
 
@@ -344,7 +346,19 @@ the structure, i.e. the structure can be used as any simple data type:
 
 Have you notices how methods with more than one return value are mapped
 to a tuple out parameter which can be tie'd to the local variables in
-this blocking call? Isn't that cool?
+this blocking call? Also, functions with no output parameters on their
+response can be called in a blocking context like the following:
+
+
+   ...
+   // calling a function without response, just wait for flushing the
+   // outgoing datastream 
+   stub.my_oneway_func(42);
+   
+   // wait for the response 
+   teststub.my_func(d) >> std::nullptr_t();
+   ...
+
 
 The signal and attribute in the example above is only sensefully usable
 in an event loop driven client. There is a slight difference between
@@ -392,8 +406,6 @@ on server side. See the clients connected callback:
    };
 
 
-This was a short introduction to simppl/dbus. I hope you will have fun
-developing client/server applications with the means of C++ and without
-the need of a complex tool chain for glue-code generation.
-
-
+This was a short introduction to simppl/dbus. I hope you like this easy 
+way of developing client/server applications with the means of C++ and 
+without the need of a complex tool chain for glue-code generation.
