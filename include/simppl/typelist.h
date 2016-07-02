@@ -64,6 +64,13 @@ struct PushFront
    typedef TypeList<InsertT, ListT> type;
 };
 
+// a NOOP
+template<typename ListT>
+struct PushFront<ListT, NilType>
+{
+   typedef ListT type;
+};
+
 template<typename ListT>
 struct PopFront;
 
