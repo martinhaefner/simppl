@@ -372,8 +372,7 @@ struct ClientRequest : ClientRequestBase
 
        if (!cs)
        {
-           return_type dummies;
-           //FIXME detail::FunctionCaller<0, return_type>::template eval_cs(that->f_, cs, dummies);
+           detail::DummyCaller<return_type>::template eval_cs(that->f_, cs);
        }
        else
        {
