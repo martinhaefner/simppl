@@ -1251,6 +1251,13 @@ struct GetCaller : simppl::NonInstantiable
    typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
 };
 
+template<>
+struct GetCaller<void> : simppl::NonInstantiable
+{
+   typedef DeserializeAndCall0 type;
+};
+
+
 }   // namespace detail
 
 }   // namespace dbus

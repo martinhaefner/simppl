@@ -98,7 +98,7 @@ protected:
 
    void cleanup();
    
-   DBusMessage* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway);
+   DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    inline
    std::string boundname() const

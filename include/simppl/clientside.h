@@ -13,11 +13,12 @@
 #include "simppl/serialization.h"
 #include "simppl/stubbase.h"
 #include "simppl/timeout.h"
+#include "simppl/parameter_deduction.h"
 
 #include "simppl/detail/validation.h"
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/clientresponseholder.h"
-#include "simmpl/detail/parameter_deduction.h"
+#include "simppl/detail/deserialize_and_return.h"
 
 
 namespace simppl
@@ -295,8 +296,8 @@ struct ClientRequestBase
 template<typename... ArgsT>
 struct ClientRequest : ClientRequestBase
 {
-   typedef typename canonify<typename detail::generate_return_type<ArgsT...>::type>::type return_type;
-   typedef typename canonify<typename detail::generate_argument_type<ArgsT...>::type>::type args_type;
+   typedef typename detail::canonify<typename detail::generate_return_type<ArgsT...>::type>::type return_type;
+   typedef typename detail::canonify<typename detail::generate_argument_type<ArgsT...>::type>::type args_type;
    typedef typename detail::generate_callback_function<ArgsT...>::type callback_type;
  
    enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
@@ -314,9 +315,10 @@ struct ClientRequest : ClientRequestBase
       // NOOP
    }
    
+   
    // blocking call
    template<typename... T>
-   return_type operator()(typename CallTraits<T>::param_type...)
+   return_type operator()(const T&... t)
    {
       static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
                     args_type>::value, "args mismatch");
@@ -324,15 +326,60 @@ struct ClientRequest : ClientRequestBase
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
-      DBusPendingCall* p = stub->sendRequest(*this, f, is_oneway);
+      std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
+      
       if (!is_oneway)
       {
-         dbus_pending_call_block(p);
+         dbus_pending_call_block(p.get());
+
+         std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(p.get()), dbus_message_unref);
+         CallState cs(*msg);
+
+         if (!cs)
+            cs.throw_exception();
+            
+         return detail::deserialize_and_return<return_type>::eval(msg.get());
       }
-      
-      
-      
-      dbus_pending_call_unref(p);
+      else
+         dbus_connection_flush(stub->conn());
+   }
+   
+   
+   // async call
+   template<typename... T>
+   void async(const T&... t)
+   {
+      static_assert(is_oneway == false, "it's a oneway function");
+      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+                    args_type>::value, "args mismatch");
+                    
+      StubBase* stub = dynamic_cast<StubBase*>(parent_);
+
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &ClientRequest::pending_notify, this, 0);
+   }
+   
+   
+   // FIXME make data point to callback function itself...
+   static 
+   void pending_notify(DBusPendingCall* pc, void* data)
+   {
+       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
+       std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+       
+       ClientRequest* that = (ClientRequest*)data;
+       CallState cs(*msg);
+
+       if (!cs)
+       {
+           return_type dummies;
+           //FIXME detail::FunctionCaller<0, return_type>::template eval_cs(that->f_, cs, dummies);
+       }
+       else
+       {
+          detail::Deserializer d(msg.get());
+          detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
+       }
    }
    
    
@@ -340,55 +387,8 @@ struct ClientRequest : ClientRequestBase
    inline
    void handledBy(FunctorT func)
    {
-      f_ = func;
+      async.f_ = func;
    }
-
-   
-   // make switchable for oneway/non-oneway requests!
-   struct Async
-   {
-      // async call
-      template<typename... T>
-      void operator()(typename CallTraits<T>::param_type... args)
-      {
-         static_assert(is_oneway == false, "it's a oneway function");
-         static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
-                       args_type>::value, "args mismatch");
-                       
-         StubBase* stub = dynamic_cast<StubBase*>(parent_);
-
-         std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
-         dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &Async::pending_notify, this, 0);
-      }
-      
-      // FIXME make data point to callback function itself...
-      static 
-      void pending_notify(DBusPendingCall* pc, void* data)
-      {
-          DBusMessage* msg = dbus_pending_call_steal_reply(pc);
-          Async* that = (Async*)data;
-         
-          CallState cs(msg);
-
-          if (!cs)
-          {
-              std::tuple<T...> dummies;
-              detail::FunctionCaller<0, std::tuple<T...>>::template eval_cs(that->f_, cs, dummies);
-          }
-          else
-          {
-             detail::Deserializer d(&msg);
-             detail::GetCaller<T...>::type::template evalResponse(d, that->f_, cs);
-          }
-          
-          dbus_message_unref(msg);
-          dbus_pending_call_unref(pc);
-      }
-      
-      // nonblocking asynchronous call needs a callback function
-      callback_type f_;
-      
-   } async;
 
    
    ClientRequest& operator[](int flags)
@@ -404,6 +404,10 @@ struct ClientRequest : ClientRequestBase
    // FIXME do we really need connection in BasicInterface?
    // FIXME do we need BasicInterface at all?
    detail::BasicInterface* parent_;
+   
+   // nonblocking asynchronous call needs a callback function
+   callback_type f_;
+
 };
 
 

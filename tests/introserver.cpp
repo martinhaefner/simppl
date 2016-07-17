@@ -5,6 +5,9 @@
 
 using namespace std::placeholders;
 
+using simppl::dbus::in;
+using simppl::dbus::out;
+
 
 namespace test
 {
@@ -80,12 +83,11 @@ struct Menu
 
 INTERFACE(Attributes)
 {
-   Request<int, std::string> set;
+   Request<in<int>, in<std::string>> set;
    Request<> shutdown;
 
-   Request<> get_all;
-   Response<Menu> get_all_r;
-
+   Request<out<Menu>> get_all;
+   
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
    
@@ -96,13 +98,12 @@ INTERFACE(Attributes)
    Attributes()
     : INIT(set)
     , INIT(get_all)
-    , INIT(get_all_r)
     , INIT(shutdown)
     , INIT(data)
     , INIT(props)
     , INIT(mayShutdown)
    {
-      get_all >> get_all_r;
+      // NOOP
    }
 };
 
@@ -167,7 +168,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       mainmenu.entries_["Settings"] = std::make_tuple(5, Menu::entry_type(settings));
       mainmenu.entries_["Security"] = std::make_tuple(6, Menu::entry_type(security));
       
-      respondWith(get_all_r(mainmenu));
+      // FIXME respondWith(get_all_r(mainmenu));
    }
 
    int calls_ = 0;

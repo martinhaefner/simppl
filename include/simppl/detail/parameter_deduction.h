@@ -9,6 +9,8 @@
 #include "simppl/if.h"
 #include "simppl/typelist.h"
 
+#include "simppl/callstate.h"
+
 
 namespace simppl
 {
@@ -26,7 +28,7 @@ struct is_in
 };
 
 template<typename T>
-struct is_in<in<T>>
+struct is_in<simppl::dbus::in<T>>
 {
    enum { value = true };
 };
@@ -38,7 +40,7 @@ struct is_out
 };
 
 template<typename T>
-struct is_out<out<T>>
+struct is_out<simppl::dbus::out<T>>
 {
    enum { value = true };
 };
@@ -80,27 +82,27 @@ template<typename ListT, typename FunctT>
 struct make_function_from_list;
 
 template<typename HeadT, typename TailT, typename... T>
-struct make_function_from_list<TypeList<HeadT, TailT>, std::function<void(int, T...)>>
+struct make_function_from_list<TypeList<HeadT, TailT>, std::function<void(CallState, T...)>>
 {
-   typedef typename make_function_from_list<TailT, std::function<void(int, T..., HeadT)>>::type type;
+   typedef typename make_function_from_list<TailT, std::function<void(CallState, T..., HeadT)>>::type type;
 };
 
 template<typename HeadT, typename... T>
-struct make_function_from_list<TypeList<HeadT, NilType>, std::function<void(int, T...)>>
+struct make_function_from_list<TypeList<HeadT, NilType>, std::function<void(CallState, T...)>>
 {
-   typedef std::function<void(int, T..., HeadT)> type;
+   typedef std::function<void(CallState, T..., HeadT)> type;
 };
 
 template<typename... T>
-struct make_function_from_list<TypeList<NilType, NilType>, std::function<void(int, T...)>>
+struct make_function_from_list<TypeList<NilType, NilType>, std::function<void(CallState, T...)>>
 {
-   typedef std::function<void(int, T...)> type;
+   typedef std::function<void(CallState, T...)> type;
 };
 
 template<typename... T>
-struct make_function_from_list<void, std::function<void(int, T...)>>
+struct make_function_from_list<void, std::function<void(CallState, T...)>>
 {
-   typedef std::function<void(int, T...)> type;
+   typedef std::function<void(CallState, T...)> type;
 };
 
 // ---------------------------------------------------------------------
@@ -178,7 +180,7 @@ template<typename... T>
 struct generate_callback_function
 {
    typedef typename filter<is_out, T...>::list_type list_type;
-   typedef typename make_function_from_list<list_type, std::function<void(int)>>::type type;
+   typedef typename make_function_from_list<list_type, std::function<void(CallState)>>::type type;
 };
 
 // ---------------------------------------------------------------------

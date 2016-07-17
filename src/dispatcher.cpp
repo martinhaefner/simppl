@@ -31,31 +31,6 @@ get_lookup_duetime()
 }
 
 
-struct BlockingResponseHandler0
-{
-   inline
-   BlockingResponseHandler0(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<>& r)
-    : disp_(disp)
-    , r_(r)
-   {
-      r_.handledBy(std::ref(*this));
-   }
-
-   inline
-   void operator()(const simppl::dbus::CallState& state)
-   {
-      disp_.stop();
-      r_.handledBy(std::nullptr_t());
-
-      if (!state)
-         disp_.propagate(state);
-   }
-
-   simppl::dbus::Dispatcher& disp_;
-   simppl::dbus::ClientResponse<>& r_;
-};
-
-
 DBusHandlerResult signal_filter(DBusConnection* /*connection*/, DBusMessage* msg, void *user_data)
 {
     simppl::dbus::Dispatcher* disp = (simppl::dbus::Dispatcher*)user_data;
@@ -584,19 +559,6 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
     }
 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-}
-
-
-void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
-{
-   assert(resp.r_);
-   assert(!isRunning());
-
-   ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
-   assert(r);
-
-   BlockingResponseHandler0 handler(*this, *r);
-   loop();
 }
 
 

@@ -30,10 +30,11 @@ struct out
 };
 
 
-#include "simppl/parameter_deduction.h"
-
-
 }   // namespace dbus
 
 }   // namespace simppl
 
+
+#include "simppl/detail/parameter_deduction.h"
+
+#endif   // SIMPPL_PARAMETERDEDUCTION_H
