@@ -18,13 +18,12 @@ namespace dbus
 
 template<template<template<typename...> class, 
                   template<typename...> class,
-                  template<typename...> class,
                   template<typename,int> class> class IfaceT>
-struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute>
+struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
    
-   typedef IfaceT<ServerRequest, ServerResponse, ServerSignal, ServerAttribute> interface_type;
+   typedef IfaceT<ServerRequest, ServerSignal, ServerAttribute> interface_type;
    
    inline
    Skeleton(const char* role)

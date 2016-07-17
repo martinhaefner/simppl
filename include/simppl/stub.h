@@ -25,16 +25,15 @@ template<typename> struct InterfaceNamer;
 
 template<template<template<typename...> class, 
                   template<typename...> class,
-                  template<typename...> class,
                   template<typename,int> class> 
    class IfaceT>
-struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
+struct Stub : StubBase, IfaceT<ClientRequest, ClientSignal, ClientAttribute>
 {   
    friend struct Dispatcher;
    
 private:
 
-   typedef IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> interface_type;
+   typedef IfaceT<ClientRequest, ClientSignal, ClientAttribute> interface_type;
    
 public:
    

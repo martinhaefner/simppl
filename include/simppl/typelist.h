@@ -296,6 +296,12 @@ struct make_typelist<T1, T...>
    typedef TypeList<T1, typename make_typelist<T...>::type> type;
 };
 
+template<>
+struct make_typelist<>
+{
+   typedef NilType type;
+};
+
 template<typename T>
 struct make_typelist<T>
 {

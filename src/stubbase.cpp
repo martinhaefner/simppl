@@ -47,19 +47,6 @@ StubBase::~StubBase()
 }
 
 
-/*static*/
-void StubBase::pending_notify(DBusPendingCall* pc, void* user_data)
-{
-    DBusMessage* msg = dbus_pending_call_steal_reply(pc);
-
-    ClientResponseBase* handler = (ClientResponseBase*)user_data;
-    handler->eval(*msg);
-    
-    dbus_message_unref(msg);
-    dbus_pending_call_unref(pc);
-}
-
-
 void StubBase::connect()
 {
     std::chrono::milliseconds sum = 0ms;
@@ -99,7 +86,7 @@ Dispatcher& StubBase::disp()
 }
 
 
-DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f)
+DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway)
 {
     DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), iface(), req.method_name_);
     DBusPendingCall* pending = nullptr;
@@ -107,7 +94,7 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
     detail::Serializer s(msg);
     f(s);
 
-    if (req.handler_)
+    if (!is_oneway)
     {
         int timeout = disp().request_timeout();
 
@@ -115,7 +102,6 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
             timeout = detail::request_specific_timeout.count();
 
         dbus_connection_send_with_reply(disp().conn_, msg, &pending, timeout);
-        dbus_pending_call_set_notify(pending, &StubBase::pending_notify, req.handler_, 0);
     }
     else
     {

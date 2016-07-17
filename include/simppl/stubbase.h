@@ -98,10 +98,7 @@ protected:
 
    void cleanup();
    
-   static
-   void pending_notify(DBusPendingCall* pc, void* user_data);
- 
-   DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
+   DBusMessage* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    inline
    std::string boundname() const
