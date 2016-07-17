@@ -135,7 +135,7 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
    void attributeChanged(simppl::dbus::CallState state, int new_value)
    {
       EXPECT_TRUE((bool)state);
-      
+
       if (first_)
       {
          // first you get the current value
@@ -231,7 +231,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
          data = 42;
       }
       else
-         sig.emit(i);
+         sig.notify(i);
    }
 
    void handleAdd(int i, double d)
@@ -253,7 +253,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
 
 TEST(Simple, methods)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c;
    Server s("s");
 
@@ -266,7 +266,7 @@ TEST(Simple, methods)
 
 TEST(Simple, signal)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    SignalClient c;
    Server s("ss");
 
@@ -281,7 +281,7 @@ TEST(Simple, signal)
 
 TEST(Simple, attribute)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    AttributeClient c;
    Server s("sa");
 
@@ -294,12 +294,12 @@ TEST(Simple, attribute)
 
 TEST(Simple, blocking)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    Server s("sb");
    d.addServer(s);
 
-   simppl::dbus::Stub<Simple> stub("sb", "dbus:session");
+   simppl::dbus::Stub<Simple> stub("sb", "bus:session");
    d.addClient(stub);
 
    stub.connect();
@@ -333,7 +333,7 @@ TEST(Simple, blocking)
    stub.data.get() >> dv;
    EXPECT_EQ(4711, dv);
    EXPECT_EQ(4711, stub.data.value());
-   
+
    EXPECT_EQ(3, s.count_oneway_);
 }
 
@@ -346,7 +346,7 @@ TEST(Simple, disconnect)
    clientd.addClient(c);
 
    {
-      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("dbus:session");
+      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("bus:session");
       Server* s = new Server("s");
       serverd->addServer(*s);
 

@@ -20,34 +20,34 @@ namespace org
          INTERFACE(Introspectable)
          {
             //typedef tTrueType introspectable;
-            
+
             Request<> Introspect;
             Response<std::string> rIntrospect;
-            
+
             Introspectable()
              : INIT(Introspect)
              , INIT(rIntrospect)
             {
                Introspect >> rIntrospect;
-               
+
                //describe_arguments(rIntrospect, "data");
             }
          };
-         
+
          INTERFACE(Properties)
          {
             Request<std::string, std::string> Get;
             Request<std::string, std::string, Variant<int>> Set;  // FIXME need type any instead!
-            
+
             Response<Variant<int>> rGet;
-            
+
             Properties()
              : INIT(Get)
              , INIT(Set)
              , INIT(rGet)
             {
                Get >> rGet;
-               
+
                //describe_arguments(Get, "interface_name", "property_name");
                //describe_arguments(rGet, "value");
                //describe_arguments(Set, "interface_name", "property_name", "value");
@@ -135,6 +135,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
    DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
+   // FIXME is this necessary?
    dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
    if (response.f_)
@@ -156,6 +157,7 @@ void SkeletonBase::respondWith(const RuntimeError& err)
    assert(current_request_.requestor_->hasResponse());
 
    DBusMessage* rmsg = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
+
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
 
    dbus_message_unref(rmsg);
@@ -169,6 +171,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
    assert(req.requestor_->hasResponse());
 
    DBusMessage* rmsg = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
+   // FIXME is this necessary?
    dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
@@ -200,25 +203,25 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          oss << "<?xml version=\"1.0\" ?>\n"
              "<node name=\""<< role() << "\">\n"
              "  <interface name=\""<< iface() << "\">\n";
-             
+
          auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
          for(auto& method : methods)
          {
             method.second->introspect(oss);
          }
-         
+
          auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
          for(auto& attribute : attributes)
          {
             attribute.second->introspect(oss);
          }
-         
+
          auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
          for(auto& sig : signals)
          {
             sig.second->introspect(oss);
          }
-         
+
          // introspectable
          oss << "  </interface>\n"
              "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
@@ -252,7 +255,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 
          return DBUS_HANDLER_RESULT_HANDLED;
       }
-#endif   // #if SIMPPL_HAVE_INTROSPECTION 
+#endif   // #if SIMPPL_HAVE_INTROSPECTION
    }
    else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
    {
@@ -273,13 +276,13 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
              {
                 DBusMessage* response = dbus_message_new_method_return(msg);
                 iter->second->eval(response);
-                
+
                 dbus_connection_send(disp_->conn_, response, nullptr);
                 dbus_message_unref(response);
              }
              else
                 iter->second->evalSet(ds);
-             
+
              return DBUS_HANDLER_RESULT_HANDLED;
           }
           else

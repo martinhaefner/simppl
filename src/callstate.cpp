@@ -9,7 +9,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -25,10 +25,10 @@ CallState::CallState(DBusMessage& msg)
          detail::Deserializer d(&msg);
          std::string text;
          d >> text;
-         
+
          char* end;
          int error = strtol(text.c_str(), &end, 10);
-         
+
          ex_.reset(new RuntimeError(error, end+1, dbus_message_get_reply_serial(&msg)));
       }
       else

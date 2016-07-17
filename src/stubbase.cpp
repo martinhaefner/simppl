@@ -28,7 +28,7 @@ StubBase::StubBase(const char* iface, const char* role)
 {
    assert(role);
    std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
-   
+
    busname_.reserve(strlen(this->iface()) + 1 + strlen(this->role()));
    busname_ = this->iface();
    busname_ += ".";
@@ -40,7 +40,7 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->removeClient(*this);
-      
+
    delete[] iface_;
    delete[] objectpath_;
    role_ = nullptr;
@@ -54,7 +54,7 @@ void StubBase::pending_notify(DBusPendingCall* pc, void* user_data)
 
     ClientResponseBase* handler = (ClientResponseBase*)user_data;
     handler->eval(*msg);
-    
+
     dbus_message_unref(msg);
     dbus_pending_call_unref(pc);
 }
@@ -122,7 +122,7 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
        dbus_connection_send(disp().conn_, msg, nullptr);
        dbus_connection_flush(disp().conn_);
     }
-    
+
     dbus_message_unref(msg);
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
@@ -146,7 +146,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
    assert(signals_.find(sigbase.name()) == signals_.end());   // signal already attached by this stub
-   
+
    disp_->registerSignal(*this, sigbase);
 
    // FIXME use intrusive container and iterate instead of using a map -> memory efficiency
@@ -157,9 +157,9 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
-   
+
    auto iter = signals_.find(sigbase.name());
-   
+
    if (iter != signals_.end())
    {
       disp_->unregisterSignal(*this, sigbase);
@@ -174,9 +174,9 @@ void StubBase::cleanup()
    {
       disp_->unregisterSignal(*this, *sig_entry.second);
    }
-   
+
    signals_.clear();
-   
+
    disp_ = nullptr;
 }
 
@@ -203,10 +203,10 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
     detail::Serializer s(msg);
     s << iface() << name;
     f(s);   // and now serialize the variant
-    
+
     dbus_connection_send(disp().conn_, msg, nullptr);
     dbus_connection_flush(disp().conn_);
-    
+
     dbus_message_unref(msg);
 }
 

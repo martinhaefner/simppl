@@ -493,7 +493,7 @@ struct ArgumentsIntrospector
    {
       // NOOP
    }
-   
+
    template<typename T>
    void operator()(const T&)
    {
@@ -504,7 +504,7 @@ struct ArgumentsIntrospector
          os_ << "direction=\"in\"";
       os_ << "/>\n";
    }
-   
+
    std::ostream& os_;
    int i_;
    bool dir_;
@@ -560,7 +560,7 @@ struct VariantDeserializer<T1, T...>
       {
          v = T1();
          s >> *v.template get<T1>();
-         
+
          return true;
       }
       else
@@ -582,10 +582,10 @@ struct VariantDeserializer<T>
       {
          v = T();
          s >> *v.template get<T>();
-         
+
          return true;
       }
-      
+
       // stop recursion
       return false;
    }
@@ -621,6 +621,15 @@ struct Serializer // : noncopyable
       dbus_message_iter_append_basic(iter_, dbus_type_code<T>::value, &t);
       return *this;
    }
+
+   inline
+   Serializer& write(bool b)
+   {
+      dbus_bool_t _b = b;
+      dbus_message_iter_append_basic(iter_, dbus_type_code<bool>::value, &_b);
+      return *this;
+   }
+
 
    template<typename T>
    inline
@@ -680,7 +689,7 @@ struct Serializer // : noncopyable
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-   
+
       for (auto& e : m) {
          s.write(e);
       }
@@ -827,10 +836,10 @@ void simppl::dbus::detail::VariantSerializer<SerializerT>::operator()(const T& t
 
     DBusMessageIter iter;
     dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
-    
+
     SerializerT s(&iter);
     s.write(t);
-    
+
     dbus_message_iter_close_container(orig_.iter_, &iter);
 }
 
@@ -877,6 +886,16 @@ struct Deserializer // : noncopyable
       return *this;
    }
 
+   Deserializer& read(bool& t)
+   {
+      dbus_bool_t b;
+      dbus_message_iter_get_basic(iter_, &b);
+      dbus_message_iter_next(iter_);
+
+      t = b;
+      return *this;
+   }
+
    template<typename T>
    Deserializer& read(T& t, tFalseType)
    {
@@ -887,6 +906,7 @@ struct Deserializer // : noncopyable
          int
 #endif
          >::template read(*this, t);
+      return *this;
    }
 
    Deserializer& read(char*& str);
@@ -900,10 +920,10 @@ struct Deserializer // : noncopyable
        DBusMessageIter iter;
        dbus_message_iter_recurse(iter_, &iter);
        Deserializer s(&iter);
-       
+
        if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
          std::cerr << "Invalid variant type detected" << std::endl;
-       
+
        dbus_message_iter_next(iter_);
        return *this;
    }

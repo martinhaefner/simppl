@@ -4,13 +4,13 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
+
 struct Dispatcher;
 
-   
+
 namespace detail
 {
 
@@ -19,9 +19,9 @@ template<typename AttributeT>
 struct BlockingAttributeResponseHandler
 {
    BlockingAttributeResponseHandler(simppl::dbus::Dispatcher& disp, AttributeT& a, typename AttributeT::data_type& t);
-   
+
    void operator()(simppl::dbus::CallState state, typename AttributeT::arg_type t);
-   
+
 private:
 
    typename AttributeT::data_type& t_;
@@ -34,9 +34,9 @@ template<typename T>
 struct BlockingResponseHandler
 {
    BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t);
-   
+
    void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type t);
-   
+
 private:
 
    T& t_;
@@ -49,9 +49,9 @@ template<typename... T>
 struct BlockingResponseHandlerN
 {
    BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t);
-   
+
    void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type... t);
-   
+
 private:
 
    std::tuple<T...>& t_;
@@ -59,7 +59,7 @@ private:
    simppl::dbus::ClientResponse<T...>& r_;
 };
 
-}   // namespace detail 
+}   // namespace detail
 
 }   // namespace dbus
 
@@ -72,7 +72,7 @@ private:
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -81,21 +81,21 @@ template<typename T, int Flags>
 void Dispatcher::waitForResponse(ClientAttribute<T, Flags>& attr, T& t)
 {
    assert(!isRunning());
-   
+
    detail::BlockingAttributeResponseHandler<ClientAttribute<T, Flags>> handler(*this, attr, t);
    loop();
 }
-   
-   
+
+
 template<typename T>
 void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, T& t)
 {
    assert(resp.r_);
    assert(!isRunning());
-   
+
    ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
    assert(r);
-   
+
    detail::BlockingResponseHandler<T> handler(*this, *r, t);
    loop();
 }
@@ -106,15 +106,15 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, std::
 {
    assert(resp.r_);
    assert(!running_.load());
-   
+
    ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
    assert(r);
-   
+
    detail::BlockingResponseHandlerN<T...> handler(*this, *r, t);
    loop();
 }
 
-   
+
 namespace detail
 {
 
@@ -128,7 +128,7 @@ BlockingAttributeResponseHandler<AttributeT>::BlockingAttributeResponseHandler(s
 {
    a_.handledBy(std::ref(*this));
 }
-   
+
 
 template<typename AttributeT>
 inline
@@ -136,14 +136,14 @@ void BlockingAttributeResponseHandler<AttributeT>::operator()(CallState state, t
 {
    disp_.stop();
    a_.handledBy(std::nullptr_t());
-   
+
    if (!state)
       disp_.propagate(state);
-      
+
    t_ = t;
 }
 
-   
+
 template<typename T>
 inline
 BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t)
@@ -160,8 +160,8 @@ void BlockingResponseHandler<T>::operator()(simppl::dbus::CallState state, typen
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());
-   
-   // do not allow to propagate the exception through the dbus C library, otherwise we could have severe 
+
+   // do not allow to propagate the exception through the dbus C library, otherwise we could have severe
    // trouble if libdbus is not compiled with exception support.
    if (!state)
       disp_.propagate(state);
@@ -186,15 +186,15 @@ void BlockingResponseHandlerN<T...>::operator()(simppl::dbus::CallState state, t
 {
    disp_.stop();
    r_.handledBy(std::nullptr_t());
-   
+
    if (!state)
       disp_.propagate(state);
-   
+
    t_ = std::make_tuple(t...);
 }
 
 
-}   // namespace detail 
+}   // namespace detail
 
 }   // namespace dbus
 
@@ -202,23 +202,23 @@ void BlockingResponseHandlerN<T...>::operator()(simppl::dbus::CallState state, t
 
 
 // ---------------------------------------------------------------------
-   
+
 
 /**
  * Call semantics for blocking calls without return value:
- * 
+ *
  * bool rc = stub.func() >> std::nullptr_t();
  */
 inline
 void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::nullptr_t)
 {
-   holder.dispatcher_.waitForResponse(holder);   
+   holder.dispatcher_.waitForResponse(holder);
 }
 
 
 /**
  * Call semantics for blocking calls with exactly one return value:
- * 
+ *
  * int ret;
  * bool rc = stub.func() >> ret;
  */
@@ -243,7 +243,7 @@ void operator>>(simppl::dbus::ClientAttribute<T, Flags>& attr, T& rArg)
 
 /**
  * Call semantics for blocking calls with multiple return values:
- * 
+ *
  * std::tuple<int> ret;
  * bool rc = stub.func() >> ret;
  */
@@ -257,7 +257,7 @@ void operator>>(simppl::dbus::detail::ClientResponseHolder holder, std::tuple<T.
 
 /**
  * Alternative call semantics for blocking calls with multiple return values:
- * 
+ *
  * int i;
  * double d;
  * bool rc = stub.func() >> std::tie(i, d);
