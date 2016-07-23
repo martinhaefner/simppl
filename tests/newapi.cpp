@@ -15,7 +15,7 @@ namespace b
 
 INTERFACE(Test)
 {
-   Request<in<int>> eval;
+   Request<in<int>, simppl::dbus::Oneway> eval;
    Request<in<int>,out<int>> echo;
    
    Test()

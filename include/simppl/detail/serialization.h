@@ -481,49 +481,6 @@ struct make_type_signature<std::map<KeyT, ValueT>>
 };
 
 
-// --- introspection stuff ---------------------------------------------
-
-
-struct ArgumentsIntrospector
-{
-   ArgumentsIntrospector(std::ostream& os, bool dir)
-    : os_(os)
-    , i_(0)
-    , dir_(dir)
-   {
-      // NOOP
-   }
-   
-   template<typename T>
-   void operator()(const T&)
-   {
-      os_ << "<arg name=\"arg" << i_++ << "\" type=\"";
-      make_type_signature<T>::eval(os_);
-      os_ << "\" ";
-      if (dir_)
-         os_ << "direction=\"in\"";
-      os_ << "/>\n";
-   }
-   
-   std::ostream& os_;
-   int i_;
-   bool dir_;
-};
-
-template<typename... T>
-void introspect_args(const std::tuple<T...>& t, std::ostream& os, bool dir)
-{
-   detail::ArgumentsIntrospector inspector(os, dir);
-   std_tuple_for_each(t, inspector);
-}
-
-inline
-void introspect_args(const std::tuple<>&, std::ostream&, bool)
-{
-   // NOOP
-}
-
-
 // --- variant stuff ---------------------------------------------------
 
 
@@ -1239,8 +1196,35 @@ struct DummyCaller<void>
 };
 
 
-template<typename... T>
+template<typename T>
 struct DeserializeAndCall : simppl::NonInstantiable
+{
+   template<typename FunctorT>
+   static inline
+   void eval(Deserializer& d, FunctorT& f)
+   {
+      std::tuple<T> tuple;
+      d.read_flattened(tuple);
+
+      FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
+   }
+
+   template<typename FunctorT>
+   static inline
+   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
+   {
+      std::tuple<T> tuple;
+
+      if (cs)
+         d.read_flattened(tuple);
+
+      FunctionCaller<0, std::tuple<T>>::template eval_cs(f, cs, tuple);
+   }
+};
+
+
+template<typename... T>
+struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline

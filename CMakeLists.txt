@@ -4,7 +4,7 @@ project (simppl)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_FLAGS "-std=c++1y -g -pthread")
+set(CMAKE_CXX_FLAGS "-DSIMPPL_HAVE_INTROSPECTION=1 -std=c++1y -g -pthread")
 
 include_directories(include)
 

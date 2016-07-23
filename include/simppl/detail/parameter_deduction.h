@@ -243,6 +243,102 @@ struct is_oneway_request
    enum { value = Find<simppl::dbus::Oneway, typename make_typelist<ArgsT...>::type>::value != -1 };
 };
 
+
+
+// --- introspection stuff ---------------------------------------------
+
+
+template<typename... T>
+struct ForEach;
+
+template<typename T1, typename... T>
+struct ForEach<T1, T...>
+{
+   template<typename FuncT>
+   static void eval(int i, FuncT& f)
+   {
+      f.template eval<T1>(i);
+      ForEach<T...>::eval(++i, f);
+   }
+};
+
+template<typename T>
+struct ForEach<T>
+{
+   template<typename FuncT>
+   static void eval(int i, FuncT& f)
+   {
+      f.template eval<T>(i);
+   }
+};
+
+template<>
+struct ForEach<>
+{
+   template<typename FuncT>
+   static void eval(int i, FuncT& f)
+   {
+      // NOOP
+   }
+};
+
+
+template<typename T>
+struct GetRealType
+{
+   typedef T type;
+};
+
+template<typename T>
+struct GetRealType<in<T>>
+{
+   typedef T type;
+};
+
+template<typename T>
+struct GetRealType<out<T>>
+{
+   typedef T type;
+};
+
+
+struct Introspector
+{
+   Introspector(std::ostream& os)
+    : os_(os)
+   {
+      // NOOP
+   }
+   
+   template<typename T>
+   void eval(int i)
+   {
+      if (std::is_same<T, Oneway>::value == 0)
+      {
+         os_ << "<arg name=\"arg" << i << "\" type=\"";
+         make_type_signature<typename GetRealType<T>::type>::eval(os_);
+         os_ << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
+      }
+   }
+   
+   void eval(int, Oneway)
+   {
+      // NOOP
+   }
+   
+   std::ostream& os_;
+};
+
+
+template<typename... T>
+void introspect_args(std::ostream& os)
+{
+   Introspector i(os);
+   int cnt = 0;
+   ForEach<T...>::eval(cnt, i);
+}
+
+
 }   // namespace detail
 
 }   // namespace dbus

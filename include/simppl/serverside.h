@@ -1,7 +1,6 @@
 #ifndef SIMPPL_SERVERSIDE_H
 #define SIMPPL_SERVERSIDE_H
 
-
 #include <set>
 #include <iostream>
 
@@ -120,8 +119,7 @@ struct ServerSignal : ServerSignalBase
    void introspect(std::ostream& os)
    {
       os << "    <signal name=\"" << this->name_ << "\">";
-      std::tuple<T...> t;   // FIXME remove tuple here, only the type is needed!
-      detail::introspect_args(t, os, false);
+      detail::introspect_args<T...>(os);
       os << "    </signal>\n";
    }
 #endif
@@ -180,8 +178,7 @@ struct ServerRequest : ServerRequestBase
    void introspect(std::ostream& os)
    {
       os << "    <method name=\"" << this->name_ << "\">";
-      std::tuple<T...> t;   // FIXME remove tuple here, only the type is needed!
-      detail::introspect_args(t, os, true);
+      detail::introspect_args<ArgsT...>(os);
       os << "    </method>\n";
    }
 #endif
