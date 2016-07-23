@@ -135,13 +135,14 @@ struct Server : simppl::dbus::Skeleton<AsyncServer>
    
    void handleAdd(int i, double d)
    {
-      req_ = deferResponse();
+      req_ = defer_response();
+      respond_with(i+d);
    }
    
    void handleEcho(int i, double d)
    {
-      respondWith(rEcho(i, d));
-      respondOn(req_, result(d));
+      respond_with(req_, d);
+      respond_with(d);
    }
    
    simppl::dbus::ServerRequestDescriptor req_;

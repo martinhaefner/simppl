@@ -11,6 +11,7 @@
 #include "simppl/callstate.h"
 #include "simppl/attribute.h"
 #include "simppl/skeletonbase.h"
+#include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
 #include "simppl/variant.h"
 
@@ -51,12 +52,6 @@ struct ServerRequestBase
    virtual void introspect(std::ostream& os) = 0;
 #endif
 
-   inline
-   bool hasResponse() const
-   {
-      return hasResponse_;
-   }
-
 protected:
 
    ServerRequestBase(const char* name, detail::BasicInterface* iface);
@@ -67,22 +62,7 @@ protected:
       // NOOP
    }
 
-   bool hasResponse_;
    const char* name_;
-};
-
-
-struct ServerResponseBase
-{
-   std::set<ServerRequestBase*> allowedRequests_;
-
-protected:
-
-   inline
-   ~ServerResponseBase()
-   {
-      // NOOP
-   }
 };
 
 
@@ -151,12 +131,17 @@ struct ServerSignal : ServerSignalBase
 // -------------------------------------------------------------------------------------
 
 
-template<typename... T>
+template<typename... ArgsT>
 struct ServerRequest : ServerRequestBase
 {
-   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
-
-   typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
+   typedef typename detail::canonify<typename detail::generate_return_type<ArgsT...>::type>::type return_type;
+   typedef typename detail::canonify<typename detail::generate_argument_type<ArgsT...>::type>::type args_type;
+   typedef typename detail::generate_server_callback_function<ArgsT...>::type callback_type;
+ 
+   enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
+ 
+   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<return_type>::value, "invalid_type_in_interface");
 
    inline
    ServerRequest(const char* name, detail::BasicInterface* iface)
@@ -175,15 +160,22 @@ struct ServerRequest : ServerRequestBase
 
    void eval(DBusMessage* msg)
    {
-      if (f_)
-      {
-          detail::Deserializer d(msg);
-          detail::GetCaller<T...>::type::template eval(d, f_);
-      }
-      else
-         assert(false);    // no response handler registered
+       assert(f_);
+       detail::Deserializer d(msg);
+       detail::GetCaller<args_type>::type::template eval(d, f_);
    }
    
+   template<typename... T>
+   inline
+   detail::ServerResponseHolder operator()(const T&... t)
+   {
+      static_assert(is_oneway == false, "it's a oneway function");
+      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+                    return_type>::value, "args mismatch");
+      
+      return __impl(bool_<(sizeof...(t) > 0)>(), t...);
+   }
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
@@ -194,49 +186,25 @@ struct ServerRequest : ServerRequestBase
    }
 #endif
 
-   function_type f_;
-};
-
-
-// ---------------------------------------------------------------------------------------------
-
-
-template<typename... T>
-struct ServerResponse : ServerResponseBase
-{
-   static_assert(detail::isValidType<T...>::value, "invalid_type_in_interface");
-
-   inline
-   ServerResponse(const char* /*name*/, detail::BasicInterface* iface)
-    : iface_(iface)
-   {
-      // NOOP
-   }
-
-   inline
-   detail::ServerResponseHolder operator()(typename CallTraits<T>::param_type... t)
-   {
-      return __impl(bool_<(sizeof...(t) > 0)>(), t...);
-   }
-
-
 private:
 
+   template<typename... T>
    inline
-   detail::ServerResponseHolder __impl(tTrueType, typename CallTraits<T>::param_type... t)
+   detail::ServerResponseHolder __impl(tTrueType, const T&... t)
    {
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
-      return detail::ServerResponseHolder(*this, f);
+      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<const T&...>, std::placeholders::_1, t...));
+      return detail::ServerResponseHolder(f);
    }
 
+   template<typename... T>
    inline
-   detail::ServerResponseHolder __impl(tFalseType, typename CallTraits<T>::param_type... t)
+   detail::ServerResponseHolder __impl(tFalseType, const T&... t)
    {
       std::function<void(detail::Serializer&)> f;
-      return detail::ServerResponseHolder(*this, f);
+      return detail::ServerResponseHolder(f);
    }
-
-   detail::BasicInterface* iface_;
+   
+   callback_type f_;
 };
 
 

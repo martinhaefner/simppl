@@ -12,19 +12,16 @@ namespace dbus
 namespace detail
 {
    
-ServerResponseHolder::ServerResponseHolder(ServerResponseBase& responder, std::function<void(Serializer&)> f)
- : responder_(&responder)
- , f_(f)
+ServerResponseHolder::ServerResponseHolder(std::function<void(Serializer&)> f)
+ : f_(f)
 {
    // NOOP
 }
 
 
 ServerResponseHolder::ServerResponseHolder(ServerResponseHolder&& rhs)
- : responder_(rhs.responder_)
- , f_(rhs.f_)
+ : f_(rhs.f_)
 {
-   rhs.responder_ = nullptr;
    // FIXME implement real move semantics
 }
 
@@ -39,10 +36,7 @@ ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs
 {
    if (this != &rhs)
    {
-      responder_ = rhs.responder_;
       f_ = rhs.f_;
-
-      rhs.responder_ = nullptr;
    }
    
    return *this;

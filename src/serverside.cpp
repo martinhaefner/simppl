@@ -14,8 +14,7 @@ namespace dbus
  
  
 ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* iface)
- : hasResponse_(false)
- , name_(name)
+ : name_(name)
 {
    dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->methods_[name_] = this;
 }

@@ -279,16 +279,15 @@ struct ClientAttribute
 // --------------------------------------------------------------------------------
 
 
+// FIXME could possibliy be dropped?!
 struct ClientRequestBase
 {
    ClientRequestBase(const char* method_name)
     : method_name_(method_name)
-    , handler_(0)
    {
        // NOOP
    }
 
-   ClientResponseBase* handler_;
    const char* method_name_;
 };
 
@@ -302,8 +301,8 @@ struct ClientRequest : ClientRequestBase
  
    enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
  
-   //FIXME static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
-   //FIXME static_assert(detail::isValidType<return_type>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidType<return_type>::value, "invalid_type_in_interface");
 
    static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
    
@@ -392,8 +391,8 @@ struct ClientRequest : ClientRequestBase
    
    ClientRequest& operator[](int flags)
    {
-      assert(handler_);   // no oneway requests
-
+      static_assert(is_oneway == false, "it's a oneway function");
+      
       if (flags & (1<<0))
          detail::request_specific_timeout = timeout.timeout_;
 

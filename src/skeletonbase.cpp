@@ -103,7 +103,7 @@ Dispatcher& SkeletonBase::disp()
 ServerRequestDescriptor SkeletonBase::deferResponse()
 {
    assert(current_request_);
-   assert(current_request_.requestor_->hasResponse());
+  // assert(current_request_.requestor_->hasResponse());
 
    return std::move(current_request_);
 }
@@ -112,7 +112,7 @@ ServerRequestDescriptor SkeletonBase::deferResponse()
 void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 {
    assert(current_request_);
-   assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
+   //assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
 
    DBusMessage* rmsg = dbus_message_new_method_return(current_request_.msg_);
 
@@ -132,7 +132,7 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response)
 {
    assert(req);
-   assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
+   //assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
    DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
    dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
@@ -153,7 +153,7 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 void SkeletonBase::respondWith(const RuntimeError& err)
 {
    assert(current_request_);
-   assert(current_request_.requestor_->hasResponse());
+   //assert(current_request_.requestor_->hasResponse());
 
    DBusMessage* rmsg = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
@@ -166,7 +166,7 @@ void SkeletonBase::respondWith(const RuntimeError& err)
 void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
 {
    assert(req);
-   assert(req.requestor_->hasResponse());
+   //assert(req.requestor_->hasResponse());
 
    DBusMessage* rmsg = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
    dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
@@ -302,7 +302,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
           if (current_request_)
           {
              // in that case the request must not have a reponse
-             assert(!current_request_.requestor_->hasResponse());
+             //assert(!current_request_.requestor_->hasResponse());
              current_request_.clear();
           }
 

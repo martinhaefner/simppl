@@ -1,5 +1,6 @@
 #include "simppl/interface.h"
 #include "simppl/stub.h"
+#include "simppl/skeleton.h"
 
 
 using simppl::dbus::in;
@@ -15,9 +16,11 @@ namespace b
 INTERFACE(Test)
 {
    Request<in<int>> eval;
+   Request<in<int>,out<int>> echo;
    
    Test()
     : INIT(eval)
+    , INIT(echo)
    {
       // NOOP
    }
@@ -31,9 +34,25 @@ INTERFACE(Test)
 // ---------------------------------------------------------------------
 
 
+void echo_handler(simppl::dbus::Skeleton<a::b::Test>& skel, int i)
+{
+   skel.respondWith(skel.echo(i));
+}
+
+
 int main()
 {
    simppl::dbus::CallState cs(nullptr);
+   
+   simppl::dbus::Stub<a::b::Test> stub("test");
+   simppl::dbus::Skeleton<a::b::Test> skel("test");
+   
+   stub.eval(42);
+   int ret = stub.echo(42);
+   
+   std::function<void(int)> handler;
+   skel.eval >> handler;
+   skel.echo >> std::bind(&echo_handler, std::ref(skel), std::placeholders::_1);
    
    // one out
    {

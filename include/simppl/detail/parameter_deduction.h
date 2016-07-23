@@ -105,6 +105,30 @@ struct make_function_from_list<void, std::function<void(CallState, T...)>>
    typedef std::function<void(CallState, T...)> type;
 };
 
+template<typename HeadT, typename TailT, typename... T>
+struct make_function_from_list<TypeList<HeadT, TailT>, std::function<void(T...)>>
+{
+   typedef typename make_function_from_list<TailT, std::function<void(T..., HeadT)>>::type type;
+};
+
+template<typename HeadT, typename... T>
+struct make_function_from_list<TypeList<HeadT, NilType>, std::function<void(T...)>>
+{
+   typedef std::function<void(T..., HeadT)> type;
+};
+
+template<typename... T>
+struct make_function_from_list<TypeList<NilType, NilType>, std::function<void(T...)>>
+{
+   typedef std::function<void(T...)> type;
+};
+
+template<typename... T>
+struct make_function_from_list<void, std::function<void(T...)>>
+{
+   typedef std::function<void(T...)> type;
+};
+
 // ---------------------------------------------------------------------
 
 // remove tuple<> if just one type is contained
@@ -181,6 +205,13 @@ struct generate_callback_function
 {
    typedef typename filter<is_out, T...>::list_type list_type;
    typedef typename make_function_from_list<list_type, std::function<void(CallState)>>::type type;
+};
+
+template<typename... T>
+struct generate_server_callback_function
+{
+   typedef typename filter<is_in, T...>::list_type list_type;
+   typedef typename make_function_from_list<list_type, std::function<void()>>::type type;
 };
 
 // ---------------------------------------------------------------------
