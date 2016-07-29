@@ -192,12 +192,12 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          
    if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
    {
-      std::cout << "*I" << std::endl;
+//      std::cout << "*I" << std::endl;
 
 #if SIMPPL_HAVE_INTROSPECTION
       if (!strcmp(method, "Introspect"))
       {
-         std::cout << "I" << std::endl;
+  //       std::cout << "I" << std::endl;
          std::ostringstream oss;
 
          oss << "<?xml version=\"1.0\" ?>\n"
@@ -207,21 +207,21 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
          for(auto& method : methods)
          {
-            std::cout << "II" << std::endl;
+    //        std::cout << "II" << std::endl;
             method.second->introspect(oss);
          }
          
          auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
          for(auto& attribute : attributes)
          {
-            std::cout << "III" << std::endl;
+            std::cout << "III " << std::endl;
             attribute.second->introspect(oss);
          }
          
          auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
          for(auto& sig : signals)
          {
-            std::cout << "IV" << std::endl;
+        //    std::cout << "IV" << std::endl;
             sig.second->introspect(oss);
          }
          

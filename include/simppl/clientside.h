@@ -385,7 +385,7 @@ struct ClientRequest : ClientRequestBase
    inline
    void handledBy(FunctorT func)
    {
-      async.f_ = func;
+      f_ = func;
    }
 
    

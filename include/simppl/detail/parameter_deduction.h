@@ -302,8 +302,29 @@ struct GetRealType<out<T>>
 };
 
 
-struct Introspector
+template<typename T>
+struct IntrospectionHelper
 {
+   static inline void eval(std::ostream& os, int i)
+   {
+      os << "<arg name=\"arg" << i << "\" type=\"";
+      make_type_signature<typename GetRealType<T>::type>::eval(os);
+      os << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
+   }
+};
+
+template<>
+struct IntrospectionHelper<::simppl::dbus::Oneway>
+{
+   static inline void eval(std::ostream& os, int i)
+   {
+      // NOOP
+   }
+};
+
+
+struct Introspector
+{     
    Introspector(std::ostream& os)
     : os_(os)
    {
@@ -313,17 +334,7 @@ struct Introspector
    template<typename T>
    void eval(int i)
    {
-      if (std::is_same<T, Oneway>::value == 0)
-      {
-         os_ << "<arg name=\"arg" << i << "\" type=\"";
-         make_type_signature<typename GetRealType<T>::type>::eval(os_);
-         os_ << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
-      }
-   }
-   
-   void eval(int, Oneway)
-   {
-      // NOOP
+      IntrospectionHelper<T>::eval(os_, i);
    }
    
    std::ostream& os_;

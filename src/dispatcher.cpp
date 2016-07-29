@@ -168,7 +168,7 @@ struct Dispatcher::Private
              
              if (pfditer != fds_.end())
              {
-                std::cout << "ok found" << std::endl;
+//                std::cout << "ok found" << std::endl;
                  fds_.erase(pfditer);
              }
              watch_handlers_.erase(iter);
