@@ -23,7 +23,7 @@ ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* i
 ServerAttributeBase::ServerAttributeBase(const char* name, detail::BasicInterface* iface)
  : name_(name)
 {
-   std::cout << "Register " << name_ << std::endl;
+ //  std::cout << "Register " << name_ << std::endl;
    dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->attributes_[name_] = this;
 }
 

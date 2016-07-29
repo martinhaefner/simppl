@@ -287,13 +287,25 @@ TEST(Simple, attribute)
 }
 
 
-TEST(Simple, blocking)
+void blockrunner()
 {
    simppl::dbus::Dispatcher d("dbus:session");
 
    Server s("sb");
    d.addServer(s);
+   
+   d.run();
+   
+   EXPECT_EQ(4, s.count_oneway_);
+}
 
+
+TEST(Simple, blocking)
+{
+   simppl::dbus::Dispatcher d("dbus:session");
+
+   std::thread t(blockrunner);
+   
    simppl::dbus::Stub<Simple> stub("sb", "dbus:session");
    d.addClient(stub);
 
@@ -325,11 +337,12 @@ TEST(Simple, blocking)
    EXPECT_LT(0.49, std::get<1>(rslt));
 
    int dv = -1;
-   // FIXME doesn't work dv = stub.data.get();
-   //EXPECT_EQ(4711, dv);
-   //EXPECT_EQ(4711, stub.data.value());
+   dv = stub.data.get();
+   EXPECT_EQ(4711, dv);
+   EXPECT_EQ(4711, stub.data.value());
    
-   EXPECT_EQ(3, s.count_oneway_);
+   stub.oneway(7777);   // stop server
+   t.join();
 }
 
 

@@ -25,7 +25,7 @@ struct deserialize_and_return
       Deserializer d(msg);
       d >> rc;
       
-      return rc; 
+      return std::move(rc); 
    }
 };
 
@@ -37,6 +37,25 @@ struct deserialize_and_return<void>
    void eval(DBusMessage*)
    {
       // NOOP
+   }
+};
+
+
+// FIXME problem when return type is a single tuple instead of a parameter list
+// then the flattened return would be problematic!
+template<typename... T> 
+struct deserialize_and_return<std::tuple<T...>>
+{
+   typedef std::tuple<T...> return_type;
+   static 
+   return_type eval(DBusMessage* msg)
+   {
+      return_type rc;
+      
+      Deserializer d(msg);
+      d.read_flattened(rc);
+      
+      return std::move(rc); 
    }
 };
    

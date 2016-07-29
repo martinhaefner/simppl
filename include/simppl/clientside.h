@@ -212,7 +212,21 @@ struct ClientAttribute
    
    // FIXME implement GetAll in Stub needs to store attributesbase in interface  
    // in a similar way as it is done on server side...
-   ClientAttribute& get()
+   const DataT& get()
+   {
+      std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(stub().getProperty(signal_.name()), dbus_message_unref);
+
+      detail::Deserializer ds(msg.get());
+        
+      Variant<DataT> v;
+      ds >> v;
+        
+      data_ = *v.template get<DataT>();
+      return data_;
+   }
+   
+   
+   ClientAttribute& get_async()
    {
       stub().getProperty(signal_.name(), &pending_notify, this);
       return *this;

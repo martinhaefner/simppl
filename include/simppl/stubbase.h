@@ -110,6 +110,10 @@ protected:
    void sendSignalUnregistration(ClientSignalBase& sigbase);
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
+   
+   // blocking version
+   DBusMessage* getProperty(const char* name);
+
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
    
    char* iface_;

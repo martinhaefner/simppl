@@ -182,6 +182,26 @@ void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, v
 }
 
 
+DBusMessage* StubBase::getProperty(const char* name)
+{
+   DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get");
+   DBusPendingCall* pending = nullptr;
+
+   detail::Serializer s(msg);
+   s << iface() << name;
+
+   dbus_connection_send_with_reply(conn(), msg, &pending, -1);
+   dbus_message_unref(msg);
+   
+   dbus_pending_call_block(pending);
+   
+   msg = dbus_pending_call_steal_reply(pending);
+   dbus_pending_call_unref(pending);
+   
+   return msg;
+}
+
+
 void StubBase::setProperty(const char* name, std::function<void(detail::Serializer&)> f)
 {
     DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set");
