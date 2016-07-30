@@ -8,6 +8,9 @@
 
 using namespace std::placeholders;
 
+using simppl::dbus::in;
+using simppl::dbus::out;
+
 
 namespace test
 {
@@ -25,14 +28,12 @@ namespace test
       
       INTERFACE(VServer)
       {
-         Request<> getData;
-         Response<std::map<std::string, simppl::Variant<int,double,std::string>>> rGetData;
-      
+         Request<out<std::map<std::string, simppl::Variant<int,double,std::string>>>> getData;
+         
          VServer()
           : INIT(getData)
-          , INIT(rGetData)
          {
-            getData >> rGetData;
+            // NOOP
          }
       };
    }
@@ -69,12 +70,12 @@ namespace {
        : simppl::dbus::Stub<test::variant::VServer>("role")
       {
          connected >> std::bind(&Client::handleConnected, this, _1);
-         rGetData >> std::bind(&Client::handleGetData, this, _1, _2);
+         getData >> std::bind(&Client::handleGetData, this, _1, _2);
       }
       
       void handleConnected(simppl::dbus::ConnectionState s)
       {
-         getData();
+         getData.async();
       }
       
       void handleGetData(simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping)
@@ -112,7 +113,7 @@ namespace {
          mapping["World"] = 4711;
          mapping["Tolle"] = std::string("Show"); 
          
-         respondWith(rGetData(mapping));
+         respondWith(getData(mapping));
       }
    };
 }

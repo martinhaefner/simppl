@@ -341,6 +341,8 @@ struct ClientRequest : ClientRequestBase
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
       
+      // FIXME move this stuff into the stub baseclass, including blocking on pending call,
+      // stealing reply, eval callstate, throw exception, ...
       if (!is_oneway)
       {
          dbus_pending_call_block(p.get());

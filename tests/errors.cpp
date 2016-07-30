@@ -4,12 +4,14 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
-#include "simppl/blocking.h"
 
 #include <thread>
 
 
 using namespace std::placeholders;
+
+using simppl::dbus::in;
+using simppl::dbus::out;
 
 
 namespace test
@@ -17,21 +19,18 @@ namespace test
    
 INTERFACE(Errors)
 {   
-   Request<> hello;
-   Request<int> hello1;
+   Request<simppl::dbus::Oneway> stop;
    
-   Response<> world;
-   Response<int> world1;
+   Request<> hello;
+   Request<in<int>, out<int>> hello1;
    
    inline
    Errors()
-    : INIT(hello)
+    : INIT(stop)
+    , INIT(hello)
     , INIT(hello1)
-    , INIT(world)
-    , INIT(world1)
    {
-      hello >> world;
-      hello1 >> world1;
+      // NOOP
    }
 };
 
@@ -50,30 +49,30 @@ struct Client : simppl::dbus::Stub<Errors>
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
       
-      world >> std::bind(&Client::handleWorld, this, _1);
-      world1 >> std::bind(&Client::handleWorld1, this, _1, _2);
+      hello >> std::bind(&Client::handleHello, this, _1);
+      hello1 >> std::bind(&Client::handleHello1, this, _1, _2);
    }
    
    
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      hello();
+      hello.async();
    }
    
    
-   void handleWorld(simppl::dbus::CallState state)
+   void handleHello(simppl::dbus::CallState state)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
       EXPECT_TRUE(state.isRuntimeError());
       EXPECT_EQ(0, strcmp(state.what(), "Shit happens"));
       
-      hello1(42);
+      hello1.async(42);
    }
    
    
-   void handleWorld1(simppl::dbus::CallState state, int)
+   void handleHello1(simppl::dbus::CallState state, int)
    {
       EXPECT_FALSE((bool)state);
       EXPECT_FALSE(state.isTransportError());
@@ -90,8 +89,14 @@ struct Server : simppl::dbus::Skeleton<Errors>
    Server(const char* rolename)
     : simppl::dbus::Skeleton<Errors>(rolename)
    {
+      stop >> std::bind(&Server::handleStop, this);
       hello >> std::bind(&Server::handleHello, this);
       hello1 >> std::bind(&Server::handleHello1, this, _1);
+   }
+   
+   void handleStop()
+   {
+      disp().stop();
    }
    
    void handleHello()
@@ -122,13 +127,23 @@ TEST(Errors, methods)
 }
 
 
-TEST(Errors, blocking) 
+static void blockrunner()
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   
+
    Server s("s");
    d.addServer(s);
    
+   d.run();
+}
+
+
+TEST(Errors, blocking) 
+{
+   std::thread t(blockrunner);
+   
+   simppl::dbus::Dispatcher d("dbus:session");
+      
    simppl::dbus::Stub<Errors> stub("s", "unix:ErrorsTest");
    d.addClient(stub);
    
@@ -136,7 +151,7 @@ TEST(Errors, blocking)
    
    try
    {
-      stub.hello() >> std::nullptr_t();
+      stub.hello();
       
       // never reach
       ASSERT_FALSE(true);
@@ -152,8 +167,7 @@ TEST(Errors, blocking)
    
    try
    {
-      int res;
-      stub.hello1(101) >> res;
+      int res = stub.hello1(101);
       
       // never reach
       ASSERT_FALSE(true);
@@ -166,4 +180,7 @@ TEST(Errors, blocking)
    {
       ASSERT_FALSE(true);
    }
+   
+   stub.stop();
+   t.join();
 }

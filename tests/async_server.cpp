@@ -10,29 +10,28 @@
 
 using namespace std::placeholders;
 
+using simppl::dbus::in;
+using simppl::dbus::out;
+
 
 namespace test {
    
 INTERFACE(AsyncServer)
 {   
-   Request<int> oneway;
+   // FIXME validate all parameters to be either in or out or oneway
+   Request<in<int>, simppl::dbus::Oneway> oneway;
    
-   Request<int, double> add;
-   Request<int, double> echo;
+   Request<in<int>, in<double>, out<double>> add;
+   Request<in<int>, in<double>, out<int>, out<double>> echo;
    
-   Response<double> result;
-   Response<int, double> rEcho;
    
    inline
    AsyncServer()
     : INIT(oneway)
     , INIT(add)
     , INIT(echo)
-    , INIT(result)
-    , INIT(rEcho)
-    {
-      add >> result;
-      echo >> rEcho;
+   {
+      // NOOP
    }
 };
 
@@ -50,20 +49,20 @@ struct Client : simppl::dbus::Stub<AsyncServer>
     : simppl::dbus::Stub<AsyncServer>("s", "unix:AServerTest")    
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
-      result >> std::bind(&Client::handleResult, this, _1, _2);
-      rEcho >> std::bind(&Client::handleEcho, this, _1, _2, _3);
+      add >> std::bind(&Client::handleAdd, this, _1, _2);
+      echo >> std::bind(&Client::handleEcho, this, _1, _2, _3);
    }
    
    
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      add(42, 777);
-      echo(42, 3.1415);
+      add.async(42, 777.);   // FIXME must even work with 777 so type check must be less hard (convertible is good enough)
+      echo.async(42, 3.1415);
     }
    
    
-   void handleResult(simppl::dbus::CallState s, double d)
+   void handleAdd(simppl::dbus::CallState s, double d)
    {
       EXPECT_TRUE((bool)s);
       oneway(42);
@@ -86,7 +85,7 @@ struct ShutdownClient : simppl::dbus::Stub<AsyncServer>
     : simppl::dbus::Stub<AsyncServer>("s", "unix:AServerTest")    
    {
       connected >> std::bind(&ShutdownClient::handleConnected, this, _1);
-      result >> std::bind(&ShutdownClient::handleResult, this, _1, _2);
+      add >> std::bind(&ShutdownClient::handleResult, this, _1, _2);
    }
    
    
@@ -96,7 +95,7 @@ struct ShutdownClient : simppl::dbus::Stub<AsyncServer>
       
       if (s == simppl::dbus::ConnectionState::Connected)
       {
-         add(42, 777);
+         add.async(42, 777.);
          oneway(42);
       }
       
@@ -135,14 +134,13 @@ struct Server : simppl::dbus::Skeleton<AsyncServer>
    
    void handleAdd(int i, double d)
    {
-      req_ = defer_response();
-      respond_with(i+d);
+      req_ = deferResponse();
    }
    
    void handleEcho(int i, double d)
    {
-      respond_with(req_, d);
-      respond_with(d);
+      respondOn(req_, add(d));
+      respondWith(echo(i, d));
    }
    
    simppl::dbus::ServerRequestDescriptor req_;

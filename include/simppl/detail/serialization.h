@@ -1178,7 +1178,7 @@ struct DummyCaller<std::tuple<T...>>
    void eval_cs(FunctorT& f, const CallState& cs)
    {
       std::tuple<T...> t;
-      FunctionCaller<std::tuple_size<std::tuple<T...>>::value, std::tuple<T...>>::eval_cs(f, cs, t);
+      FunctionCaller<0, std::tuple<T...>>::eval_cs(f, cs, t);
    }
 };
 

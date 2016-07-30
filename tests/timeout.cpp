@@ -4,7 +4,6 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
-#include "simppl/blocking.h"
 
 #include <thread>
 
@@ -12,24 +11,24 @@
 using namespace std::literals::chrono_literals;
 using namespace std::placeholders;
 
+using simppl::dbus::in;
+using simppl::dbus::out;
+
 
 namespace test
 {
 
 INTERFACE(Timeout)
 {
-   Request<int> eval;
-   Request<int> oneway;
-
-   Response<double> rEval;
+   Request<in<int>, out<double>> eval;
+   Request<in<int>, simppl::dbus::Oneway> oneway;
 
    inline
    Timeout()
     : INIT(eval)
     , INIT(oneway)
-    , INIT(rEval)
    {
-      eval >> rEval;
+      // NOOP
    }
 };
 
@@ -49,7 +48,7 @@ struct Client : simppl::dbus::Stub<Timeout>
     : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
-      rEval >> std::bind(&Client::handleEval, this, _1, _2);
+      eval >> std::bind(&Client::handleEval, this, _1, _2);
    }
 
 
@@ -60,7 +59,7 @@ struct Client : simppl::dbus::Stub<Timeout>
       if (s == simppl::dbus::ConnectionState::Connected)
       {
          start_ = std::chrono::steady_clock::now();
-         eval(42);
+         eval.async(42);
       }
 
       expect_ = simppl::dbus::ConnectionState::Disconnected;
@@ -95,7 +94,7 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
     : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
    {
       connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
-      rEval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
+      eval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
    }
 
 
@@ -104,7 +103,7 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
       EXPECT_EQ(expect_, s);
 
       if (s == simppl::dbus::ConnectionState::Connected)
-         eval(777);
+         eval.async(777);
 
       expect_ = simppl::dbus::ConnectionState::Disconnected;
    }
@@ -188,7 +187,7 @@ struct Server : simppl::dbus::Skeleton<Timeout>
       if (i == 42)
       {
   //       std::cout << "response" << std::endl;
-         respondWith(rEval(3.1415));
+         respondWith(eval(3.1415));
       }
       else
          (void)deferResponse();
@@ -210,16 +209,17 @@ void runServer()
    simppl::dbus::Dispatcher d("dbus:session");
    gbl_disp = &d;
 
-try{
-   Server s;
-   d.addServer(s);
+   try
+   {
+      Server s;
+      d.addServer(s);
 
-   d.run();
-}
-catch(...)
-{
-   std::cout << "Ex. in server" << std::endl;
-}
+      d.run();
+   }
+   catch(...)
+   {
+      std::cout << "Ex. in server" << std::endl;
+   }
 }
 
 
@@ -297,10 +297,8 @@ TEST(Timeout, request_specific)
 
    try
    {
-      double rc;
-
       // request specific timeout -> overrides default
-      stub.eval[simppl::dbus::timeout = 700ms](42) >> rc;
+      double rc = stub.eval[simppl::dbus::timeout = 700ms](42);
 
       // never arrive here!
       EXPECT_FALSE(true);
@@ -356,8 +354,7 @@ TEST(Timeout, blocking_api)
 
    try
    {
-      double rc;
-      stub.eval(42) >> rc;
+      double rc = stub.eval(42);
 
       // never arrive here!
       EXPECT_FALSE(true);
