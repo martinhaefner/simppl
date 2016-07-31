@@ -151,7 +151,7 @@ struct ClientAttributeWritableMixin
       Variant<data_type> vt(t);
       
       std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
-         simppl::dbus::detail::serializeN(s, vt);
+         simppl::dbus::detail::serialize(s, vt);
       };
       
       that->stub().setProperty(that->signal_.name(), f);
@@ -336,14 +336,13 @@ struct ClientRequest : ClientRequestBase
    template<typename... T>
    return_type operator()(const T&... t)
    {
-      // FIXME make better check
-      //static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
-        //            args_type>::value, "args mismatch");
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+                    args_type>::value, "args mismatch");
       
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
-         simppl::dbus::detail::serializeN(s, t...);
+         simppl::dbus::detail::serialize(s, t...);
       };
 
       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
@@ -372,13 +371,13 @@ struct ClientRequest : ClientRequestBase
    void async(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      //FIXME static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
-        //            args_type>::value, "args mismatch");
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+                    args_type>::value, "args mismatch");
                     
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
-         simppl::dbus::detail::serializeN(s, t...);
+         simppl::dbus::detail::serialize(s, t...);
       };
       
       dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &ClientRequest::pending_notify, this, 0);

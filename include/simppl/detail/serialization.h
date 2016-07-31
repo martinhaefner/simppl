@@ -1083,12 +1083,6 @@ Serializer& serialize(Serializer& s, const T1& t1, const T&... t)
    return serialize(s, t...);
 }
 
-template<typename... T>
-inline
-void serializeN(Serializer& s, const T&... t)
-{
-   serialize(s, t...);
-}
 
 // -----------------------------------------------------------------------
 
