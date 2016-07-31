@@ -150,7 +150,10 @@ struct ClientAttributeWritableMixin
       
       Variant<data_type> vt(t);
       
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<const Variant<data_type>&>, std::placeholders::_1, vt));
+      std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
+         simppl::dbus::detail::serializeN(s, vt);
+      };
+      
       that->stub().setProperty(that->signal_.name(), f);
    }
 };
@@ -339,7 +342,10 @@ struct ClientRequest : ClientRequestBase
       
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
+         simppl::dbus::detail::serializeN(s, t...);
+      };
+
       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
       
       // FIXME move this stuff into the stub baseclass, including blocking on pending call,
@@ -371,7 +377,10 @@ struct ClientRequest : ClientRequestBase
                     
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+      std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
+         simppl::dbus::detail::serializeN(s, t...);
+      };
+      
       dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &ClientRequest::pending_notify, this, 0);
    }
    

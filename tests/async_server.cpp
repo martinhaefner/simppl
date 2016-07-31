@@ -57,7 +57,7 @@ struct Client : simppl::dbus::Stub<AsyncServer>
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      add.async(42, 777.);   // FIXME must even work with 777 so type check must be less hard (convertible is good enough)
+      add.async(42, 777);   // FIXME must even work with 777 so type check must be less hard (convertible is good enough)
       echo.async(42, 3.1415);
     }
    
