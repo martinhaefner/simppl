@@ -1,18 +1,20 @@
 #include <gtest/gtest.h>
 
 // just check if we get compilation errors with validation...
-#define SIMPPL_HAVE_VALIDATION 1
+// FIXME #define SIMPPL_HAVE_VALIDATION 1
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
-#include "simppl/blocking.h"
 
 #include <thread>
 
 
 using namespace std::placeholders;
+
+using simppl::dbus::in;
+using simppl::dbus::out;
 
 
 namespace test
@@ -25,8 +27,8 @@ enum ident_t {
 
 INTERFACE(Attributes)
 {
-   Request<int, std::string> set;
-   Request<> shutdown;
+   Request<in<int>, in<std::string>> set;
+   Request<simppl::dbus::Oneway> shutdown;
 
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
@@ -68,7 +70,7 @@ struct Client : simppl::dbus::Stub<Attributes>
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       props.attach() >> std::bind(&Client::handleProps, this, _1, _2);
 
-      set(Four, "Four");
+      set.async(Four, "Four");
    }
 
 
@@ -96,8 +98,8 @@ struct Client : simppl::dbus::Stub<Attributes>
          mayShutdown.attach() >> std::bind(&Client::aboutToShutdown, this, _1);
 
          // one more roundtrip to see if further signals arrive...
-         set(Five, "Five");
-         set(Six, "Six");
+         set.async(Five, "Five");
+         set.async(Six, "Six");
       }
    }
 
@@ -131,7 +133,7 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
       if (attach_)
       {
          props.attach() >> std::bind(&MultiClient::handleProps, this, _1, _2);
-         set(Four, "Four");
+         set.async(Four, "Four");
       }
    }
 

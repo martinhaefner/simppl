@@ -15,17 +15,12 @@ add_executable(unittests
    simple.cpp
    errors.cpp
    async_server.cpp
-   #attributes.cpp
+   attributes.cpp
    variant.cpp
 )
 
-
-add_executable(newapi
-   newapi.cpp
-)
-
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
-target_link_libraries(newapi simppl dbus-1)
+
 
 # This is so you can do 'make test' to see all your tests run, instead of
 # manually running the executable runUnitTests to see those specific tests.

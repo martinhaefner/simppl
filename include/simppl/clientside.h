@@ -333,8 +333,9 @@ struct ClientRequest : ClientRequestBase
    template<typename... T>
    return_type operator()(const T&... t)
    {
-      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
-                    args_type>::value, "args mismatch");
+      // FIXME make better check
+      //static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+        //            args_type>::value, "args mismatch");
       
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
@@ -365,8 +366,8 @@ struct ClientRequest : ClientRequestBase
    void async(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
-                    args_type>::value, "args mismatch");
+      //FIXME static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+        //            args_type>::value, "args mismatch");
                     
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
