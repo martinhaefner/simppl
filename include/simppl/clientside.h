@@ -318,8 +318,8 @@ struct ClientRequest : ClientRequestBase
  
    enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
  
-   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
-   static_assert(detail::isValidType<return_type>::value, "invalid_type_in_interface");
+// FIXME make better support   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidReturnType<return_type>::value, "invalid_return_type_in_interface");
 
    static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
    

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 // just check if we get compilation errors with validation...
-// FIXME #define SIMPPL_HAVE_VALIDATION 1
+#define SIMPPL_HAVE_VALIDATION 1
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"

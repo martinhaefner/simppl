@@ -138,8 +138,8 @@ struct ServerRequest : ServerRequestBase
  
    enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
  
-   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
-   static_assert(detail::isValidType<return_type>::value, "invalid_type_in_interface");
+   //static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
+   static_assert(detail::isValidReturnType<return_type>::value, "invalid_return_type_in_interface");
 
    inline
    ServerRequest(const char* name, detail::BasicInterface* iface)

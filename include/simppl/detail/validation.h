@@ -36,6 +36,13 @@ struct isValidTuple<std::tuple<T...> >
    enum { value = isValidType<T...>::value };
 };
 
+// empty tuple allowed at least as argument list of interfaces
+template<>
+struct isValidTuple<std::tuple<>>
+{
+   enum { value = true };
+};
+
 
 // --------------------------------------------------------------------------------------------
 
@@ -222,10 +229,31 @@ struct isValidType<T>
    };
 };
 
+
+// allow void for return type
+template<typename T>
+struct isValidReturnType
+{
+   enum { value = isValidType<T>::value };
+};
+
+template<>
+struct isValidReturnType<void>
+{
+   enum { value = true };
+};
+
+
 #else   // SIMPPL_HAVE_VALIDATION
 
 template<typename... T>
 struct isValidType
+{
+   enum { value = true };
+};
+
+template<typename T>
+struct isValidReturnType
 {
    enum { value = true };
 };
