@@ -8,10 +8,10 @@
 
 namespace simppl
 {
-   
+
 namespace inifile
 {
-   
+
 // forward decl
 struct Section;
 struct File;
@@ -22,10 +22,10 @@ struct NoopHeaderParser;
 
 // ----------------------------------------------------------------------------
 
-   
+
 namespace detail
 {
-   
+
 struct IniFileSectionReturn
 {
    template<typename T>
@@ -45,7 +45,7 @@ struct SubCompositeSectionReturn
    }
 };
 
-   
+
 #ifndef INIFILE_HAVE_STL_STREAMS
 
 struct InputFileStream /* : noncopyable */
@@ -57,20 +57,20 @@ struct InputFileStream /* : noncopyable */
    {
       // NOOP
    }
-   
+
    inline
    ~InputFileStream()
    {
       if (file_)
          (void)fclose(file_);
    }
-   
+
    inline
    bool is_open() const
    {
       return file_ != 0;
    }
-   
+
    inline
    bool open(const char* filename)
    {
@@ -79,32 +79,32 @@ struct InputFileStream /* : noncopyable */
          fclose(file_);
          file_ = 0;
       }
-      
+
       file_ = fopen(filename, "r");
       last_ = 0;
-      
+
       return is_open();
    }
-   
+
    inline
    bool bad()
    {
       assert(file_);
       return file_ == 0 || (ferror(file_) && !feof(file_));
    }
-   
+
    inline
    size_t gcount() const
    {
       return last_;
    }
-   
+
    inline
    operator const void*() const
    {
       return file_ && !feof(file_) && !ferror(file_) ? this : 0;
    }
-   
+
    InputFileStream& getline(char* buffer, size_t buflen)
    {
       if (file_)
@@ -112,7 +112,7 @@ struct InputFileStream /* : noncopyable */
          if (fgets(buffer, buflen, file_) != 0)
          {
             size_t len = strlen(buffer);
-            
+
             if (len == buflen - 1)
             {
                if (buffer[len-1] != '\n')
@@ -121,11 +121,11 @@ struct InputFileStream /* : noncopyable */
             else if (len > 0)
             {
                last_ = len;
-               
+
                // remove tailing linefeeds
                if (buffer[len-1] == '\n')
                   buffer[--len] = '\0';
-               
+
                if (len > 0 && buffer[len-1] == '\r')
                   buffer[--len] = '\0';
             }
@@ -135,16 +135,16 @@ struct InputFileStream /* : noncopyable */
          else
             last_ = 0;
       }
-      
+
       return *this;
    }
-   
+
 private:
-   
+
    // noncopyable
    InputFileStream(const InputFileStream&);
    InputFileStream& operator=(const InputFileStream&);
-   
+
    FILE* file_;
    size_t last_;   // for gcount()
 };
@@ -154,7 +154,7 @@ private:
 }   // namespace detail
 
 
-#ifdef INIFILE_HAVE_STL_STREAMS 
+#ifdef INIFILE_HAVE_STL_STREAMS
 typedef std::ifstream stream_type;
 #else
 typedef detail::InputFileStream stream_type;
@@ -163,14 +163,14 @@ typedef detail::InputFileStream stream_type;
 
 namespace detail
 {
-   
+
 
 // NOOP handler for const char* and std::string
 template<typename T>
 struct Converter
 {
    static inline
-   typename std::remove_reference<T>::type 
+   typename std::remove_reference<T>::type
    eval(const char* ptr, bool&)
    {
       return ptr;
@@ -185,7 +185,7 @@ struct Converter<bool>
    bool eval(const char* ptr, bool& ret)
    {
       (void)ret;
-#ifndef NDEBUG      
+#ifndef NDEBUG
       ret = !strcasecmp(ptr, "true") || !strcasecmp(ptr, "false");
 #endif
       return !strcasecmp(ptr, "true");
@@ -209,19 +209,19 @@ static
 long long convert(const char* ptr, bool& success)
 {
    int base = 10;
-   
+
    if (*ptr == '0' && *(ptr+1) != '\0')
    {
       base = 8;
-   
+
       if (*(ptr+1) == 'x')
          base = 16;
    }
-   
+
    char* end;
    long long rc = strtoll(ptr, &end, base);
    success = (*end == '\0');
-   
+
    return rc;
 }
 
@@ -275,15 +275,15 @@ struct FunctionArgumentTypeDeducer<ReturnT(*)(ArgumentT)>
 // -------------------------------------------------------------------------------
 
 
-template<typename ActionReturnT> 
+template<typename ActionReturnT>
 struct ActionCaller
 {
    template<typename ActionT>
-   static inline 
+   static inline
    bool eval(ActionT& a, const char* value)
    {
       typedef typename FunctionArgumentTypeDeducer<ActionT>::argument_type action_argument_type;
-      
+
       bool success = true;
       (void)a(Converter<action_argument_type>::eval(value, success));
       return success;
@@ -291,15 +291,15 @@ struct ActionCaller
 };
 
 
-template<> 
+template<>
 struct ActionCaller<bool>
 {
    template<typename ActionT>
-   static inline 
+   static inline
    bool eval(ActionT& a, const char* value)
    {
       typedef typename FunctionArgumentTypeDeducer<ActionT>::argument_type action_argument_type;
-      
+
       bool success = true;
       return a(Converter<action_argument_type>::eval(value, success)) && success;
    }
@@ -349,19 +349,19 @@ struct FunctionReturnTypeDeducer<ReturnT(*)(ArgumentT)>
 struct KeyValueParser
 {
 private:
-   
+
    void strmove(char* dest, const char* src)
    {
       while(*src)
       {
          *dest++ = *src++;
       }
-      
+
       *dest = '\0';
    }
-   
+
    typedef void(KeyValueParser::*State)();
-   
+
    // the key part
    void key__()
    {
@@ -369,14 +369,14 @@ private:
       {
          if (!beginkey_)
             beginkey_ = cur_;
-         
+
          ++cur_;
          endkey_ = cur_;
       }
       else
          state_ = next();
    }
-   
+
    // white space
    void ws()
    {
@@ -387,46 +387,46 @@ private:
       else
          state_ = next();
    }
-   
+
    // equality operator
    void equal()
    {
       state_ = (*cur_ == '=' ? next() : &KeyValueParser::fail);
-      ++cur_;   
+      ++cur_;
    }
-   
+
    // start of quotation of a value
    void beginquote()
    {
       if (*cur_ == '"')
       {
          quoted_ = true;
-         ++cur_;   
+         ++cur_;
       }
-         
+
       state_ = next();
-      
+
    }
-   
+
    // end of quotation of a value
    void endquote()
    {
       state_ = ((quoted_ && *cur_ == '"') || (!quoted_ && *cur_ != '"') ? next() : &KeyValueParser::fail);
-      
+
       if (quoted_)
-         ++cur_;   
+         ++cur_;
    }
-   
-   inline 
+
+   inline
    void storeAndAdvanceValuePtrs()
    {
       if (!beginvalue_)
          beginvalue_ = cur_;
-      
+
       ++cur_;
       endvalue_ = cur_;
    }
-   
+
    // the value part
    void value__()
    {
@@ -461,48 +461,48 @@ private:
          }
       }
    }
-   
+
    // end state
    void success()
    {
       // NOOP
    }
-   
+
    // end state
    void fail()
    {
       // NOOP
    }
-   
+
    // real parser chain end state -> must be terminating 0, otherwise the parser ran into error somehow
    void finish()
    {
       state_ = (*cur_ == '\0' || *cur_ == '#' ? &KeyValueParser::success : &KeyValueParser::fail);
    }
-   
+
    // return next state in parser chain (the grammar)
    inline
    State next()
    {
       // this is the grammar - how the tokens have to follow each other
-      static State states[] = { 
-         &KeyValueParser::ws, 
-         &KeyValueParser::key__, 
-         &KeyValueParser::ws, 
+      static State states[] = {
+         &KeyValueParser::ws,
+         &KeyValueParser::key__,
+         &KeyValueParser::ws,
          &KeyValueParser::equal,
-         &KeyValueParser::ws, 
-         &KeyValueParser::beginquote, 
-         &KeyValueParser::value__, 
-         &KeyValueParser::endquote, 
-         &KeyValueParser::ws, 
-         &KeyValueParser::finish 
+         &KeyValueParser::ws,
+         &KeyValueParser::beginquote,
+         &KeyValueParser::value__,
+         &KeyValueParser::endquote,
+         &KeyValueParser::ws,
+         &KeyValueParser::finish
       };
-      
+
       return states[++idx_];
    }
-   
-public: 
-   
+
+public:
+
    explicit inline
    KeyValueParser(char* line)
     : state_(0)
@@ -516,61 +516,61 @@ public:
    {
       // NOOP
    }
-   
+
    // call this once on a parser object
    KeyValueParser& parse()
    {
       assert(idx_ == -1);
-      
+
       state_ = next();
-      
+
       while(state_ != &KeyValueParser::fail && state_ != &KeyValueParser::success)
       {
          (this->*state_)();
       }
-      
+
       return *this;
    }
-   
+
    // evaluate if parse was successful
    inline
    bool good() const
    {
       return state_ == &KeyValueParser::success;
    }
-   
+
    // return the section name, only call this after good() returned 'true'.
    inline
    const char* key() const
    {
       assert(good());
-      
+
       *endkey_ = '\0';   // terminate the key
       return beginkey_;
    }
-   
+
    inline
    const char* value() const
    {
       assert(good());
-      
+
       *endvalue_ = '\0';   // terminate the value
       return beginvalue_;
    }
-      
+
    State state_;
    char* cur_;
    int idx_;
    bool quoted_;
-   
+
    char* beginkey_;
    volatile char* endkey_;
-   
+
    char* beginvalue_;
    volatile char* endvalue_;
 };
 
-   
+
 static
 char* skipComments(char* line)
 {
@@ -582,7 +582,7 @@ char* skipComments(char* line)
    *ptr = '\0';
    while(::isblank(*--ptr))
       *ptr = '\0';
-   
+
    return line;
 }
 
@@ -597,7 +597,7 @@ struct KeyHandlerComposite
    {
       // NOOP
    }
-   
+
    tribool operator()(const char* key, const char* value)
    {
       if (key_(key))
@@ -615,7 +615,7 @@ struct KeyHandlerComposite
       p.second = key_.key_;
       return key_.ok();
    }
-   
+
    Key<MandatoryT> key_;
    HandlerT handler_;
 };
@@ -636,29 +636,29 @@ struct BackInserterContainerHandler
    {
       // NOOP
    }
-   
+
    bool operator()(const char* value)
    {
       char* v = const_cast<char*>(value);
       bool rc = true;
-         
+
       char* token = strtok(v, ",");
       while(token && rc)
       {
          container_.push_back(Converter<typename ContainerT::value_type>::eval(token, rc));
          token = strtok(0, ",");
       }
-      
-      return rc;   
+
+      return rc;
    }
-   
+
    ContainerT& container_;
 };
 
 
 // -------------------------------------------------------------------------------------------
 
-   
+
 /**
  * A generic setter for options.
  */
@@ -667,20 +667,20 @@ struct set
 {
    typedef void return_type;
    typedef T arg1_type;
-   
+
    inline explicit
    set(T& t)
     : t_(t)
    {
       // NOOP
    }
-   
+
    inline
    void operator()(const T& t)
    {
       t_ = t;
    }
-   
+
    T& t_;
 };
 
@@ -693,20 +693,20 @@ struct set<char[]>
 {
    typedef void return_type;
    typedef const char* arg1_type;
-   
+
    inline explicit
    set(char* t)
     : t_(t)
    {
       // NOOP
    }
-   
+
    inline
    void operator()(const char* t)
    {
       ::strcpy(t_, t);
    }
-   
+
    char* t_;
 };
 
@@ -722,14 +722,14 @@ struct ParserChainSectionBase : simppl::inifile::Section
    {
       // NOOP
    }
-   
+
    inline
    ParserChainSectionBase()
     : simppl::inifile::Section()
    {
       // NOOP
    }
-   
+
    tribool eval(char* line)
    {
       KeyValueParser p(line);
@@ -737,13 +737,13 @@ struct ParserChainSectionBase : simppl::inifile::Section
       {
          return doEval(p.key(), p.value());
       }
-      
+
       return false;
    }
-   
-   
+
+
 protected:
-   
+
    virtual tribool doEval(const char* key, const char* value) = 0;
 };
 
@@ -759,7 +759,7 @@ struct ParserChainSection : ParserChainSectionBase
    {
       // NOOP
    }
-   
+
    /// unnamed default section
    explicit inline
    ParserChainSection(ParserT parser)
@@ -768,19 +768,19 @@ struct ParserChainSection : ParserChainSectionBase
    {
       // NOOP
    }
-   
+
    tribool doEval(const char* key, const char* value)
    {
       return parser_(key, value);
    }
-   
-   inline      
+
+   inline
    bool ok(section_key_pair_type& p) const
    {
       p.first = name();
       return parser_.ok(p);
    }
-   
+
    ParserT parser_;
 };
 
@@ -806,13 +806,13 @@ struct FullHandledSection : simppl::inifile::Section
    {
       // NOOP
    }
-   
+
    tribool eval(char* line)
    {
       typedef typename FunctionReturnTypeDeducer<HandlerT>::return_type action_return_type;
       return ActionCaller<action_return_type>::template eval(handler_, skipComments(line));
    }
-   
+
    HandlerT handler_;
 };
 
@@ -822,7 +822,7 @@ struct FullHandledSection : simppl::inifile::Section
 
 /// template based section-composite
 template<typename SectionT, typename IncludedSectionT>
-struct SectionatedIniFile 
+struct SectionatedIniFile
 {
    SectionatedIniFile(const SectionT& section, const IncludedSectionT& included)
     : section_(section)
@@ -830,7 +830,7 @@ struct SectionatedIniFile
    {
       assert(included_.find(section_.name()) == 0);
    }
-   
+
    Section* find(const char* name)
    {
       if (!::strcmp(section_.name(), name))
@@ -840,32 +840,32 @@ struct SectionatedIniFile
       else
          return included_.find(name);
    }
-   
+
    inline
    Section& defaultSection()
    {
-      typedef typename if_<std::is_same<IncludedSectionT, File>::value, detail::IniFileSectionReturn, detail::SubCompositeSectionReturn>::type caller_type;
+      typedef typename std::conditional<std::is_same<IncludedSectionT, File>::value, detail::IniFileSectionReturn, detail::SubCompositeSectionReturn>::type caller_type;
       return caller_type::eval(*this);
    }
-   
+
    inline
    const char* filename() const
    {
       return included_.filename();
    }
-   
+
    inline
    const char* defaultFilename() const
    {
       return included_.defaultFilename();
    }
-   
+
    inline
    bool ok(detail::section_key_pair_type& p) const
    {
       return section_.ok(p) && included_.ok(p);
    }
-   
+
    SectionT section_;
    IncludedSectionT included_;
 };
@@ -901,7 +901,7 @@ struct DuplicateKeyEncountered<KeyHandlerComposite<MandatoryT, HandlerT> >
 
 // ---------------------------------------------------------------------------------------
 
-   
+
 template<typename MandatoryT1, typename HandlerT1, typename CompositeT>
 struct HandlerComposite
 {
@@ -912,7 +912,7 @@ struct HandlerComposite
    {
       assert(!DuplicateKeyEncountered<CompositeT>::eval(rhs, lhs_.key_.key_));
    }
-   
+
    inline
    bool contains(const char* key) const
    {
@@ -924,16 +924,16 @@ struct HandlerComposite
       tribool rc = lhs_(key, value);
       if (rc || !rc)
          return rc;
-      
+
       return rhs_(key, value);
    }
-   
+
    inline
    bool ok(section_key_pair_type& p) const
    {
       return lhs_.ok(p) && rhs_.ok(p);
    }
-   
+
    KeyHandlerComposite<MandatoryT1, HandlerT1> lhs_;
    CompositeT rhs_;
 };
@@ -945,16 +945,16 @@ struct HandlerComposite
 struct SectionNameParser
 {
 private:
-   
+
    typedef void(SectionNameParser::*State)();
-   
-   // left sectionname start bracket 
+
+   // left sectionname start bracket
    void start()
    {
       state_ = (*cur_ == '[' ? next() : &SectionNameParser::fail);
       ++cur_;
    }
-   
+
    // white space
    void ws()
    {
@@ -965,7 +965,7 @@ private:
       else
          state_ = next();
    }
-   
+
    // the section name part
    void name__()
    {
@@ -973,60 +973,60 @@ private:
       {
          if (!start_)
             start_ = cur_;
-         
+
          ++cur_;
          end_ = cur_;
       }
       else
          state_ = next();
    }
-   
+
    // right sectionname stop bracket
    void end()
    {
       state_ = (*cur_ == ']' ? next() : &SectionNameParser::fail);
       ++cur_;
    }
-   
+
    // end state
    void success()
    {
       // NOOP
    }
-   
+
    // end state
    void fail()
    {
       // NOOP
    }
-   
+
    // real parser chain end state -> must be terminating 0, otherwise the parser ran into error somehow
-   // or it may stop at a comment 
+   // or it may stop at a comment
    void finish()
    {
       state_ = (*cur_ == '\0' || *cur_ == '#' ? &SectionNameParser::success : &SectionNameParser::fail);
    }
-   
+
    // return next state in parser chain (the grammar)
    inline
    State next()
    {
       // this is the grammar - how the tokens have to follow each other
-      static State states[] = { 
-         &SectionNameParser::start, 
-         &SectionNameParser::ws, 
+      static State states[] = {
+         &SectionNameParser::start,
+         &SectionNameParser::ws,
          &SectionNameParser::name__,
-         &SectionNameParser::ws, 
-         &SectionNameParser::end, 
-         &SectionNameParser::ws, 
-         &SectionNameParser::finish 
+         &SectionNameParser::ws,
+         &SectionNameParser::end,
+         &SectionNameParser::ws,
+         &SectionNameParser::finish
       };
-      
+
       return states[++idx_];
    }
-   
-public: 
-   
+
+public:
+
    explicit inline
    SectionNameParser(char* line)
     : state_(0)
@@ -1037,65 +1037,65 @@ public:
    {
       // NOOP
    }
-   
+
    // call this once on a parser object
    SectionNameParser& parse()
    {
       assert(idx_ == -1);
-      
+
       state_ = next();
-      
+
       while(state_ != &SectionNameParser::fail && state_ != &SectionNameParser::success)
       {
          (this->*state_)();
       }
-      
+
       return *this;
    }
-   
+
    // evaluate if parse was successful
    inline
    bool good() const
    {
       return state_ == &SectionNameParser::success;
    }
-   
+
    // return the section name, only call this after good() returned 'true'.
    inline
    const char* name() const
    {
       assert(good());
-      
+
       *end_ = '\0';   // terminate the section name
       return start_;
    }
-      
+
    State state_;
    char* cur_;
    int idx_;
-   
+
    const char* start_;
    mutable char* end_;
 };
 
-   
+
 template<typename ParserT>
 struct HeaderlineEvaluator
 {
-   static 
+   static
    bool eval(stream_type& is, int& line)
    {
       char buf[128];
       is.getline(buf, sizeof(buf));
       ++line;
-      
+
       if (is.gcount() > 0 && is.gcount() < sizeof(buf) - 1)
       {
          return ParserT::eval(buf);
       }
       else
          return false;
-   }   
+   }
 };
 
 
@@ -1106,7 +1106,7 @@ struct HeaderlineEvaluator<NoopHeaderParser>
    bool eval(stream_type&, int&)
    {
       return true;
-   }   
+   }
 };
 
 

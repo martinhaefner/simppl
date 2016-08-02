@@ -19,6 +19,7 @@
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/clientresponseholder.h"
 #include "simppl/detail/deserialize_and_return.h"
+#include "simppl/detail/callinterface.h"
 
 
 namespace simppl
@@ -122,11 +123,8 @@ struct ClientSignal : ClientSignalBase
 
    void eval(DBusMessage* msg)
    {
-      if (f_)
-      {
-          detail::Deserializer d(msg);
-          detail::GetCaller<T...>::type::template eval(d, f_);
-      }
+      detail::Deserializer d(msg);
+      detail::GetCaller<T...>::type::template eval(d, f_);
    }
 
    function_type f_;
@@ -141,19 +139,19 @@ struct ClientAttributeWritableMixin
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   
-   
+
+
    void set(arg_type t)
    {
       AttributeT* that = (AttributeT*)this;
       that->data_ = t;
-      
+
       Variant<data_type> vt(t);
-      
+
       std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, vt);
       };
-      
+
       that->stub().setProperty(that->signal_.name(), f);
    }
 };
@@ -165,10 +163,10 @@ struct NoopMixin
 
 
 template<typename DataT, int Flags = Notifying|ReadOnly>
-struct ClientAttribute 
- : if_<(Flags & ReadWrite), ClientAttributeWritableMixin<ClientAttribute<DataT, Flags>, DataT>, NoopMixin>::type
+struct ClientAttribute
+ : std::conditional<(Flags & ReadWrite), ClientAttributeWritableMixin<ClientAttribute<DataT, Flags>, DataT>, NoopMixin>::type
 {
-   static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
+   static_assert(detail::isValidType<DataT>::value, "invalid attribute type");
 
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
@@ -189,7 +187,7 @@ struct ClientAttribute
    {
       f_ = func;
    }
-   
+
    StubBase& stub()
    {
       return *dynamic_cast<StubBase*>(signal_.iface_);
@@ -206,36 +204,36 @@ struct ClientAttribute
 
       return *this;
    }
-   
+
    inline
    const DataT& value() const
    {
       return data_;
    }
-   
-   // FIXME implement GetAll in Stub needs to store attributesbase in interface  
+
+   // FIXME implement GetAll in Stub needs to store attributesbase in interface
    // in a similar way as it is done on server side...
    const DataT& get()
    {
       std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(stub().getProperty(signal_.name()), dbus_message_unref);
 
       detail::Deserializer ds(msg.get());
-        
+
       Variant<DataT> v;
       ds >> v;
-        
+
       data_ = *v.template get<DataT>();
       return data_;
    }
-   
-   
+
+
    ClientAttribute& get_async()
    {
       stub().getProperty(signal_.name(), &pending_notify, this);
       return *this;
    }
-   
-   
+
+
    ClientAttribute& operator=(arg_type t)
    {
       this->set(t);
@@ -253,36 +251,40 @@ struct ClientAttribute
 //FIXME protected:
 
     static
-    void pending_notify(DBusPendingCall* pending, void* user_data)
+    void pending_notify(DBusPendingCall* pc, void* user_data)
     {
-        DBusMessage* msg = dbus_pending_call_steal_reply(pending);
-        
-        ClientAttribute* handler = (ClientAttribute*)user_data;
-        handler->eval(*msg);
-        
-        dbus_message_unref(msg);
-        dbus_pending_call_unref(pending);
+        std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
+        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+
+        CallState cs(*msg);
+
+        // TODO callstate should be part of the callback
+        if (cs)
+        {
+           ClientAttribute* handler = (ClientAttribute*)user_data;
+           handler->eval(*msg);
+        }
     }
 
     void eval(DBusMessage& msg)
     {
         detail::Deserializer ds(&msg);
-        
+
         // FIXME check type of variant and set error flag on stream?!
         Variant<DataT> v;
         ds >> v;
-        
+
         data_ = *v.template get<DataT>();
-        
+
         if (f_)
-            f_(CallState(msg), *v.template get<DataT>());        
+            f_(CallState(msg), *v.template get<DataT>());
     }
 
 
    void valueChanged(arg_type arg)
    {
       data_ = arg;
-      
+
       if (f_)
          f_(CallState(42), arg);
    }
@@ -312,33 +314,40 @@ struct ClientRequestBase
 template<typename... ArgsT>
 struct ClientRequest : ClientRequestBase
 {
-   typedef typename detail::canonify<typename detail::generate_return_type<ArgsT...>::type>::type return_type;
-   typedef typename detail::canonify<typename detail::generate_argument_type<ArgsT...>::type>::type args_type;
-   typedef typename detail::generate_callback_function<ArgsT...>::type callback_type;
- 
-   enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
- 
-// FIXME make better support   static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
-   static_assert(detail::isValidReturnType<return_type>::value, "invalid_return_type_in_interface");
+    typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
+    typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
-   static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
-   
-   inline
-   ClientRequest(const char* method_name, detail::BasicInterface* parent)
+    enum {
+        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
+        valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
+        valid_out = AllOf<typename return_type_generator::list_type, detail::IsValidTypeFunctor>::value,
+        is_oneway = detail::is_oneway_request<ArgsT...>::value
+    };
+
+    typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
+    typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
+
+    typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
+
+    static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
+
+
+    inline
+    ClientRequest(const char* method_name, detail::BasicInterface* parent)
     : ClientRequestBase(method_name)
     , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
-   {
+    {
       // NOOP
-   }
-   
-   
+    }
+
+
    // blocking call
    template<typename... T>
    return_type operator()(const T&... t)
    {
-      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
-      
+
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
@@ -346,7 +355,7 @@ struct ClientRequest : ClientRequestBase
       };
 
       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
-      
+
       // FIXME move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
       if (!is_oneway)
@@ -358,54 +367,50 @@ struct ClientRequest : ClientRequestBase
 
          if (!cs)
             cs.throw_exception();
-            
+
          return detail::deserialize_and_return<return_type>::eval(msg.get());
       }
       else
          dbus_connection_flush(stub->conn());
    }
-   
-   
+
+
    // async call
    template<typename... T>
    void async(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
-                    
+
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, t...);
       };
-      
+
       dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &ClientRequest::pending_notify, this, 0);
    }
-   
-   
-   // FIXME make data point to callback function itself...
-   static 
+
+
+   static
    void pending_notify(DBusPendingCall* pc, void* data)
    {
        std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
        
        ClientRequest* that = (ClientRequest*)data;
-       CallState cs(*msg);
+       
+       if (that->f_)
+       {
+           CallState cs(*msg);
 
-       if (!cs)
-       {
-           detail::DummyCaller<return_type>::template eval_cs(that->f_, cs);
-       }
-       else
-       {
-          detail::Deserializer d(msg.get());
-          detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
+           detail::Deserializer d(msg.get());
+           detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
        }
    }
-   
-   
+
+
    template<typename FunctorT>
    inline
    void handledBy(FunctorT func)
@@ -413,21 +418,21 @@ struct ClientRequest : ClientRequestBase
       f_ = func;
    }
 
-   
+
    ClientRequest& operator[](int flags)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      
+
       if (flags & (1<<0))
          detail::request_specific_timeout = timeout.timeout_;
 
       return *this;
    }
-   
+
    // FIXME do we really need connection in BasicInterface?
    // FIXME do we need BasicInterface at all?
    detail::BasicInterface* parent_;
-   
+
    // nonblocking asynchronous call needs a callback function
    callback_type f_;
 

@@ -5,7 +5,6 @@
 #include <type_traits>
 
 #include "simppl/type_wrappers.h"
-#include "simppl/if.h"
 
 
 namespace simppl
@@ -13,44 +12,26 @@ namespace simppl
 
 struct NilType {};
 
-template<typename HeadT, typename TailT> 
+template<typename HeadT, typename TailT>
 struct TypeList
 {
     typedef HeadT head_type;
     typedef TailT tail_type;
 };
 
-
-#define TYPELIST_1(t1) TypeList<t1, NilType>
-#define TYPELIST_2(t1, t2) TypeList<t1, TYPELIST_1(t2) >
-#define TYPELIST_3(t1, t2, t3) TypeList<t1, TYPELIST_2(t2, t3) >
-#define TYPELIST_4(t1, t2, t3, t4) TypeList<t1, TYPELIST_3(t2, t3, t4) >
-#define TYPELIST_5(t1, t2, t3, t4, t5) TypeList<t1, TYPELIST_4(t2, t3, t4, t5) >
-#define TYPELIST_6(t1, t2, t3, t4, t5, t6) TypeList<t1, TYPELIST_5(t2, t3, t4, t5, t6) >
-#define TYPELIST_7(t1, t2, t3, t4, t5, t6, t7) TypeList<t1, TYPELIST_6(t2, t3, t4, t5, t6, t7) >
-#define TYPELIST_8(t1, t2, t3, t4, t5, t6, t7, t8) TypeList<t1, TYPELIST_7(t2, t3, t4, t5, t6, t7, t8) >
-#define TYPELIST_9(t1, t2, t3, t4, t5, t6, t7, t8, t9) TypeList<t1, TYPELIST_8(t2, t3, t4, t5, t6, t7, t8, t9) >
-#define TYPELIST_10(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10) TypeList<t1, TYPELIST_9(t2, t3, t4, t5, t6, t7, t8, t9, t10) >
-#define TYPELIST_11(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11) TypeList<t1, TYPELIST_10(t2, t3, t4, t5, t6, t7, t8, t9, t10, t11) >
-#define TYPELIST_12(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12) TypeList<t1, TYPELIST_11(t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12) >
-#define TYPELIST_13(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13) TypeList<t1, TYPELIST_12(t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13) >
-#define TYPELIST_14(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14) TypeList<t1, TYPELIST_13(t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14) >
-#define TYPELIST_15(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15) TypeList<t1, TYPELIST_14(t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15) >
-
-
 // ---------------------------------- size ------------------------------------------
 
 /// calculate the size of a given typelist
-template<typename ListT> 
+template<typename ListT>
 struct Size;
 
-template<typename HeadT, typename TailT> 
+template<typename HeadT, typename TailT>
 struct Size<TypeList<HeadT, TailT> >
 {
     enum { value = Size<TailT>::value + 1 };
 };
 
-template<typename HeadT> 
+template<typename HeadT>
 struct Size<TypeList<HeadT, NilType> >
 {
     enum { value = 1 };
@@ -176,14 +157,14 @@ struct Find;
 template<typename SearchT, typename HeadT, typename TailT, int N>
 struct Find<SearchT, TypeList<HeadT, TailT>, N>
 {
-    typedef typename if_<(int)std::is_same<SearchT, HeadT>::value, int_<N>, Find<SearchT, TailT, N+1> >::type type_;
+    typedef typename std::conditional<(int)std::is_same<SearchT, HeadT>::value, std::integral_constant<int, N>, Find<SearchT, TailT, N+1> >::type type_;
     static const int value = type_::value;
 };
 
 template<typename SearchT, typename HeadT, int N>
 struct Find<SearchT, TypeList<HeadT, NilType>, N>
 {
-    typedef typename if_<(int)std::is_same<SearchT, HeadT>::value, int_<N>, int_<-1> >::type type_;    
+    typedef typename std::conditional<(int)std::is_same<SearchT, HeadT>::value, std::integral_constant<int, N>, std::integral_constant<int, -1> >::type type_;
     static const int value = type_::value;
 };
 
@@ -196,17 +177,17 @@ struct Find<SearchT, NilType, N>
 // -------------------------------- type at -------------------------------------------
 
 /// extract type at given position in typelist; position must be within bounds
-template<int N, typename ListT> 
+template<int N, typename ListT>
 struct TypeAt;
 
-template<int N, typename HeadT, typename TailT> 
+template<int N, typename HeadT, typename TailT>
 struct TypeAt<N, TypeList<HeadT, TailT> >
 {
     typedef typename TypeAt<N-1, TailT>::type type;
     typedef const typename TypeAt<N-1, TailT>::type const_type;
 };
 
-template<typename HeadT, typename TailT> 
+template<typename HeadT, typename TailT>
 struct TypeAt<0, TypeList<HeadT, TailT> >
 {
     typedef HeadT type;
@@ -217,24 +198,24 @@ struct TypeAt<0, TypeList<HeadT, TailT> >
 
 /// extract type at given position in typelist; if position is out of
 /// typelist bounds it always returns the type NilType
-template<int N, typename ListT> 
+template<int N, typename ListT>
 struct RelaxedTypeAt;
 
-template<int N> 
+template<int N>
 struct RelaxedTypeAt<N, NilType>
 {
     typedef NilType type;   ///< save access over end of typelist
     typedef const NilType const_type;
 };
 
-template<int N, typename HeadT, typename TailT> 
+template<int N, typename HeadT, typename TailT>
 struct RelaxedTypeAt<N, TypeList<HeadT, TailT> >
 {
     typedef typename RelaxedTypeAt<N-1, TailT>::type type;
     typedef const typename RelaxedTypeAt<N-1, TailT>::type const_type;
 };
 
-template<typename HeadT, typename TailT> 
+template<typename HeadT, typename TailT>
 struct RelaxedTypeAt<0, TypeList<HeadT, TailT> >
 {
     typedef HeadT type;
@@ -245,7 +226,7 @@ struct RelaxedTypeAt<0, TypeList<HeadT, TailT> >
 
 namespace detail
 {
-   
+
 template<typename ListT, int N>
 struct ReverseHelper
 {
@@ -299,13 +280,36 @@ struct make_typelist<T1, T...>
 template<>
 struct make_typelist<>
 {
-   typedef NilType type;
+   typedef TypeList<NilType, NilType> type;
 };
 
 template<typename T>
 struct make_typelist<T>
 {
    typedef TypeList<T, NilType> type;
+};
+
+// ---------------------------- all of ---------------------------------
+
+template<typename TL, typename FuncT>
+struct AllOf;
+
+template<typename HeadT, typename TailT, typename FuncT>
+struct AllOf<TypeList<HeadT, TailT>, FuncT>
+{
+    enum { value = FuncT::template apply_<HeadT>::value && AllOf<TailT, FuncT>::value };
+};
+
+template<typename HeadT, typename FuncT>
+struct AllOf<TypeList<HeadT, NilType>, FuncT>
+{
+    enum { value = FuncT::template apply_<HeadT>::value };
+};
+
+template<typename FuncT>
+struct AllOf<TypeList<NilType, NilType>, FuncT>
+{
+    enum { value = true };
 };
 
 }   // namespace simppl

@@ -4,37 +4,14 @@
 
 namespace simppl
 {
-   
-/**
- * integral constant wrapper
- */
-template<int i>
-struct int_
-{
-    typedef int value_type;
-    static const int value = i;
-};
 
 
 /**
- * integral constant wrapper
+ * TODO this is obsolete with C++17
  */
-template<char c>
-struct char_
-{
-    typedef char value_type;
-    static const char value = c;
-};
+template<bool B>
+using bool_constant = std::integral_constant<bool, B>;
 
-
-template<bool b>
-struct bool_
-{
-   static const bool value = b;
-};
-
-typedef bool_<true> tTrueType;
-typedef bool_<false> tFalseType;
 
 }   // namespace simppl
 

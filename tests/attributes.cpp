@@ -24,6 +24,9 @@ enum ident_t {
    One=1, Two, Three, Four, Five, Six
 };
 
+struct gaga
+{
+};
 
 INTERFACE(Attributes)
 {
@@ -32,10 +35,9 @@ INTERFACE(Attributes)
 
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
-   
-   // FIXME without arg possible?
-   Signal<int> mayShutdown;
 
+   Signal<int> mayShutdown;
+   
    inline
    Attributes()
     : INIT(set)
@@ -230,7 +232,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       new_props[(ident_t)id] = str;
 
       props = new_props;
-
+      
       mayShutdown.emit(42);
    }
 
@@ -283,6 +285,6 @@ TEST(Attributes, set)
 
    d.addClient(c);
    d.addServer(s);
-   
+
    d.run();
 }

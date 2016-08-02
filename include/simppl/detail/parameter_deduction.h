@@ -6,18 +6,16 @@
 #include <tuple>
 #include <functional>
 
-#include "simppl/if.h"
 #include "simppl/typelist.h"
-
 #include "simppl/callstate.h"
 
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
+
 namespace detail
 {
 
@@ -46,7 +44,7 @@ struct is_out<simppl::dbus::out<T>>
 };
 
 // ---------------------------------------------------------------------
- 
+
 // flatten typelist into std::tuple
 template<typename ListT, typename TupleT>
 struct make_tuple_from_list;
@@ -69,14 +67,8 @@ struct make_tuple_from_list<TypeList<NilType, NilType>, std::tuple<T...>>
    typedef std::tuple<T...> type;
 };
 
-template<typename... T>
-struct make_tuple_from_list<void, std::tuple<T...>>
-{
-   typedef std::tuple<T...> type;
-};
-
 // ---------------------------------------------------------------------
- 
+
 // flatten typelist into std::function
 template<typename ListT, typename FunctT>
 struct make_function_from_list;
@@ -161,39 +153,39 @@ struct canonify<std::tuple<>>
 
 // ---------------------------------------------------------------------
 
-template<template<typename> class FilterFunc, typename... T> 
+template<template<typename> class FilterFunc, typename... T>
 struct filter;
 
-template<template<typename> class FilterFunc, typename T1, typename... T> 
+template<template<typename> class FilterFunc, typename T1, typename... T>
 struct filter<FilterFunc, T1, T...>
-{   
+{
    typedef typename std::conditional<FilterFunc<T1>::value, typename T1::real_type, NilType>::type first_type;
    typedef typename PushFront<typename filter<FilterFunc, T...>::list_type, first_type>::type list_type;
 };
 
-template<template<typename> class FilterFunc, typename T> 
+template<template<typename> class FilterFunc, typename T>
 struct filter<FilterFunc, T>
-{   
+{
    typedef typename std::conditional<FilterFunc<T>::value, typename T::real_type, NilType>::type first_type;
    typedef typename make_typelist<first_type>::type list_type;
 };
 
-template<template<typename> class FilterFunc> 
+template<template<typename> class FilterFunc>
 struct filter<FilterFunc>
-{   
-   typedef void list_type;
+{
+   typedef TypeList<NilType, NilType> list_type;
 };
 
 // ---------------------------------------------------------------------
 
-template<typename... T> 
+template<typename... T>
 struct generate_return_type
 {
    typedef typename filter<is_out, T...>::list_type list_type;
    typedef typename make_tuple_from_list<list_type, std::tuple<>>::type type;
 };
 
-template<typename... T> 
+template<typename... T>
 struct generate_argument_type
 {
    typedef typename filter<is_in, T...>::list_type list_type;
@@ -219,7 +211,7 @@ struct generate_server_callback_function
 template<typename T>
 struct gen_dummy_return_value
 {
-   static inline 
+   static inline
    T eval()
    {
       return T();
@@ -229,7 +221,7 @@ struct gen_dummy_return_value
 template<>
 struct gen_dummy_return_value<void>
 {
-   static inline 
+   static inline
    void eval()
    {
       // NOOP
@@ -324,19 +316,19 @@ struct IntrospectionHelper<::simppl::dbus::Oneway>
 
 
 struct Introspector
-{     
+{
    Introspector(std::ostream& os)
     : os_(os)
    {
       // NOOP
    }
-   
+
    template<typename T>
    void eval(int i)
    {
       IntrospectionHelper<T>::eval(os_, i);
    }
-   
+
    std::ostream& os_;
 };
 

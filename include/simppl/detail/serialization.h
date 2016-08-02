@@ -7,7 +7,6 @@
 #include "simppl/callstate.h"
 #include "simppl/variant.h"
 
-#include <iostream>   // FIXME remove this
 #include <map>
 #include <vector>
 #include <tuple>
@@ -32,32 +31,27 @@ namespace simppl
 namespace dbus
 {
 
-// forward decls
-template<typename> struct ServerVectorAttributeUpdate;
-template<typename> struct ClientVectorAttributeUpdate;
-
-
 namespace detail
 {
 
 template<typename T>
 struct isPod
 {
-   typedef TYPELIST_14( \
-      bool, \
-      char, \
-      signed char, \
-      unsigned char, \
-      short, \
-      unsigned short, \
-      int, \
-      unsigned int, \
-      long, \
-      unsigned long, \
-      long long, \
-      unsigned long long, \
-      float, \
-      double) pod_types;
+   typedef make_typelist<
+      bool,
+      char,
+      signed char,
+      unsigned char,
+      short,
+      unsigned short,
+      int,
+      unsigned int,
+      long,
+      unsigned long,
+      long long,
+      unsigned long long,
+      float,
+      double>::type pod_types;
 
   enum { value = Find<T, pod_types>::value >= 0 };
 };
@@ -367,7 +361,7 @@ struct make_type_signature
 {
    static inline std::ostream& eval(std::ostream& os)
    {
-      make_type_signature<T>::helper(os, bool_<isPod<T>::value || std::is_enum<T>::value>());
+      make_type_signature<T>::helper(os, bool_constant<isPod<T>::value || std::is_enum<T>::value>());
       return os;
    }
 
@@ -375,13 +369,13 @@ struct make_type_signature
 private:
 
    // pod helper
-   static inline void helper(std::ostream& os, tTrueType)
+   static inline void helper(std::ostream& os, std::true_type)
    {
       os << (char)dbus_type_code<T>::value;
    }
 
    // struct helper
-   static inline void helper(std::ostream& os, tFalseType)
+   static inline void helper(std::ostream& os, std::false_type)
    {
       T::serializer_type::write_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
       os << DBUS_STRUCT_END_CHAR_AS_STRING;
@@ -517,7 +511,7 @@ struct VariantDeserializer<T1, T...>
       {
          v = T1();
          s >> *v.template get<T1>();
-         
+
          return true;
       }
       else
@@ -539,10 +533,10 @@ struct VariantDeserializer<T>
       {
          v = T();
          s >> *v.template get<T>();
-         
+
          return true;
       }
-      
+
       // stop recursion
       return false;
    }
@@ -568,12 +562,12 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(const T& t)
    {
-      return write(t, bool_<isPod<T>::value || std::is_pointer<T>::value || std::is_enum<T>::value>());
+      return write(t, bool_constant<isPod<T>::value || std::is_pointer<T>::value || std::is_enum<T>::value>());
    }
 
    template<typename T>
    inline
-   Serializer& write(T t, tTrueType)
+   Serializer& write(T t, std::true_type)
    {
       dbus_message_iter_append_basic(iter_, dbus_type_code<T>::value, &t);
       return *this;
@@ -581,7 +575,7 @@ struct Serializer // : noncopyable
 
    template<typename T>
    inline
-   Serializer& write(const T& t, tFalseType)
+   Serializer& write(const T& t, std::false_type)
    {
       StructSerializationHelper<
 #ifdef SIMPPL_HAVE_BOOST_FUSION
@@ -637,7 +631,7 @@ struct Serializer // : noncopyable
       dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
       Serializer s(&iter);
-   
+
       for (auto& e : m) {
          s.write(e);
       }
@@ -728,11 +722,6 @@ MAKE_SERIALIZER(const char*)
 MAKE_SERIALIZER(const std::string&)
 
 
-// forward decl
-template<typename VectorT>
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer&, const simppl::dbus::ServerVectorAttributeUpdate<VectorT>&);
-
-
 template<typename T>
 inline
 simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::vector<T>& v)
@@ -784,10 +773,10 @@ void simppl::dbus::detail::VariantSerializer<SerializerT>::operator()(const T& t
 
     DBusMessageIter iter;
     dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
-    
+
     SerializerT s(&iter);
     s.write(t);
-    
+
     dbus_message_iter_close_container(orig_.iter_, &iter);
 }
 
@@ -822,11 +811,11 @@ struct Deserializer // : noncopyable
    inline
    Deserializer& read(T& t)
    {
-      return read(t, bool_<isPod<T>::value || std::is_enum<T>::value>());
+      return read(t, bool_constant<isPod<T>::value || std::is_enum<T>::value>());
    }
 
    template<typename T>
-   Deserializer& read(T& t, tTrueType)
+   Deserializer& read(T& t, std::true_type)
    {
       dbus_message_iter_get_basic(iter_, &t);
       dbus_message_iter_next(iter_);
@@ -835,7 +824,7 @@ struct Deserializer // : noncopyable
    }
 
    template<typename T>
-   Deserializer& read(T& t, tFalseType)
+   Deserializer& read(T& t, std::false_type)
    {
       StructSerializationHelper<
 #ifdef SIMPPL_HAVE_BOOST_FUSION
@@ -857,10 +846,10 @@ struct Deserializer // : noncopyable
        DBusMessageIter iter;
        dbus_message_iter_recurse(iter_, &iter);
        Deserializer s(&iter);
-       
-       if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
-         std::cerr << "Invalid variant type detected" << std::endl;
-       
+
+       //if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
+         //std::cerr << "Invalid variant type detected" << std::endl;
+
        dbus_message_iter_next(iter_);
        return *this;
    }
@@ -1008,10 +997,6 @@ MAKE_DESERIALIZER(char*)
 MAKE_DESERIALIZER(std::string)
 
 
-// forward decl
-template<typename VectorT>
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer&, simppl::dbus::ClientVectorAttributeUpdate<VectorT>&);
-
 template<typename T>
 inline
 simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::vector<T>& v)
@@ -1082,197 +1067,6 @@ Serializer& serialize(Serializer& s, const T1& t1, const T&... t)
    s << t1;
    return serialize(s, t...);
 }
-
-
-// -----------------------------------------------------------------------
-
-
-// FIXME use calltraits or rvalue references here
-
-template<int N, typename TupleT>
-struct FunctionCaller
-{
-   template<typename FunctorT>
-   static inline
-   void eval(FunctorT& f, const TupleT& tuple)
-   {
-      FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
-   }
-
-   template<typename FunctorT>
-   static inline
-   void eval_cs(FunctorT& f, const CallState& cs, const TupleT& tuple)
-   {
-      FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
-   }
-
-   template<typename FunctorT, typename... T>
-   static inline
-   void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
-   {
-     FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
-   }
-
-   template<typename FunctorT, typename... T>
-   static inline
-   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& tuple, const T&... t)
-   {
-      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs(f, cs, tuple, t..., std::get<N>(tuple));
-   }
-};
-
-template<typename TupleT>
-struct FunctionCaller<-1, TupleT>
-{
-   template<typename FunctorT, typename... T>
-   static inline
-   void eval_intern(FunctorT& f, const TupleT& /*tuple*/, const T&... t)
-   {
-      f(t...);
-   }
-
-   template<typename FunctorT, typename... T>
-   static inline
-   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& /*tuple*/, const T&... t)
-   {
-      f(cs, t...);
-   }
-};
-
-template<>
-struct FunctionCaller<0, std::tuple<>>
-{
-   template<typename FunctorT, typename... T>
-   static inline
-   void eval_cs(FunctorT& f, const CallState& cs, const std::tuple<>& tuple)
-   {
-      f(cs);
-   }
-};
-
-
-template<typename T>
-struct DummyCaller
-{
-   template<typename FunctorT>
-   static inline
-   void eval_cs(FunctorT& f, const CallState& cs)
-   {
-      T t;
-      f(cs, t);
-   }
-};
-
-
-template<typename... T>
-struct DummyCaller<std::tuple<T...>>
-{
-   template<typename FunctorT>
-   static inline
-   void eval_cs(FunctorT& f, const CallState& cs)
-   {
-      std::tuple<T...> t;
-      FunctionCaller<0, std::tuple<T...>>::eval_cs(f, cs, t);
-   }
-};
-
-
-template<>
-struct DummyCaller<void>
-{
-   template<typename FunctorT>
-   static inline
-   void eval_cs(FunctorT& f, const CallState& cs)
-   {
-      std::tuple<> t;
-      FunctionCaller<0, std::tuple<>>::eval_cs(f, cs, t);
-   }
-};
-
-
-template<typename T>
-struct DeserializeAndCall : simppl::NonInstantiable
-{
-   template<typename FunctorT>
-   static inline
-   void eval(Deserializer& d, FunctorT& f)
-   {
-      std::tuple<T> tuple;
-      d.read_flattened(tuple);
-
-      FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
-   }
-
-   template<typename FunctorT>
-   static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
-   {
-      std::tuple<T> tuple;
-
-      if (cs)
-         d.read_flattened(tuple);
-
-      FunctionCaller<0, std::tuple<T>>::template eval_cs(f, cs, tuple);
-   }
-};
-
-
-template<typename... T>
-struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
-{
-   template<typename FunctorT>
-   static inline
-   void eval(Deserializer& d, FunctorT& f)
-   {
-      std::tuple<T...> tuple;
-      d.read_flattened(tuple);
-
-      FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
-   }
-
-   template<typename FunctorT>
-   static inline
-   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
-   {
-      std::tuple<T...> tuple;
-
-      if (cs)
-         d.read_flattened(tuple);
-
-      FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
-   }
-};
-
-
-struct DeserializeAndCall0 : simppl::NonInstantiable
-{
-   template<typename FunctorT>
-   static inline
-   void eval(Deserializer& /*d*/, FunctorT& f)
-   {
-      f();
-   }
-
-   template<typename FunctorT>
-   static inline
-   void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::dbus::CallState& cs)
-   {
-      f(cs);
-   }
-};
-
-
-template<typename... T>
-struct GetCaller : simppl::NonInstantiable
-{
-   typedef typename if_<sizeof...(T) == 0, DeserializeAndCall0, DeserializeAndCall<T...>>::type type;
-};
-
-template<>
-struct GetCaller<void> : simppl::NonInstantiable
-{
-   typedef DeserializeAndCall0 type;
-};
 
 
 }   // namespace detail

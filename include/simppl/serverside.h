@@ -17,6 +17,7 @@
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/validation.h"
+#include "simppl/detail/callinterface.h"
 
 
 #if !(defined(SIMPPL_SKELETONBASE_H) \
@@ -71,14 +72,14 @@ protected:
 struct ServerSignalBase
 {
    ServerSignalBase(const char* name, detail::BasicInterface* iface);
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
-#endif 
+#endif
 
 protected:
 
-   inline ~ServerSignalBase() 
+   inline ~ServerSignalBase()
    {
       // NOOP
    }
@@ -114,7 +115,7 @@ struct ServerSignal : ServerSignalBase
          dbus_message_unref(msg);
       }
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
@@ -132,29 +133,38 @@ struct ServerSignal : ServerSignalBase
 template<typename... ArgsT>
 struct ServerRequest : ServerRequestBase
 {
-   typedef typename detail::canonify<typename detail::generate_return_type<ArgsT...>::type>::type return_type;
-   typedef typename detail::canonify<typename detail::generate_argument_type<ArgsT...>::type>::type args_type;
-   typedef typename detail::generate_server_callback_function<ArgsT...>::type callback_type;
- 
-   enum { is_oneway = detail::is_oneway_request<ArgsT...>::value }; 
- 
-   //static_assert(detail::isValidType<args_type>::value, "invalid_type_in_interface");
-   static_assert(detail::isValidReturnType<return_type>::value, "invalid_return_type_in_interface");
+    typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
+    typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
-   inline
-   ServerRequest(const char* name, detail::BasicInterface* iface)
+    enum {
+        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
+        valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
+        valid_out = AllOf<typename return_type_generator::list_type, detail::IsValidTypeFunctor>::value,
+        is_oneway = detail::is_oneway_request<ArgsT...>::value
+    };
+
+    typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
+    typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
+
+    typedef typename detail::generate_server_callback_function<ArgsT...>::type callback_type;
+
+    static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
+
+
+    inline
+    ServerRequest(const char* name, detail::BasicInterface* iface)
     : ServerRequestBase(name, iface)
-   {
-      // NOOP
-   }
+    {
+        // NOOP
+    }
 
-   template<typename FunctorT>
-   inline
-   void handledBy(FunctorT func)
-   {
-      assert(!f_);
-      f_ = func;
-   }
+    template<typename FunctorT>
+    inline
+    void handledBy(FunctorT func)
+    {
+        assert(!f_);
+        f_ = func;
+    }
 
    void eval(DBusMessage* msg)
    {
@@ -162,16 +172,16 @@ struct ServerRequest : ServerRequestBase
        detail::Deserializer d(msg);
        detail::GetCaller<args_type>::type::template eval(d, f_);
    }
-   
+
    template<typename... T>
    inline
    detail::ServerResponseHolder operator()(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type, 
+      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     return_type>::value, "args mismatch");
-      
-      return __impl(bool_<(sizeof...(t) > 0)>(), t...);
+
+      return __impl(bool_constant<(sizeof...(t) > 0)>(), t...);
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
@@ -187,7 +197,7 @@ private:
 
    template<typename... T>
    inline
-   detail::ServerResponseHolder __impl(tTrueType, const T&... t)
+   detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<const T&...>, std::placeholders::_1, t...));
       return detail::ServerResponseHolder(f);
@@ -195,12 +205,12 @@ private:
 
    template<typename... T>
    inline
-   detail::ServerResponseHolder __impl(tFalseType, const T&... t)
+   detail::ServerResponseHolder __impl(std::false_type, const T&... t)
    {
       std::function<void(detail::Serializer&)> f;
       return detail::ServerResponseHolder(f);
    }
-   
+
    callback_type f_;
 };
 
@@ -214,7 +224,7 @@ struct ServerAttributeBase
 
    virtual void eval(DBusMessage* msg) = 0;
    virtual void evalSet(detail::Deserializer& ds) = 0;
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
 #endif
@@ -251,11 +261,11 @@ struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
    void eval(DBusMessage* response)
    {
       detail::Serializer s(response);
-      
+
       Variant<DataT> v(t_);   // FIXME this copy is overhead, just somehow wrap it...
       serialize(s, v);
    }
-   
+
 protected:
 
    DataT t_;
@@ -282,7 +292,7 @@ struct ServerAttribute : BaseAttribute<DataT>
       this->t_ = data;
       return *this;
    }
-   
+
 protected:
 
    // FIXME only do something if readwrite enabled!
@@ -293,14 +303,14 @@ protected:
 
       *this = *v.template get<DataT>();
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os)
    {
       // FIXME name_ seems to be here multiple times: signal and ABase
       os << "    <property name=\"" << ServerAttributeBase::name_ << "\" type=\"";
       detail::make_type_signature<DataT>::eval(os);
-      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n"; 
+      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }
 #endif
 };

@@ -243,7 +243,6 @@ struct isValidReturnType<void>
    enum { value = true };
 };
 
-
 #else   // SIMPPL_HAVE_VALIDATION
 
 template<typename... T>
@@ -259,6 +258,29 @@ struct isValidReturnType
 };
 
 #endif   // SIMPPL_HAVE_VALIDATION
+
+
+struct IsValidTypeFunctor
+{
+    template<typename T>
+    struct apply_
+    {
+        static_assert(isValidType<T>::value, "no serializable type");
+        enum { value = isValidType<T>::value };
+    };
+};
+
+
+struct InOutOrOneway
+{
+    template<typename T>
+    struct apply_
+    {
+        static_assert(is_in<T>::value || is_out<T>::value || std::is_same<T, Oneway>::value, "neither in, out nor oneway parameter");
+        enum { value = is_in<T>::value || is_out<T>::value || std::is_same<T, Oneway>::value };
+    };
+};
+
 
 }   // namespace detail
 
