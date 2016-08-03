@@ -28,13 +28,12 @@ mappings and will definitely not work with complex data types containing
 virtual functions or containing multiple inheritence.
 
 
-
 Status
 
-The library is currently not used in production projects and therefore
-it still can be regarded as 'proof of concept'. Due to the simplicity
-of the glue layer and the main functionality provided by libdbus I would
-already recommend to give it a try, even in real projects.
+The library is used in a production project and but it still can be 
+regarded as 'proof of concept'. Interface design may still be under change. 
+Due to the simplicity of the glue layer and the main functionality provided 
+by libdbus I would recommend to give it a try in real projects.
 
 
 CopyLeft
@@ -67,18 +66,17 @@ Let's start with a simple echo service. See the service description:
 
    INTERFACE(EchoService)
    {
-      Request<std::string> echo;
-      Response<std::string> echo_response;
+      Request<in<std::string>, out<std::string>> echo;
    };
 
    }   // namespace
 
 
-Remember, this is pure C++. The header file with this definition can be
-included by the server  and by the client. But, until now there is no 
-correlation between the request method and the response. A correct 
-interface definition also needs some hand-written glue, but it's simple.
-The full interface looks like this:
+Remember, this is pure C++. You see a request named 'echo' taking a 
+string as 'in' argument and a string as 'out' argument. 
+The header file with this definition can be included by the server and 
+by the client. A complete interface definition also needs some hand-written 
+glue code, but it's very simple. The full interface looks like this:
 
 
    namespace test
@@ -86,25 +84,22 @@ The full interface looks like this:
 
    INTERFACE(EchoService)
    {
-      Request<std::string> echo;
-      Response<std::string> echo_response;
+      Request<in<std::string>, out<std::string>> echo;
       
       // constructor
       EchoService()
        : INIT(echo)
-       , INIT(echo_response)
       {
-         echo >> echo_response;
       }
    };
 
    }   // namespace
 
 
-Now the interface is correct C++. You need the implement the constructor 
-to corretly initialize the members. The correlation of request to response
-is always done in the constructor of the interface itself. For oneway
-requests this can be omitted.
+Now the interface is complete C++. You need the implement the constructor 
+to correctly initialize the members. For oneway requests, you just add
+the keyword Oneway to the request definition. Oneway, in and out are
+part of the C++ namespace simppl::dbus.
 
 But, how is the service mapped to dbus? Well, have you seen the namespace 
 definition? Then you can already imagine how the service is mapped, can't you?
@@ -176,7 +171,7 @@ no response yet. Let's send a response back to the client:
       void handle_echo(const std::string& echo_string)
       {
          std::cout << "Client says '" << echo_string << "'" << std::endl;
-         respond_with(echo_response(echo_string));
+         respond_with(echo(echo_string));
       }
    };
 
@@ -189,7 +184,7 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
       simppl::dbus::Dispatcher disp("dbus::session");
       MyEcho instance;
       
-      disp.addClient(instance);
+      disp.addServer(instance);
       disp.run();
       
       return EXIT_SUCCESS;
@@ -209,8 +204,9 @@ with a simple blocking client:
       simppl::dbus::Stub<EchoService> stub("myEcho");
       disp.addClient(stub);
       
-      std::string echoed;
-      stub.echo("Hello world!") >> echoed; 
+      stub.connect();
+      
+      std::string echoed = stub.echo("Hello world!"); 
       
       return EXIT_SUCCESS;
    }
@@ -218,13 +214,15 @@ with a simple blocking client:
    
 That's it. The request call blocks until the response is received and 
 stored in the echoed variable. In case of an error, an exception is thrown.
-Note that even if there is no event loop visible in the main function, 
-it is necessary though and will be started in the background. That's the 
-reason why the stub must also be registered to a Dispatcher. 
+Note that the underlying DBus implementation will block on the fd correlated
+with the request and therefore a blocking client can never be running on the
+same connection as the server (ok, that's only a test setup, in real world
+client and server typically reside in different applications. 
 
 But have a look on the message loop driven client. The best way to implement
 such a client is to derive from the stub base template and delegate the
-callbacks to member functions.
+callbacks to member functions. Note that the request is called via the async(...)
+member function.
 
 
    class MyEchoClient : simppl::dbus::Stub<EchoService>
@@ -240,16 +238,16 @@ callbacks to member functions.
       {
          if (st == simppl::dbus::ConnectionState::Connected)
          {
-            echo("Hello World!);
+            echo.async("Hello World!);
          }
       }
       
-      void handle_echo(const simppl::cbus::Callstate st, const std::string& echo_string)
+      void handle_echo(const simppl::dbus::Callstate st, const std::string& echo_string)
       {
          if (st)
          {
             std::cout << "Server says '" << echo_string << "'" << std::endl;
-            respond_with(echo_response(echo_string));
+            respond_with(echo(echo_string));
          }
          else
             std::cout << "Got error: " << st.what() << std::endl;
@@ -262,8 +260,9 @@ when any event occurs. The initial event for a client is the connected event
 which will be emitted when the server registers itself on the bus (remember
 the busname). After being connected, the client may start a sequence of
 request/response pairs like in the example above. These callbacks can be
-any function object fullfilling the response signature. The main program 
-is as simple as in the blocking example:
+any function object fullfilling the response signature, the preferred 
+way nowadays in a C++ lambda. The main program is as simple as in the 
+blocking example:
 
 
    int main()
@@ -298,8 +297,7 @@ and server. See the following example:
    
       INTERFACE(ComplexTest)
       {
-         Request<Data> eval;
-         Response<int, std::string> eval_response;
+         Request<in<Data>, out<int>, out<std::string>> eval;
          
          Signal<std::map<int,int>> sig;
          
@@ -307,11 +305,9 @@ and server. See the following example:
          
          ComplexTest()
           : INIT(eval)
-          , INIT(eval_response)
           , INIT(sig)
           , INIT(data)
          {
-            eval >> eval_response;
          }
       };
    }
@@ -336,7 +332,7 @@ the structure, i.e. the structure can be used as any simple data type:
       int i_ret;
       std::string s_ret;
       
-      teststub.eval(d) >> std::tie(i_ret, s_ret);
+      std::tie(i_ret, s_ret) = teststub.eval(d);
       
       return EXIT_SUCCESS;
    }
@@ -392,8 +388,6 @@ on server side. See the clients connected callback:
    };
    
    
-This was a short introduction to simppl/dbus. I hope you will have fun
+This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without
 the need of a complex tool chain for glue-code generation.
-
-
