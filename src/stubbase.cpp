@@ -28,7 +28,7 @@ StubBase::StubBase(const char* iface, const char* role)
 {
    assert(role);
    std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
-   
+
    busname_.reserve(strlen(this->iface()) + 1 + strlen(this->role()));
    busname_ = this->iface();
    busname_ += ".";
@@ -40,7 +40,7 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->removeClient(*this);
-      
+
    delete[] iface_;
    delete[] objectpath_;
    role_ = nullptr;
@@ -86,9 +86,9 @@ Dispatcher& StubBase::disp()
 }
 
 
-DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway)
+DBusPendingCall* StubBase::sendRequest(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
 {
-    DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), iface(), req.method_name_);
+    DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), iface(), method_name);
     DBusPendingCall* pending = nullptr;
 
     detail::Serializer s(msg);
@@ -108,7 +108,7 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
        dbus_connection_send(disp().conn_, msg, nullptr);
        dbus_connection_flush(disp().conn_);
     }
-    
+
     dbus_message_unref(msg);
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
@@ -132,7 +132,7 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
    assert(signals_.find(sigbase.name()) == signals_.end());   // signal already attached by this stub
-   
+
    disp_->registerSignal(*this, sigbase);
 
    // FIXME use intrusive container and iterate instead of using a map -> memory efficiency
@@ -143,9 +143,9 @@ void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
 void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 {
    assert(disp_);
-   
+
    auto iter = signals_.find(sigbase.name());
-   
+
    if (iter != signals_.end())
    {
       disp_->unregisterSignal(*this, sigbase);
@@ -160,9 +160,9 @@ void StubBase::cleanup()
    {
       disp_->unregisterSignal(*this, *sig_entry.second);
    }
-   
+
    signals_.clear();
-   
+
    disp_ = nullptr;
 }
 
@@ -192,12 +192,12 @@ DBusMessage* StubBase::getProperty(const char* name)
 
    dbus_connection_send_with_reply(conn(), msg, &pending, -1);
    dbus_message_unref(msg);
-   
+
    dbus_pending_call_block(pending);
-   
+
    msg = dbus_pending_call_steal_reply(pending);
    dbus_pending_call_unref(pending);
-   
+
    return msg;
 }
 
@@ -209,10 +209,10 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
     detail::Serializer s(msg);
     s << iface() << name;
     f(s);   // and now serialize the variant
-    
+
     dbus_connection_send(disp().conn_, msg, nullptr);
     dbus_connection_flush(disp().conn_);
-    
+
     dbus_message_unref(msg);
 }
 

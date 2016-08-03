@@ -2,6 +2,9 @@
 #define SIMPPL_TYPE_WRAPPERS_H
 
 
+#include <type_traits>
+
+
 namespace simppl
 {
 

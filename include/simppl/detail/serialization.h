@@ -573,6 +573,14 @@ struct Serializer // : noncopyable
       return *this;
    }
 
+   inline
+   Serializer& write(bool b)
+   {
+      dbus_bool_t _b = b;
+      dbus_message_iter_append_basic(iter_, dbus_type_code<bool>::value, &_b);
+      return *this;
+   }
+
    template<typename T>
    inline
    Serializer& write(const T& t, std::false_type)
@@ -823,6 +831,16 @@ struct Deserializer // : noncopyable
       return *this;
    }
 
+   Deserializer& read(bool& t)
+   {
+      dbus_bool_t b;
+      dbus_message_iter_get_basic(iter_, &b);
+      dbus_message_iter_next(iter_);
+
+      t = b;
+      return *this;
+   }
+
    template<typename T>
    Deserializer& read(T& t, std::false_type)
    {
@@ -833,6 +851,7 @@ struct Deserializer // : noncopyable
          int
 #endif
          >::template read(*this, t);
+      return *this;
    }
 
    Deserializer& read(char*& str);
@@ -847,8 +866,8 @@ struct Deserializer // : noncopyable
        dbus_message_iter_recurse(iter_, &iter);
        Deserializer s(&iter);
 
-       //if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
-         //std::cerr << "Invalid variant type detected" << std::endl;
+       if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
+           assert(false);
 
        dbus_message_iter_next(iter_);
        return *this;

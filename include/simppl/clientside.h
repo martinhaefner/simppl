@@ -17,7 +17,6 @@
 
 #include "simppl/detail/validation.h"
 #include "simppl/detail/basicinterface.h"
-#include "simppl/detail/clientresponseholder.h"
 #include "simppl/detail/deserialize_and_return.h"
 #include "simppl/detail/callinterface.h"
 
@@ -30,21 +29,6 @@ namespace dbus
 
 // forward decl
 template<typename> struct InterfaceNamer;
-
-
-// FIXME remove these types of interfaces in favour of std::function interface
-struct ClientResponseBase
-{
-   virtual void eval(DBusMessage& msg) = 0;
-
-protected:
-
-   inline
-   ~ClientResponseBase()
-   {
-      // NOOP
-   }
-};
 
 
 // ---------------------------------------------------------------------------------
@@ -270,7 +254,6 @@ struct ClientAttribute
     {
         detail::Deserializer ds(&msg);
 
-        // FIXME check type of variant and set error flag on stream?!
         Variant<DataT> v;
         ds >> v;
 
@@ -280,39 +263,25 @@ struct ClientAttribute
             f_(CallState(msg), *v.template get<DataT>());
     }
 
+    void valueChanged(arg_type arg)
+    {
+        data_ = arg;
 
-   void valueChanged(arg_type arg)
-   {
-      data_ = arg;
+        if (f_)
+            f_(CallState(42), arg);
+    }
 
-      if (f_)
-         f_(CallState(42), arg);
-   }
-
-   signal_type signal_;
-   function_type f_;
-   DataT data_;
+    signal_type signal_;
+    function_type f_;
+    DataT data_;
 };
 
 
 // --------------------------------------------------------------------------------
 
 
-// FIXME could possibliy be dropped?!
-struct ClientRequestBase
-{
-   ClientRequestBase(const char* method_name)
-    : method_name_(method_name)
-   {
-       // NOOP
-   }
-
-   const char* method_name_;
-};
-
-
 template<typename... ArgsT>
-struct ClientRequest : ClientRequestBase
+struct ClientRequest
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
@@ -334,8 +303,8 @@ struct ClientRequest : ClientRequestBase
 
     inline
     ClientRequest(const char* method_name, detail::BasicInterface* parent)
-    : ClientRequestBase(method_name)
-    , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
+     : method_name_(method_name)
+     , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
     {
       // NOOP
     }
@@ -354,7 +323,7 @@ struct ClientRequest : ClientRequestBase
          simppl::dbus::detail::serialize(s, t...);
       };
 
-      std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(*this, f, is_oneway), dbus_pending_call_unref);
+      std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(method_name_, f, is_oneway), dbus_pending_call_unref);
 
       // FIXME move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
@@ -389,7 +358,7 @@ struct ClientRequest : ClientRequestBase
          simppl::dbus::detail::serialize(s, t...);
       };
 
-      dbus_pending_call_set_notify(stub->sendRequest(*this, f, false), &ClientRequest::pending_notify, this, 0);
+      dbus_pending_call_set_notify(stub->sendRequest(method_name_, f, false), &ClientRequest::pending_notify, this, 0);
    }
 
 
@@ -398,9 +367,9 @@ struct ClientRequest : ClientRequestBase
    {
        std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
-       
+
        ClientRequest* that = (ClientRequest*)data;
-       
+
        if (that->f_)
        {
            CallState cs(*msg);
@@ -429,13 +398,13 @@ struct ClientRequest : ClientRequestBase
       return *this;
    }
 
+    const char* method_name_;
+
    // FIXME do we really need connection in BasicInterface?
    // FIXME do we need BasicInterface at all?
    detail::BasicInterface* parent_;
 
-   // nonblocking asynchronous call needs a callback function
-   callback_type f_;
-
+   callback_type f_;   ///< nonblocking asynchronous call needs a callback function
 };
 
 

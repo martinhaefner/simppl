@@ -23,8 +23,6 @@ namespace dbus
 
 // forward decls
 struct Dispatcher;
-struct ClientResponseBase;
-struct ClientRequestBase;
 struct ClientSignalBase;
 
 namespace detail
@@ -39,12 +37,12 @@ struct StubBase
    template<typename... T> friend struct ClientRequest;
    template<typename, int> friend struct ClientAttribute;
    template<typename, typename> friend struct ClientAttributeWritableMixin;
-   
+
    friend struct Dispatcher;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
-   
+
 protected:
 
    virtual ~StubBase();
@@ -89,7 +87,7 @@ public:
    }
 
    /**
-    * Blocking connect. Throws exception on timeout. 
+    * Blocking connect. Throws exception on timeout.
     */
    void connect();
 
@@ -97,8 +95,8 @@ public:
 protected:
 
    void cleanup();
-   
-   DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f, bool is_oneway);
+
+   DBusPendingCall* sendRequest(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    inline
    std::string boundname() const
@@ -110,12 +108,12 @@ protected:
    void sendSignalUnregistration(ClientSignalBase& sigbase);
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
-   
+
    // blocking version
    DBusMessage* getProperty(const char* name);
 
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
-   
+
    char* iface_;
    char* role_;
    char* objectpath_;
