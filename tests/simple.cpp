@@ -56,28 +56,23 @@ struct Client : simppl::dbus::Stub<Simple>
    Client()
     : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
    {
-      connected >> std::bind(&Client::handleConnected, this, _1);
-      hello >> std::bind(&Client::handleWorld, this, _1);
-   }
+      connected >> [this](simppl::dbus::ConnectionState s)
+      {
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+         this->hello.async();
+      };
+      
+      hello >> [this](simppl::dbus::CallState state)
+      {
+         EXPECT_TRUE((bool)state);
+         EXPECT_FALSE(state.isTransportError());
+         EXPECT_FALSE(state.isRuntimeError());
 
+         this->oneway(42);
 
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      hello.async();
-   }
-
-
-   void handleWorld(simppl::dbus::CallState state)
-   {
-      EXPECT_TRUE((bool)state);
-      EXPECT_FALSE(state.isTransportError());
-      EXPECT_FALSE(state.isRuntimeError());
-
-      oneway(42);
-
-      // shutdown
-      oneway(7777);
+         // shutdown
+         this->oneway(7777);
+      };
    }
 };
 
@@ -87,23 +82,21 @@ struct DisconnectClient : simppl::dbus::Stub<Simple>
    DisconnectClient()
     : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
    {
-      connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
-   }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expected_, s);
-
-      if (s == simppl::dbus::ConnectionState::Connected)
+      connected >> [this](simppl::dbus::ConnectionState s)
       {
-         oneway(7777);
-      }
-      else
-         disp().stop();
+         EXPECT_EQ(this->expected_, s);
 
-      expected_ = simppl::dbus::ConnectionState::Disconnected;
+         if (s == simppl::dbus::ConnectionState::Connected)
+         {
+            this->oneway(7777);
+         }
+         else
+            this->disp().stop();
+
+         this->expected_ = simppl::dbus::ConnectionState::Disconnected;      
+      };
    }
+
 
    simppl::dbus::ConnectionState expected_ = simppl::dbus::ConnectionState::Connected;
 };
@@ -114,18 +107,17 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
    AttributeClient()
     : simppl::dbus::Stub<Simple>("sa", "unix:SimpleTest")
    {
-      connected >> std::bind(&AttributeClient::handleConnected, this, _1);
+      connected >> [this](simppl::dbus::ConnectionState s)
+      {
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+         // like for signals, attributes must be attached when the client is connected
+         this->data.attach() >> [this](simppl::dbus::CallState state, int new_value)
+         {
+            this->attributeChanged(state, new_value);
+         };
+      };
    }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-
-      // like for signals, attributes must be attached when the client is connected
-      data.attach() >> std::bind(&AttributeClient::attributeChanged, this, _1, _2);
-   }
-
 
    void attributeChanged(simppl::dbus::CallState state, int new_value)
    {
@@ -160,17 +152,18 @@ struct SignalClient : simppl::dbus::Stub<Simple>
    SignalClient()
     : simppl::dbus::Stub<Simple>("ss", "unix:SimpleTest")
    {
-      connected >> std::bind(&SignalClient::handleConnected, this, _1);
-   }
+      connected >> [this](simppl::dbus::ConnectionState s)
+      {
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-
-      // like for attributes, attributes must be attached when the client is connected
-      sig.attach() >> std::bind(&SignalClient::handleSignal, this, _1);
-      oneway(100);
+         // like for attributes, attributes must be attached when the client is connected
+         this->sig.attach() >> [this](int value)
+         {
+            this->handleSignal(value);
+         };
+         
+         this->oneway(100);
+      };
    }
 
 

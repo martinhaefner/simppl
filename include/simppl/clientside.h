@@ -369,22 +369,19 @@ struct ClientRequest
        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
 
        ClientRequest* that = (ClientRequest*)data;
+       assert(that->f_);
+      
+       CallState cs(*msg);
 
-       if (that->f_)
-       {
-           CallState cs(*msg);
-
-           detail::Deserializer d(msg.get());
-           detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
-       }
+       detail::Deserializer d(msg.get());
+       detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
    }
-
-
+   
+   
    template<typename FunctorT>
-   inline
-   void handledBy(FunctorT func)
+   void handledBy(FunctorT f)
    {
-      f_ = func;
+      f_ = f;
    }
 
 
