@@ -198,47 +198,46 @@ struct Server : simppl::dbus::Skeleton<Simple>
    Server(const char* rolename)
     : simppl::dbus::Skeleton<Simple>(rolename)
    {
-      hello >> std::bind(&Server::handleHello, this);
-      oneway >> std::bind(&Server::handleOneway, this, _1);
-      add >> std::bind(&Server::handleAdd, this, _1, _2);
-      echo >> std::bind(&Server::handleEcho, this, _1, _2);
-
       // initialize attribute
       data = 4711;
-   }
-
-   void handleHello()
-   {
-      respondWith(hello());
-   }
-
-   void handleOneway(int i)
-   {
-      ++count_oneway_;
-
-      if (i == 7777)
+      
+      // initialize handlers
+      hello >> [this]()
       {
-         disp().stop();
-      }
-      else if (i < 100)
+         this->respondWith(hello());
+      };
+      
+      
+      oneway >> [this](int i)
       {
-         EXPECT_EQ(42, i);
-         data = 42;
-      }
-      else
-         sig.emit(i);
-   }
+         ++this->count_oneway_;
 
-   void handleAdd(int i, double d)
-   {
-      respondWith(add(i*d));
+         if (i == 7777)
+         {
+            this->disp().stop();
+         }
+         else if (i < 100)
+         {
+            EXPECT_EQ(42, i);
+            this->data = 42;
+         }
+         else
+            this->sig.emit(i);
+      };
+      
+      
+      add >> [this](int i, double d)
+      {
+         this->respondWith(add(i*d));
+      };
+      
+      
+      echo >> [this](int i, double d)
+      {
+         this->respondWith(echo(i, d));
+      };
    }
-
-   void handleEcho(int i, double d)
-   {
-      respondWith(echo(i, d));
-   }
-
+   
    int count_oneway_ = 0;
 };
 
