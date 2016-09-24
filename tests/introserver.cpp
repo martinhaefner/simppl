@@ -91,8 +91,8 @@ INTERFACE(Attributes)
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
    
-   // FIXME without arg possible?
    Signal<int> mayShutdown;
+   Signal<> hi;
 
    inline
    Attributes()
@@ -102,6 +102,7 @@ INTERFACE(Attributes)
     , INIT(data)
     , INIT(props)
     , INIT(mayShutdown)
+    , INIT(hi)
    {
       // NOOP
    }
@@ -143,6 +144,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       props = new_props;
 
       mayShutdown.emit(42);
+      hi.emit();
    }
    
    void handle_get_all()
@@ -168,7 +170,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       mainmenu.entries_["Settings"] = std::make_tuple(5, Menu::entry_type(settings));
       mainmenu.entries_["Security"] = std::make_tuple(6, Menu::entry_type(security));
       
-      // FIXME respondWith(get_all_r(mainmenu));
+      respondWith(get_all(mainmenu));
    }
 
    int calls_ = 0;

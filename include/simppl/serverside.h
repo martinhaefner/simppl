@@ -242,11 +242,11 @@ protected:
 
 
 template<typename DataT>
-struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
+struct BaseAttribute : ServerAttributeBase
 {
    inline
    BaseAttribute(const char* name, detail::BasicInterface* iface)
-    : ServerSignal<DataT>(name, iface)
+    : sig_(name, iface)
     , ServerAttributeBase(name, iface)
    {
       // NOOP
@@ -269,6 +269,7 @@ struct BaseAttribute : ServerSignal<DataT>, ServerAttributeBase
 protected:
 
    DataT t_;
+   ServerSignal<DataT> sig_;
 };
 
 
@@ -287,7 +288,7 @@ struct ServerAttribute : BaseAttribute<DataT>
    ServerAttribute& operator=(const DataT& data)
    {
       // FIXME if emitting...
-      this->emit(data);
+      this->sig_.emit(data);
 
       this->t_ = data;
       return *this;
