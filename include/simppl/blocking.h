@@ -33,7 +33,7 @@ private:
 template<typename T>
 struct BlockingResponseHandler
 {
-   BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t);
+   BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, uint32_t serial, T& t);
 
    void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type t);
 
@@ -42,13 +42,14 @@ private:
    T& t_;
    simppl::dbus::Dispatcher& disp_;
    simppl::dbus::ClientResponse<T>& r_;
+   uint32_t serial_;
 };
 
 
 template<typename... T>
 struct BlockingResponseHandlerN
 {
-   BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t);
+   BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, uint32_t serial, std::tuple<T...>& t);
 
    void operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type... t);
 
@@ -57,6 +58,7 @@ private:
    std::tuple<T...>& t_;
    simppl::dbus::Dispatcher& disp_;
    simppl::dbus::ClientResponse<T...>& r_;
+   uint32_t serial_;
 };
 
 }   // namespace detail
@@ -96,7 +98,7 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, T& t)
    ClientResponse<T>* r = safe_cast<ClientResponse<T>*>(resp.r_);
    assert(r);
 
-   detail::BlockingResponseHandler<T> handler(*this, *r, t);
+   detail::BlockingResponseHandler<T> handler(*this, *r, resp.serial_, t);
    loop();
 }
 
@@ -110,7 +112,7 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp, std::
    ClientResponse<T...>* r = safe_cast<ClientResponse<T...>*>(resp.r_);
    assert(r);
 
-   detail::BlockingResponseHandlerN<T...> handler(*this, *r, t);
+   detail::BlockingResponseHandlerN<T...> handler(*this, *r, resp.serial_, t);
    loop();
 }
 
@@ -146,10 +148,11 @@ void BlockingAttributeResponseHandler<AttributeT>::operator()(CallState state, t
 
 template<typename T>
 inline
-BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, T& t)
+BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T>& r, uint32_t serial, T& t)
  : t_(t)
  , disp_(disp)
  , r_(r)
+ , serial_(serial)
 {
    r_.handledBy(std::ref(*this));
 }
@@ -158,24 +161,28 @@ BlockingResponseHandler<T>::BlockingResponseHandler(simppl::dbus::Dispatcher& di
 template<typename T>
 void BlockingResponseHandler<T>::operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type t)
 {
-   disp_.stop();
-   r_.handledBy(std::nullptr_t());
+   if (state.sequenceNr() == serial_)
+   {
+      disp_.stop();
+      r_.handledBy(std::nullptr_t());
 
-   // do not allow to propagate the exception through the dbus C library, otherwise we could have severe
-   // trouble if libdbus is not compiled with exception support.
-   if (!state)
-      disp_.propagate(state);
+      // do not allow to propagate the exception through the dbus C library, otherwise we could have severe
+      // trouble if libdbus is not compiled with exception support.
+      if (!state)
+         disp_.propagate(state);
 
-   t_ = t;
+      t_ = t;
+   }
 }
 
 
 template<typename... T>
 inline
-BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, std::tuple<T...>& t)
+BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<T...>& r, uint32_t serial, std::tuple<T...>& t)
  : t_(t)
  , disp_(disp)
  , r_(r)
+ , serial_(serial)
 {
    r_.handledBy(std::ref(*this));
 }
@@ -184,13 +191,16 @@ BlockingResponseHandlerN<T...>::BlockingResponseHandlerN(simppl::dbus::Dispatche
 template<typename... T>
 void BlockingResponseHandlerN<T...>::operator()(simppl::dbus::CallState state, typename CallTraits<T>::param_type... t)
 {
-   disp_.stop();
-   r_.handledBy(std::nullptr_t());
+   if (state.sequenceNr() == serial_)
+   {
+      disp_.stop();
+      r_.handledBy(std::nullptr_t());
 
-   if (!state)
-      disp_.propagate(state);
+      if (!state)
+         disp_.propagate(state);
 
-   t_ = std::make_tuple(t...);
+      t_ = std::make_tuple(t...);
+   }
 }
 
 

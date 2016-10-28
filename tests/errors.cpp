@@ -166,4 +166,24 @@ TEST(Errors, blocking)
    {
       ASSERT_FALSE(true);
    }
+
+   try
+   {
+      int res;
+
+      // forget handler
+      stub.hello1(101);
+      stub.hello1(101) >> res;
+
+      // never reach
+      ASSERT_FALSE(true);
+   }
+   catch(const simppl::dbus::RuntimeError& e)
+   {
+      EXPECT_EQ(0, strcmp(e.what(), "Also shit"));
+   }
+   catch(...)
+   {
+      ASSERT_FALSE(true);
+   }
 }

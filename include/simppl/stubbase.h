@@ -39,12 +39,12 @@ struct StubBase
    template<typename... T> friend struct ClientRequest;
    template<typename, int> friend struct ClientAttribute;
    template<typename, typename> friend struct ClientAttributeWritableMixin;
-   
+
    friend struct Dispatcher;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
-   
+
 protected:
 
    virtual ~StubBase();
@@ -89,7 +89,7 @@ public:
    }
 
    /**
-    * Blocking connect. Throws exception on timeout. 
+    * Blocking connect. Throws exception on timeout.
     */
    void connect();
 
@@ -97,11 +97,12 @@ public:
 protected:
 
    void cleanup();
-   
+
    static
    void pending_notify(DBusPendingCall* pc, void* user_data);
- 
-   DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
+
+   /// @return request serial
+   uint32_t sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 
    inline
    std::string boundname() const
@@ -114,7 +115,7 @@ protected:
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
-   
+
    char* iface_;
    char* role_;
    char* objectpath_;

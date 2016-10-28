@@ -335,6 +335,13 @@ TEST(Simple, blocking)
    EXPECT_EQ(4711, stub.data.value());
 
    EXPECT_EQ(3, s.count_oneway_);
+
+   // test missing handler - send the request two times, but let the
+   // dispatcher loop until the second arrived!
+   stub.echo(1, 0.5);
+   stub.echo(2, 3.1415) >> std::tie(i, x);
+
+   EXPECT_EQ(2, i);
 }
 
 

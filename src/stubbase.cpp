@@ -99,16 +99,16 @@ Dispatcher& StubBase::disp()
 }
 
 
-DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f)
+uint32_t StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f)
 {
     DBusMessage* msg = dbus_message_new_method_call(boundname().c_str(), objectpath(), iface(), req.method_name_);
-    DBusPendingCall* pending = nullptr;
 
     detail::Serializer s(msg);
     f(s);
 
     if (req.handler_)
     {
+        DBusPendingCall* pending = nullptr;
         int timeout = disp().request_timeout();
 
         if (detail::request_specific_timeout.count() > 0)
@@ -123,10 +123,12 @@ DBusPendingCall* StubBase::sendRequest(ClientRequestBase& req, std::function<voi
        dbus_connection_flush(disp().conn_);
     }
 
+    uint32_t serial = dbus_message_get_serial(msg);
+
     dbus_message_unref(msg);
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
-    return pending;
+    return serial;
 }
 
 

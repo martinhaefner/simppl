@@ -34,9 +34,10 @@ get_lookup_duetime()
 struct BlockingResponseHandler0
 {
    inline
-   BlockingResponseHandler0(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<>& r)
+   BlockingResponseHandler0(simppl::dbus::Dispatcher& disp, simppl::dbus::ClientResponse<>& r, uint32_t serial)
     : disp_(disp)
     , r_(r)
+    , serial_(serial)
    {
       r_.handledBy(std::ref(*this));
    }
@@ -44,15 +45,19 @@ struct BlockingResponseHandler0
    inline
    void operator()(simppl::dbus::CallState state)
    {
-      disp_.stop();
-      r_.handledBy(std::nullptr_t());
+      if (state.sequenceNr() == serial_)
+      {
+          disp_.stop();
+          r_.handledBy(std::nullptr_t());
 
-      if (!state)
-         disp_.propagate(state);
+         if (!state)
+            disp_.propagate(state);
+      }
    }
 
    simppl::dbus::Dispatcher& disp_;
    simppl::dbus::ClientResponse<>& r_;
+   uint32_t serial_;
 };
 
 
@@ -625,7 +630,7 @@ void Dispatcher::waitForResponse(const detail::ClientResponseHolder& resp)
    ClientResponse<>* r = safe_cast<ClientResponse<>*>(resp.r_);
    assert(r);
 
-   BlockingResponseHandler0 handler(*this, *r);
+   BlockingResponseHandler0 handler(*this, *r, resp.serial_);
    loop();
 }
 
