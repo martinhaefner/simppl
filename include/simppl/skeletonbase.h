@@ -27,12 +27,14 @@ struct SkeletonBase
 {
    SkeletonBase(const SkeletonBase&) = delete;
    SkeletonBase& operator=(const SkeletonBase&) = delete;
-   
+
    friend struct Dispatcher;
 
    static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
 
    SkeletonBase(const char* iface, const char* role);
+
+   SkeletonBase(const char* iface, const char* busname, const char* objectpath);
 
    virtual ~SkeletonBase();
 
@@ -62,17 +64,17 @@ struct SkeletonBase
    }
 
    inline
-   const char* role() const
-   {
-      return role_;
-   }
-
-   inline
    const char* objectpath() const
    {
       return objectpath_;
    }
-   
+
+   inline
+   const char* busname() const
+   {
+       return busname_;
+   }
+
 
 protected:
 
@@ -82,7 +84,7 @@ protected:
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();
 
    char* iface_;
-   char* role_;
+   char* busname_;
    char* objectpath_;
 
    Dispatcher* disp_;

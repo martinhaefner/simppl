@@ -7,6 +7,8 @@
 #include <map>
 
 #include "simppl/attribute.h"
+#include "simppl/objectpath.h"
+
 #include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/serverrequestbasesetter.h"

@@ -15,7 +15,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -23,28 +23,34 @@ namespace dbus
 template<typename> struct InterfaceNamer;
 
 
-template<template<template<typename...> class, 
+template<template<template<typename...> class,
                   template<typename...> class,
                   template<typename...> class,
-                  template<typename,int> class> 
+                  template<typename,int> class>
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute>
-{   
+{
    friend struct Dispatcher;
-   
+
 private:
 
    typedef IfaceT<ClientRequest, ClientResponse, ClientSignal, ClientAttribute> interface_type;
-   
+
 public:
-   
+
+   Stub(const char* role)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role)
+   {
+       // NOOP
+   }
+
    /**
     * @param unused For compatibility reason to socket based simppl only. Unused on dbus.
     */
-   Stub(const char* role, const char* unused = nullptr)
-    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role)
+   Stub(const char* busname, const char* objectpath)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, busname, objectpath)
    {
-      (void)unused;   // make compiler happy
+      // NOOP
    }
 };
 

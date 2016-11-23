@@ -77,6 +77,14 @@ struct Variant
       // NOOP
    }
 
+
+   inline
+   ~Variant()
+   {
+       try_destroy();
+   }
+
+
    template<typename _T>
    inline
    Variant(const _T& t)             // FIXME use calltraits here

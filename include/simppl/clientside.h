@@ -309,6 +309,7 @@ struct ClientRequest : ClientRequestBase
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
       std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serializeN<typename CallTraits<T>::param_type...>, std::placeholders::_1, t...));
+
       stub->sendRequest(*this, f);
 
       return detail::ClientResponseHolder(stub->disp(), handler_);

@@ -76,20 +76,38 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 
 SkeletonBase::SkeletonBase(const char* iface, const char* role)
  : iface_(detail::extract_interface(iface))
- , role_(nullptr)
+ , busname_(nullptr)
  , objectpath_(nullptr)
  , disp_(nullptr)
 {
    assert(role);
-   std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
+   objectpath_ = detail::create_objectpath(iface_, role);
+   busname_ = detail::create_busname(iface_, role);
+}
+
+
+SkeletonBase::SkeletonBase(const char* iface, const char* busname, const char* objectpath)
+ : iface_(detail::extract_interface(iface))
+ , busname_(nullptr)
+ , objectpath_(nullptr)
+ , disp_(nullptr)
+{
+   assert(busname);
+   assert(objectpath);
+
+   busname_ = new char[strlen(busname) + 1];
+   strcpy(busname_, busname);
+
+   objectpath_ = new char[strlen(objectpath)+1];
+   strcpy(objectpath_, objectpath);
 }
 
 
 SkeletonBase::~SkeletonBase()
 {
    delete[] iface_;
+   delete[] busname_;
    delete[] objectpath_;
-   role_ = nullptr;
 }
 
 
@@ -123,8 +141,8 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
    }
 
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
-
    dbus_message_unref(rmsg);
+
    current_request_.clear();   // only respond once!!!
 }
 
@@ -135,8 +153,6 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
    DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
-   // FIXME is this necessary?
-   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
    if (response.f_)
    {
@@ -156,7 +172,7 @@ void SkeletonBase::respondWith(const RuntimeError& err)
    assert(current_request_);
    assert(current_request_.requestor_->hasResponse());
 
-   DBusMessage* rmsg = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
+   DBusMessage* rmsg = err.create_dbus_message(*currentRequest().msg_);
 
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
 
@@ -170,13 +186,11 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& e
    assert(req);
    assert(req.requestor_->hasResponse());
 
-   DBusMessage* rmsg = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
-   // FIXME is this necessary?
-   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
+   DBusMessage* rmsg = err.create_dbus_message(*req.msg_);
 
    dbus_connection_send(disp_->conn_, rmsg, nullptr);
-
    dbus_message_unref(rmsg);
+
    req.clear();
 }
 
@@ -201,7 +215,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          std::ostringstream oss;
 
          oss << "<?xml version=\"1.0\" ?>\n"
-             "<node name=\""<< role() << "\">\n"
+             "<node name=\""<< objectpath() << "\">\n"
              "  <interface name=\""<< iface() << "\">\n";
 
          auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
@@ -312,7 +326,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
           return DBUS_HANDLER_RESULT_HANDLED;
       }
       else
-         std::cout << "method '" << method << "' unknown" << std::endl;
+         std::cerr << "method '" << method << "' unknown" << std::endl;
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

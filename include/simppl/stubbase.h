@@ -39,12 +39,12 @@ struct StubBase
    template<typename... T> friend struct ClientRequest;
    template<typename, int> friend struct ClientAttribute;
    template<typename, typename> friend struct ClientAttributeWritableMixin;
-   
+
    friend struct Dispatcher;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
-   
+
 protected:
 
    virtual ~StubBase();
@@ -55,16 +55,13 @@ public:
 
    StubBase(const char* iface, const char* role);
 
+   // FIXME use ObjectPath instead of const char*
+   StubBase(const char* iface, const char* busname, const char* objectpath);
+
    inline
    const char* iface() const
    {
       return iface_;
-   }
-
-   inline
-   const char* role() const
-   {
-      return role_;
    }
 
    inline
@@ -89,7 +86,7 @@ public:
    }
 
    /**
-    * Blocking connect. Throws exception on timeout. 
+    * Blocking connect. Throws exception on timeout.
     */
    void connect();
 
@@ -97,10 +94,10 @@ public:
 protected:
 
    void cleanup();
-   
+
    static
    void pending_notify(DBusPendingCall* pc, void* user_data);
- 
+
    DBusPendingCall* sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 
    inline
@@ -114,9 +111,8 @@ protected:
 
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
-   
+
    char* iface_;
-   char* role_;
    char* objectpath_;
    std::string busname_;
    ConnectionState conn_state_;
