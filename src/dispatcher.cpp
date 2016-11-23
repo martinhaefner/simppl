@@ -469,23 +469,29 @@ void Dispatcher::addServer(SkeletonBase& serv)
    DBusError err;
    dbus_error_init(&err);
 
-   std::ostringstream busname;
-   busname << serv.iface() << '.' << serv.role();
+   dbus_bus_request_name(conn_, serv.busname(), 0, &err);
 
-   dbus_bus_request_name(conn_, busname.str().c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
    if (dbus_error_is_set(&err))
    {
        std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
+       dbus_error_free(&err);
    }
-   //assert(!dbus_error_is_set(&err));
 
-   dbus_error_free(&err);
+   //assert(!dbus_error_is_set(&err));
 
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
 
-   // register same path as busname, just with / instead of .
-   dbus_connection_register_object_path(conn_, serv.objectpath(), &stub_v_table, &serv);
+   dbus_error_init(&err);
+
+   // register object path
+   dbus_connection_try_register_object_path(conn_, serv.objectpath(), &stub_v_table, &serv, &err);
+
+   if (dbus_error_is_set(&err))
+   {
+       std::cerr << "dbus_connection_register_object_path - DBus error: " << err.name << ": " << err.message << std::endl;
+       dbus_error_free(&err);
+   }
 
    serv.disp_ = this;
 }
@@ -741,9 +747,7 @@ int Dispatcher::run()
    running_.store(true);
 
    while(running_.load())
-   {
        step_ms(100);
-   }
 }
 
 }   // namespace dbus

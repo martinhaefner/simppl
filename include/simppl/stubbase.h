@@ -55,16 +55,13 @@ public:
 
    StubBase(const char* iface, const char* role);
 
+   // FIXME use ObjectPath instead of const char*
+   StubBase(const char* iface, const char* busname, const char* objectpath);
+
    inline
    const char* iface() const
    {
       return iface_;
-   }
-
-   inline
-   const char* role() const
-   {
-      return role_;
    }
 
    inline
@@ -101,7 +98,6 @@ protected:
    static
    void pending_notify(DBusPendingCall* pc, void* user_data);
 
-   /// @return request serial
    uint32_t sendRequest(ClientRequestBase& req, std::function<void(detail::Serializer&)> f);
 
    inline
@@ -117,7 +113,6 @@ protected:
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
 
    char* iface_;
-   char* role_;
    char* objectpath_;
    std::string busname_;
    ConnectionState conn_state_;

@@ -37,6 +37,14 @@ detail::Serializer& detail::Serializer::write(const char* str)
 }
 
 
+detail::Serializer& detail::Serializer::write(const ObjectPath& p)
+{
+   char* c_str = const_cast<char*>(p.path.c_str());
+   dbus_message_iter_append_basic(iter_, DBUS_TYPE_OBJECT_PATH, &c_str);
+   return *this;
+}
+
+
 // ----------------------------------------------------------------------------
 
 
@@ -87,6 +95,24 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
 
    return *this;
 }
+
+
+detail::Deserializer& detail::Deserializer::read(ObjectPath& p)
+{
+   char* c_str = 0;
+   dbus_message_iter_get_basic(iter_, &c_str);
+   dbus_message_iter_next(iter_);
+
+   if (c_str)
+   {
+      p.path.assign(c_str);
+   }
+   else
+      p.path.clear();
+
+   return *this;
+}
+
 
 }   // namespace dbus
 

@@ -7,9 +7,10 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
+
 
 template<typename... T>
 struct make_serializer

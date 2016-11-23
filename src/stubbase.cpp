@@ -21,18 +21,33 @@ namespace dbus
 
 StubBase::StubBase(const char* iface, const char* role)
  : iface_(detail::extract_interface(iface))
- , role_(nullptr)
  , objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
 {
    assert(role);
-   std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
+   objectpath_ = detail::create_objectpath(iface_, role);
 
-   busname_.reserve(strlen(this->iface()) + 1 + strlen(this->role()));
+   busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
    busname_ = this->iface();
    busname_ += ".";
-   busname_ += this->role();
+   busname_ += role;
+}
+
+
+StubBase::StubBase(const char* iface, const char* busname, const char* objectpath)
+ : iface_(detail::extract_interface(iface))
+ , objectpath_(nullptr)
+ , conn_state_(ConnectionState::Disconnected)
+ , disp_(nullptr)
+{
+   assert(busname);
+   assert(objectpath);
+
+   objectpath_ = new char[strlen(objectpath)+1];
+   strcpy(objectpath_, objectpath);
+
+   busname_ = busname;
 }
 
 
@@ -43,7 +58,6 @@ StubBase::~StubBase()
 
    delete[] iface_;
    delete[] objectpath_;
-   role_ = nullptr;
 }
 
 
@@ -206,10 +220,23 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
     s << iface() << name;
     f(s);   // and now serialize the variant
 
-    dbus_connection_send(disp().conn_, msg, nullptr);
-    dbus_connection_flush(disp().conn_);
+    DBusError err;
+    dbus_error_init(&err);
 
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg, DBUS_TIMEOUT_USE_DEFAULT, &err);
+
+    // drop original message
     dbus_message_unref(msg);
+
+    // check for reponse
+    if (dbus_error_is_set(&err))
+    {
+        // FIXME create classes for each defined dbus error message
+        UserError ex(err.name, err.message);
+
+        dbus_error_free(&err);
+        throw ex;
+    }
 }
 
 

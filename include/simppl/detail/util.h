@@ -7,7 +7,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -15,11 +15,14 @@ namespace detail
 {
 
 /**
- * @return a tuple with <0> a pointer to the objectpath which has to be deleted[]
- *         when unused any more and <1> a pointer to the rolename which points
- *         to the rolename within the objectpath.
+ * Trivially mangle iface with role to create objectpath.
  */
-std::tuple<char*, char*> create_objectpath(const char* iface, const char* role);   
+char* create_objectpath(const char* iface, const char* role);
+
+/**
+ * Trivially mangle iface with role to create busname.
+ */
+char* create_busname(const char* iface, const char* role);
 
 
 /**

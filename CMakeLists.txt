@@ -6,6 +6,8 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_FLAGS "-std=c++1y -g -pthread")
 
+add_definitions(-DSIMPPL_HAVE_INTROSPECTION)
+
 include_directories(include)
 
 # DBus includes
