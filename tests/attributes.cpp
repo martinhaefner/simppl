@@ -37,7 +37,7 @@ INTERFACE(Attributes)
    Attribute<std::map<ident_t, std::string>> props;
 
    Signal<int> mayShutdown;
-   
+
    inline
    Attributes()
     : INIT(set)
@@ -60,8 +60,8 @@ namespace {
 
 struct Client : simppl::dbus::Stub<Attributes>
 {
-   Client()
-    : simppl::dbus::Stub<Attributes>("s")
+   Client(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Attributes>(d, "s")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
    }
@@ -120,8 +120,8 @@ struct Client : simppl::dbus::Stub<Attributes>
 
 struct MultiClient : simppl::dbus::Stub<Attributes>
 {
-   MultiClient(bool attach)
-    : simppl::dbus::Stub<Attributes>("s")
+   MultiClient(simppl::dbus::Dispatcher& d, bool attach)
+    : simppl::dbus::Stub<Attributes>(d, "s")
     , attach_(attach)
    {
       connected >> std::bind(&MultiClient::handleConnected, this, _1);
@@ -169,8 +169,8 @@ struct MultiClient : simppl::dbus::Stub<Attributes>
 
 struct SetterClient : simppl::dbus::Stub<Attributes>
 {
-   SetterClient()
-    : simppl::dbus::Stub<Attributes>("s")
+   SetterClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Attributes>(d, "s")
    {
       connected >> std::bind(&SetterClient::handleConnected, this, _1);
    }
@@ -206,8 +206,8 @@ struct SetterClient : simppl::dbus::Stub<Attributes>
 
 struct Server : simppl::dbus::Skeleton<Attributes>
 {
-   Server(const char* rolename)
-    : simppl::dbus::Skeleton<Attributes>(rolename)
+   Server(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Attributes>(d, rolename)
    {
       shutdown >> std::bind(&Server::handleShutdown, this);
       set >> std::bind(&Server::handleSet, this, _1, _2);
@@ -232,7 +232,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       new_props[(ident_t)id] = str;
 
       props = new_props;
-      
+
       mayShutdown.emit(42);
    }
 
@@ -246,11 +246,8 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 TEST(Attributes, attr)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   Client c;
-   Server s("s");
-
-   d.addClient(c);
-   d.addServer(s);
+   Client c(d);
+   Server s(d, "s");
 
    d.run();
 
@@ -262,13 +259,9 @@ TEST(Attributes, attr)
 TEST(Attributes, multiple_attach)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   MultiClient c1(true);
-   MultiClient c2(false);
-   Server s("s");
-
-   d.addClient(c1);
-   d.addClient(c2);
-   d.addServer(s);
+   MultiClient c1(d, true);
+   MultiClient c2(d, false);
+   Server s(d, "s");
 
    d.run();
 
@@ -277,14 +270,34 @@ TEST(Attributes, multiple_attach)
 }
 
 
+namespace
+{
+    void blockrunner()
+    {
+       simppl::dbus::Dispatcher d("dbus:session");
+       Server s(d, "s");
+
+       d.run();
+    }
+}
+
+
+// FIXME currently, set is only possible within blocking calls, no eventloop driven client
 TEST(Attributes, set)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   SetterClient c;
-   Server s("s");
 
-   d.addClient(c);
-   d.addServer(s);
+   std::thread t(blockrunner);
 
-   d.run();
+   simppl::dbus::Stub<Attributes> c(d, "s");
+
+   c.connect();
+
+   c.data = 5555;
+   int val = c.data.get();
+
+   EXPECT_EQ(val, 5555);
+
+   c.shutdown();   // stop server
+   t.join();
 }

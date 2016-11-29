@@ -20,9 +20,9 @@ namespace test
 INTERFACE(Simple)
 {
    Request<> hello;
-   
+
    Request<in<int>, simppl::dbus::Oneway> oneway;
-   
+
    Request<in<int>, in<double>, out<double>> add;
    Request<in<int>, in<double>, out<int>, out<double>> echo;
 
@@ -53,20 +53,18 @@ namespace {
 
 struct Client : simppl::dbus::Stub<Simple>
 {
-   Client()
-    : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
+   Client(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "s")
    {
       connected >> [this](simppl::dbus::ConnectionState s)
       {
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
          this->hello.async();
       };
-      
+
       hello >> [this](simppl::dbus::CallState state)
       {
          EXPECT_TRUE((bool)state);
-         EXPECT_FALSE(state.isTransportError());
-         EXPECT_FALSE(state.isRuntimeError());
 
          this->oneway(42);
 
@@ -79,8 +77,8 @@ struct Client : simppl::dbus::Stub<Simple>
 
 struct DisconnectClient : simppl::dbus::Stub<Simple>
 {
-   DisconnectClient()
-    : simppl::dbus::Stub<Simple>("s", "unix:SimpleTest")
+   DisconnectClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "s")
    {
       connected >> [this](simppl::dbus::ConnectionState s)
       {
@@ -93,7 +91,7 @@ struct DisconnectClient : simppl::dbus::Stub<Simple>
          else
             this->disp().stop();
 
-         this->expected_ = simppl::dbus::ConnectionState::Disconnected;      
+         this->expected_ = simppl::dbus::ConnectionState::Disconnected;
       };
    }
 
@@ -104,8 +102,8 @@ struct DisconnectClient : simppl::dbus::Stub<Simple>
 
 struct AttributeClient : simppl::dbus::Stub<Simple>
 {
-   AttributeClient()
-    : simppl::dbus::Stub<Simple>("sa", "unix:SimpleTest")
+   AttributeClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "sa")
    {
       connected >> [this](simppl::dbus::ConnectionState s)
       {
@@ -122,7 +120,7 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
    void attributeChanged(simppl::dbus::CallState state, int new_value)
    {
       EXPECT_TRUE((bool)state);
-      
+
       if (first_)
       {
          // first you get the current value
@@ -149,8 +147,8 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
 
 struct SignalClient : simppl::dbus::Stub<Simple>
 {
-   SignalClient()
-    : simppl::dbus::Stub<Simple>("ss", "unix:SimpleTest")
+   SignalClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "ss")
    {
       connected >> [this](simppl::dbus::ConnectionState s)
       {
@@ -161,7 +159,7 @@ struct SignalClient : simppl::dbus::Stub<Simple>
          {
             this->handleSignal(value);
          };
-         
+
          this->oneway(100);
       };
    }
@@ -188,19 +186,19 @@ struct SignalClient : simppl::dbus::Stub<Simple>
 
 struct Server : simppl::dbus::Skeleton<Simple>
 {
-   Server(const char* rolename)
-    : simppl::dbus::Skeleton<Simple>(rolename)
+   Server(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Simple>(d, rolename)
    {
       // initialize attribute
       data = 4711;
-      
+
       // initialize handlers
       hello >> [this]()
       {
          this->respondWith(hello());
       };
-      
-      
+
+
       oneway >> [this](int i)
       {
          ++this->count_oneway_;
@@ -217,20 +215,20 @@ struct Server : simppl::dbus::Skeleton<Simple>
          else
             this->sig.emit(i);
       };
-      
-      
+
+
       add >> [this](int i, double d)
       {
          this->respondWith(add(i*d));
       };
-      
-      
+
+
       echo >> [this](int i, double d)
       {
          this->respondWith(echo(i, d));
       };
    }
-   
+
    int count_oneway_ = 0;
 };
 
@@ -241,11 +239,8 @@ struct Server : simppl::dbus::Skeleton<Simple>
 TEST(Simple, methods)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   Client c;
-   Server s("s");
-
-   d.addClient(c);
-   d.addServer(s);
+   Client c(d);
+   Server s(d, "s");
 
    d.run();
 }
@@ -254,11 +249,8 @@ TEST(Simple, methods)
 TEST(Simple, signal)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   SignalClient c;
-   Server s("ss");
-
-   d.addClient(c);
-   d.addServer(s);
+   SignalClient c(d);
+   Server s(d, "ss");
 
    d.run();
 
@@ -269,11 +261,8 @@ TEST(Simple, signal)
 TEST(Simple, attribute)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   AttributeClient c;
-   Server s("sa");
-
-   d.addClient(c);
-   d.addServer(s);
+   AttributeClient c(d);
+   Server s(d, "sa");
 
    d.run();
 }
@@ -283,11 +272,10 @@ void blockrunner()
 {
    simppl::dbus::Dispatcher d("dbus:session");
 
-   Server s("sb");
-   d.addServer(s);
-   
+   Server s(d, "sb");
+
    d.run();
-   
+
    EXPECT_EQ(4, s.count_oneway_);
 }
 
@@ -297,9 +285,8 @@ TEST(Simple, blocking)
    simppl::dbus::Dispatcher d("dbus:session");
 
    std::thread t(blockrunner);
-   
-   simppl::dbus::Stub<Simple> stub("sb", "dbus:session");
-   d.addClient(stub);
+
+   simppl::dbus::Stub<Simple> stub(d, "sb");
 
    stub.connect();
 
@@ -332,7 +319,7 @@ TEST(Simple, blocking)
    dv = stub.data.get();
    EXPECT_EQ(4711, dv);
    EXPECT_EQ(4711, stub.data.value());
-   
+
    stub.oneway(7777);   // stop server
    t.join();
 }
@@ -342,13 +329,11 @@ TEST(Simple, disconnect)
 {
    simppl::dbus::Dispatcher clientd;
 
-   DisconnectClient c;
-   clientd.addClient(c);
+   DisconnectClient c(clientd);
 
    {
       simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("dbus:session");
-      Server* s = new Server("s");
-      serverd->addServer(*s);
+      Server* s = new Server(*serverd, "s");
 
       std::thread serverthread([serverd, s](){
          serverd->run();

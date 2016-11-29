@@ -16,14 +16,14 @@ using simppl::dbus::out;
 
 namespace test
 {
-   
+
 INTERFACE(Errors)
-{   
+{
    Request<simppl::dbus::Oneway> stop;
-   
+
    Request<> hello;
    Request<in<int>, out<int>> hello1;
-   
+
    inline
    Errors()
     : INIT(stop)
@@ -40,45 +40,41 @@ using namespace test;
 
 
 namespace {
-   
+
 
 struct Client : simppl::dbus::Stub<Errors>
 {
-   Client()   
-    : simppl::dbus::Stub<Errors>("s", "unix:ErrorsTest")    
+   Client(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Errors>(d, "s")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
-      
+
       hello >> std::bind(&Client::handleHello, this, _1);
       hello1 >> std::bind(&Client::handleHello1, this, _1, _2);
    }
-   
-   
+
+
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       hello.async();
    }
-   
-   
+
+
    void handleHello(simppl::dbus::CallState state)
    {
       EXPECT_FALSE((bool)state);
-      EXPECT_FALSE(state.isTransportError());
-      EXPECT_TRUE(state.isRuntimeError());
-      EXPECT_EQ(0, strcmp(state.what(), "Shit happens"));
-      
+      EXPECT_STREQ(state.exception().name(), "shit.happens");
+
       hello1.async(42);
    }
-   
-   
+
+
    void handleHello1(simppl::dbus::CallState state, int)
    {
       EXPECT_FALSE((bool)state);
-      EXPECT_FALSE(state.isTransportError());
-      EXPECT_TRUE(state.isRuntimeError());
-      EXPECT_EQ(0, strcmp(state.what(), "Also shit"));
-      
+      EXPECT_STREQ(state.exception().name(), "also.shit");
+
       disp().stop();
    }
 };
@@ -86,27 +82,27 @@ struct Client : simppl::dbus::Stub<Errors>
 
 struct Server : simppl::dbus::Skeleton<Errors>
 {
-   Server(const char* rolename)
-    : simppl::dbus::Skeleton<Errors>(rolename)
+   Server(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Errors>(d, rolename)
    {
       stop >> std::bind(&Server::handleStop, this);
       hello >> std::bind(&Server::handleHello, this);
       hello1 >> std::bind(&Server::handleHello1, this, _1);
    }
-   
+
    void handleStop()
    {
       disp().stop();
    }
-   
+
    void handleHello()
    {
-      respondWith(simppl::dbus::RuntimeError(-1, "Shit happens"));
+      respondWith(simppl::dbus::Error("shit.happens"));
    }
-   
+
    void handleHello1(int i)
    {
-      respondWith(simppl::dbus::RuntimeError(-2, "Also shit"));
+      respondWith(simppl::dbus::Error("also.shit"));
    }
 };
 
@@ -114,15 +110,12 @@ struct Server : simppl::dbus::Skeleton<Errors>
 }   // anonymous namespace
 
 
-TEST(Errors, methods) 
+TEST(Errors, methods)
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   Client c;
-   Server s("s");
-   
-   d.addClient(c);
-   d.addServer(s);
-   
+   Client c(d);
+   Server s(d, "s");
+
    d.run();
 }
 
@@ -130,57 +123,54 @@ TEST(Errors, methods)
 static void blockrunner()
 {
    simppl::dbus::Dispatcher d("dbus:session");
+   Server s(d, "s");
 
-   Server s("s");
-   d.addServer(s);
-   
    d.run();
 }
 
 
-TEST(Errors, blocking) 
+TEST(Errors, blocking)
 {
    std::thread t(blockrunner);
-   
+
    simppl::dbus::Dispatcher d("dbus:session");
-      
-   simppl::dbus::Stub<Errors> stub("s", "unix:ErrorsTest");
-   d.addClient(stub);
-   
+
+   simppl::dbus::Stub<Errors> stub(d, "s");
+
    stub.connect();
-   
+
    try
    {
       stub.hello();
-      
+
       // never reach
       ASSERT_FALSE(true);
    }
-   catch(const simppl::dbus::RuntimeError& e)
+   catch(const simppl::dbus::Error& e)
    {
-      EXPECT_EQ(0, strcmp(e.what(), "Shit happens"));
+      EXPECT_STREQ(e.name(), "shit.happens");
    }
    catch(...)
    {
       ASSERT_FALSE(true);
    }
-   
+
    try
    {
       int res = stub.hello1(101);
-      
+
       // never reach
       ASSERT_FALSE(true);
    }
-   catch(const simppl::dbus::RuntimeError& e)
+   catch(const simppl::dbus::Error& e)
    {
-      EXPECT_EQ(0, strcmp(e.what(), "Also shit"));
+      EXPECT_STREQ(e.name(), "also.shit");
    }
    catch(...)
    {
       ASSERT_FALSE(true);
    }
-   
+
    stub.stop();
    t.join();
 }

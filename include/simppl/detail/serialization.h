@@ -6,6 +6,7 @@
 #include "simppl/typelist.h"
 #include "simppl/callstate.h"
 #include "simppl/variant.h"
+#include "simppl/objectpath.h"
 
 #include <map>
 #include <vector>
@@ -79,6 +80,8 @@ template<> struct dbus_type_code<int32_t>            { enum { value = DBUS_TYPE_
 template<> struct dbus_type_code<long>               { enum { value = DBUS_TYPE_INT32   }; };
 template<> struct dbus_type_code<long long>          { enum { value = DBUS_TYPE_INT64   }; };
 template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
+
+template<> struct dbus_type_code<simppl::dbus::ObjectPath> { enum { value = DBUS_TYPE_OBJECT_PATH }; };
 
 template<typename... T>
 struct dbus_type_code<std::tuple<T...>>              { enum { value = DBUS_TYPE_STRUCT }; };
@@ -475,6 +478,17 @@ struct make_type_signature<std::map<KeyT, ValueT>>
 };
 
 
+template<>
+struct make_type_signature<ObjectPath>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_OBJECT_PATH_AS_STRING;
+   }
+};
+
+
 // --- variant stuff ---------------------------------------------------
 
 
@@ -599,6 +613,7 @@ struct Serializer // : noncopyable
 
    Serializer& write(const std::string& str);
    Serializer& write(const char* str);
+   Serializer& write(const ObjectPath& path);
 
    template<typename... T>
    inline
@@ -855,8 +870,8 @@ struct Deserializer // : noncopyable
    }
 
    Deserializer& read(char*& str);
-
    Deserializer& read(std::string& str);
+   Deserializer& read(ObjectPath& path);
 
    template<typename... T>
    inline

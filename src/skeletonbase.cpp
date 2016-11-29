@@ -20,34 +20,34 @@ namespace org
          INTERFACE(Introspectable)
          {
             //typedef tTrueType introspectable;
-            
+
             Request<> Introspect;
             Response<std::string> rIntrospect;
-            
+
             Introspectable()
              : INIT(Introspect)
              , INIT(rIntrospect)
             {
                Introspect >> rIntrospect;
-               
+
                //describe_arguments(rIntrospect, "data");
             }
          };
-         
+
          INTERFACE(Properties)
          {
             Request<std::string, std::string> Get;
             Request<std::string, std::string, Variant<int>> Set;  // FIXME need type any instead!
-            
+
             Response<Variant<int>> rGet;
-            
+
             Properties()
              : INIT(Get)
              , INIT(Set)
              , INIT(rGet)
             {
                Get >> rGet;
-               
+
                //describe_arguments(Get, "interface_name", "property_name");
                //describe_arguments(rGet, "value");
                //describe_arguments(Set, "interface_name", "property_name", "value");
@@ -76,20 +76,39 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 
 SkeletonBase::SkeletonBase(const char* iface, const char* role)
  : iface_(detail::extract_interface(iface))
- , role_(nullptr)
+ , busname_(nullptr)
  , objectpath_(nullptr)
  , disp_(nullptr)
 {
    assert(role);
-   std::tie(objectpath_, role_) = detail::create_objectpath(iface_, role);
+
+   objectpath_ = detail::create_objectpath(iface_, role);
+   busname_ = detail::create_busname(iface_, role);
+}
+
+
+SkeletonBase::SkeletonBase(const char* iface, const char* busname, const char* objectpath)
+ : iface_(detail::extract_interface(iface))
+ , busname_(nullptr)
+ , objectpath_(nullptr)
+ , disp_(nullptr)
+{
+   assert(busname);
+   assert(objectpath);
+
+   busname_ = new char[strlen(busname) + 1];
+   strcpy(busname_, busname);
+
+   objectpath_ = new char[strlen(objectpath)+1];
+   strcpy(objectpath_, objectpath);
 }
 
 
 SkeletonBase::~SkeletonBase()
 {
    delete[] iface_;
+   delete[] busname_;
    delete[] objectpath_;
-   role_ = nullptr;
 }
 
 
@@ -135,7 +154,6 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    //assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
    DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
-   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
 
    if (response.f_)
    {
@@ -150,30 +168,26 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 }
 
 
-void SkeletonBase::respondWith(const RuntimeError& err)
+void SkeletonBase::respondWith(const Error& err)
 {
    assert(current_request_);
    //assert(current_request_.requestor_->hasResponse());
 
-   DBusMessage* rmsg = dbus_message_new_error_printf(currentRequest().msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
-   dbus_connection_send(disp_->conn_, rmsg, nullptr);
+   dbus_message_ptr_t rmsg = err.make_reply_for(*currentRequest().msg_);
+   dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
-   dbus_message_unref(rmsg);
    current_request_.clear();   // only respond once!!!
 }
 
 
-void SkeletonBase::respondOn(ServerRequestDescriptor& req, const RuntimeError& err)
+void SkeletonBase::respondOn(ServerRequestDescriptor& req, const Error& err)
 {
    assert(req);
    //assert(req.requestor_->hasResponse());
 
-   DBusMessage* rmsg = dbus_message_new_error_printf(req.msg_, DBUS_ERROR_FAILED, "%d %s", err.error(), err.what()?err.what():"");
-   dbus_message_set_reply_serial(rmsg, dbus_message_get_serial(req.msg_));
+   dbus_message_ptr_t rmsg = err.make_reply_for(*req.msg_);
+   dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
-   dbus_connection_send(disp_->conn_, rmsg, nullptr);
-
-   dbus_message_unref(rmsg);
    req.clear();
 }
 
@@ -189,7 +203,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 {
    const char* method = dbus_message_get_member(msg);
    const char* interface = dbus_message_get_interface(msg);
-         
+
    if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
    {
 #if SIMPPL_HAVE_INTROSPECTION
@@ -198,27 +212,27 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
          std::ostringstream oss;
 
          oss << "<?xml version=\"1.0\" ?>\n"
-             "<node name=\""<< role() << "\">\n"
+             "<node name=\""<< objectpath() << "\">\n"
              "  <interface name=\""<< iface() << "\">\n";
-             
+
          auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
          for(auto& method : methods)
          {
             method.second->introspect(oss);
          }
-         
+
          auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
          for(auto& attribute : attributes)
          {
             attribute.second->introspect(oss);
          }
-         
+
          auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
          for(auto& sig : signals)
          {
             sig.second->introspect(oss);
          }
-         
+
          // introspectable
          oss << "  </interface>\n"
              "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
@@ -252,7 +266,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
 
          return DBUS_HANDLER_RESULT_HANDLED;
       }
-#endif   // #if SIMPPL_HAVE_INTROSPECTION 
+#endif   // #if SIMPPL_HAVE_INTROSPECTION
    }
    else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
    {
@@ -273,13 +287,19 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
              {
                 DBusMessage* response = dbus_message_new_method_return(msg);
                 iter->second->eval(response);
-                
+
                 dbus_connection_send(disp_->conn_, response, nullptr);
                 dbus_message_unref(response);
              }
              else
+             {
                 iter->second->evalSet(ds);
-             
+
+                DBusMessage* response = dbus_message_new_method_return(msg);
+                dbus_connection_send(disp_->conn_, response, nullptr);
+                dbus_message_unref(response);
+             }
+
              return DBUS_HANDLER_RESULT_HANDLED;
           }
           else

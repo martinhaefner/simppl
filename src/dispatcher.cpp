@@ -49,7 +49,7 @@ short make_poll_events(int flags)
 
     // do not expect to have read and write simultaneously from DBus API
     assert(flags | (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE) != (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE));
-    
+
     return rc;
 }
 
@@ -82,6 +82,25 @@ namespace simppl
 
 namespace dbus
 {
+
+
+// --- need this in order to resolve cyclic dependencies ---------------
+
+
+void dispatcher_add_stub(Dispatcher& disp, StubBase& stub)
+{
+    disp.addClient(stub);
+}
+
+
+void dispatcher_add_skeleton(Dispatcher& disp, SkeletonBase& stub)
+{
+    disp.addServer(stub);
+}
+
+
+// ---------------------------------------------------------------------
+
 
 struct Dispatcher::Private
 {
@@ -145,7 +164,7 @@ struct Dispatcher::Private
         }
         //else
           // std::cout << "Not enabled" << std::endl;
-        
+
         watch_handlers_.insert(std::make_pair(fd.fd, w));
 
         return TRUE;
@@ -156,16 +175,16 @@ struct Dispatcher::Private
     {
        //std::cout << "remove_watch" << std::endl;
        auto result = watch_handlers_.equal_range(dbus_watch_get_unix_fd(w));
-       
+
        for(auto iter = result.first; iter != result.second; ++iter)
        {
           if (iter->second == w)
           {
-             auto pfditer = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ 
+             auto pfditer = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){
                 return dbus_watch_get_unix_fd(w) == pfd.fd
-                    && pfd.revents & make_poll_events(dbus_watch_get_flags(w)); 
+                    && pfd.revents & make_poll_events(dbus_watch_get_flags(w));
              });
-             
+
              if (pfditer != fds_.end())
              {
 //                std::cout << "ok found" << std::endl;
@@ -271,11 +290,11 @@ struct Dispatcher::Private
                 {
                     auto result = watch_handlers_.equal_range(pfd.fd);
                     bool handled = false;
-                    
+
                     for(auto iter = result.first; iter != result.second; ++iter)
                     {
                        handled = true;   // ok, fd found...
-                       
+
                        if (pfd.revents & make_poll_events(dbus_watch_get_flags(iter->second)))
                        {
                            int fd = pfd.fd;
@@ -285,7 +304,7 @@ struct Dispatcher::Private
                            break;
                         }
                     }
-                    
+
                     // must be a timeout
                     if (!handled)
                     {
@@ -300,7 +319,7 @@ struct Dispatcher::Private
                             dbus_timeout_handle(t_iter->second);
                         }
                     }
-                  
+
                     break;
                 }
             }
@@ -398,9 +417,9 @@ Dispatcher::~Dispatcher()
 }
 
 
-void Dispatcher::notify_clients(const std::string& boundname, ConnectionState state)
+void Dispatcher::notify_clients(const std::string& busname, ConnectionState state)
 {
-   auto range = stubs_.equal_range(boundname);
+   auto range = stubs_.equal_range(busname);
 
    std::for_each(range.first, range.second, [state](auto& entry){
       entry.second->connection_state_changed(state);
@@ -413,19 +432,28 @@ void Dispatcher::addServer(SkeletonBase& serv)
    DBusError err;
    dbus_error_init(&err);
 
-   std::ostringstream busname;
-   busname << serv.iface() << '.' << serv.role();
+   dbus_bus_request_name(conn_, serv.busname(), 0, &err);
 
-   dbus_bus_request_name(conn_, busname.str().c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-   assert(!dbus_error_is_set(&err));
-
-   dbus_error_free(&err);
+   if (dbus_error_is_set(&err))
+   {
+      std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
+      dbus_error_free(&err);
+   }
 
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
 
    // register same path as busname, just with / instead of .
-   dbus_connection_register_object_path(conn_, serv.objectpath(), &stub_v_table, &serv);
+   dbus_error_init(&err);
+
+   // register object path
+   dbus_connection_try_register_object_path(conn_, serv.objectpath(), &stub_v_table, &serv, &err);
+
+   if (dbus_error_is_set(&err))
+   {
+       std::cerr << "dbus_connection_register_object_path - DBus error: " << err.name << ": " << err.message << std::endl;
+       dbus_error_free(&err);
+   }
 
    serv.disp_ = this;
 }
@@ -436,7 +464,7 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
    DBusError err;
    dbus_error_init(&err);
 
-   std::string signalname(stub.boundname() + "." + sigbase.name());
+   std::string signalname(stub.busname() + "." + sigbase.name());
 
    auto iter = signal_matches_.find(signalname);
 
@@ -445,7 +473,7 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
        // FIXME do we really need dependency to dispatcher?
        std::ostringstream match_string;
        match_string << "type='signal'";
-       match_string << ",sender='" << stub.boundname() << "'";
+       match_string << ",sender='" << stub.busname() << "'";
        match_string << ",interface='" << stub.iface() << "'";
        match_string << ",member='" << sigbase.name() << "'";
 
@@ -463,7 +491,7 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
 
 void Dispatcher::unregisterSignal(StubBase& stub, ClientSignalBase& sigbase)
 {
-    std::string signalname(stub.boundname() + "." + sigbase.name());
+    std::string signalname(stub.busname() + "." + sigbase.name());
 
     auto iter = signal_matches_.find(signalname);
 
@@ -476,7 +504,7 @@ void Dispatcher::unregisterSignal(StubBase& stub, ClientSignalBase& sigbase)
 
             std::ostringstream match_string;
             match_string << "type='signal'";
-            match_string << ", sender='" << stub.boundname() << "'";
+            match_string << ", sender='" << stub.busname() << "'";
             match_string << ", interface='" << stub.iface() << "'";
             match_string << ", member='" << sigbase.name() << "'";
 
@@ -576,18 +604,16 @@ bool Dispatcher::isRunning() const
 
 void Dispatcher::addClient(StubBase& clnt)
 {
-   assert(!clnt.disp_);   // don't add it twice
-
    clnt.disp_ = this;
 
    // isn't this double the information?
    dynamic_cast<detail::BasicInterface*>(&clnt)->conn_ = conn_;
 
-//   std::cout << "Adding stub: " << clnt.boundname() << std::endl;
-   stubs_.insert(std::make_pair(clnt.boundname(), &clnt));
+   //std::cout << "Adding stub: " << clnt.busname() << std::endl;
+   stubs_.insert(std::make_pair(clnt.busname(), &clnt));
 
    // send connected request from event loop
-   auto iter = busnames_.find(clnt.boundname());
+   auto iter = busnames_.find(clnt.busname());
    if (iter != busnames_.end())
    {
       std::ostringstream objpath;
@@ -596,7 +622,7 @@ void Dispatcher::addClient(StubBase& clnt)
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
 
       detail::Serializer s(msg);
-      serialize(s, clnt.boundname());
+      serialize(s, clnt.busname());
 
       dbus_connection_send(conn_, msg, nullptr);
       dbus_message_unref(msg);

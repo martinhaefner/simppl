@@ -199,7 +199,7 @@ struct ClientAttribute
    // in a similar way as it is done on server side...
    const DataT& get()
    {
-      std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(stub().getProperty(signal_.name()), dbus_message_unref);
+      dbus_message_ptr_t msg(stub().getProperty(signal_.name()), dbus_message_unref);
 
       detail::Deserializer ds(msg.get());
 
@@ -238,7 +238,7 @@ struct ClientAttribute
     void pending_notify(DBusPendingCall* pc, void* user_data)
     {
         std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
-        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+        dbus_message_ptr_t msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
 
         CallState cs(*msg);
 
@@ -331,7 +331,7 @@ struct ClientRequest
       {
          dbus_pending_call_block(p.get());
 
-         std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(p.get()), dbus_message_unref);
+         dbus_message_ptr_t msg(dbus_pending_call_steal_reply(p.get()), dbus_message_unref);
          CallState cs(*msg);
 
          if (!cs)
@@ -366,18 +366,18 @@ struct ClientRequest
    void pending_notify(DBusPendingCall* pc, void* data)
    {
        std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
-       std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+       dbus_message_ptr_t msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
 
        ClientRequest* that = (ClientRequest*)data;
        assert(that->f_);
-      
+
        CallState cs(*msg);
 
        detail::Deserializer d(msg.get());
        detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
    }
-   
-   
+
+
    template<typename FunctorT>
    void handledBy(FunctorT f)
    {

@@ -76,6 +76,12 @@ struct Variant
       // NOOP
    }
 
+   inline
+   ~Variant()
+   {
+       try_destroy();
+   }
+
    template<typename _T>
    inline
    Variant(const _T& t)             // FIXME use calltraits here
@@ -88,10 +94,10 @@ struct Variant
 
 
    // FIXME implement inplace factories and assignment operator
-   
+
    Variant(const Variant& rhs);
    Variant& operator=(const Variant& rhs);
-   
+
    // NO INLINE, TOO LONG
    template<typename _T>
    Variant& operator=(const _T& t)            // FIXME use calltraits here
@@ -262,17 +268,17 @@ namespace detail
       {
          // NOOP
       }
-      
+
       template<typename T>
       void operator()(const T& t)
       {
          ::new(&v_.data_) T(t);
       }
-      
+
       VariantT& v_;
    };
-   
-   
+
+
    template<typename VariantT>
    struct AssignmentVisitor : StaticVisitor<>
    {
@@ -281,13 +287,13 @@ namespace detail
       {
          // NOOP
       }
-      
+
       template<typename T>
       void operator()(const T& t)
       {
          *v_.template get<T>() = t;
       }
-      
+
       VariantT& v_;
    };
 }
@@ -314,20 +320,20 @@ Variant<T...>& Variant<T...>::operator=(const Variant<T...>& rhs)
       {
          // need to call copy constructor
          try_destroy();
-         
+
          idx_ = rhs.idx_;
          detail::ConstructionVisitor<Variant<T...>> v(*this);
          staticVisit(v, rhs);
       }
       else
-      {   
+      {
          detail::AssignmentVisitor<Variant<T...>> v(*this);
          staticVisit(v, rhs);
       }
    }
-   
+
    return *this;
-}   
+}
 
 }   // namespace simppl
 

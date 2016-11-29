@@ -12,29 +12,33 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
-template<template<template<typename...> class, 
+// forward decl
+void dispatcher_add_skeleton(Dispatcher&, StubBase&);
+
+
+template<template<template<typename...> class,
                   template<typename...> class,
                   template<typename,int> class> class IfaceT>
 struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerSignal, ServerAttribute>
 {
    friend struct Dispatcher;
-   
+
    typedef IfaceT<ServerRequest, ServerSignal, ServerAttribute> interface_type;
-   
+
    inline
-   Skeleton(const char* role)
+   Skeleton(Dispatcher& disp, const char* role)
     : SkeletonBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)
    {
-      // NOOP
+      dispatcher_add_skeleton(disp, *this);
    }
-   
-   
+
+
 protected:
-   
+
    ServerRequestDescriptor current_request_;
 };
 

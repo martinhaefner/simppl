@@ -4,38 +4,24 @@
 
 #include <cstring>
 
-#include "simppl/serialization.h"
-
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
 
 CallState::CallState(DBusMessage& msg)
  : ex_()
- , sequence_nr_(INVALID_SEQUENCE_NR)
+ , serial_(SIMPPL_INVALID_SERIAL)
 {
    if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
    {
-      if (!strcmp(dbus_message_get_error_name(&msg), DBUS_ERROR_FAILED))
-      {
-         detail::Deserializer d(&msg);
-         std::string text;
-         d >> text;
-         
-         char* end;
-         int error = strtol(text.c_str(), &end, 10);
-         
-         ex_.reset(new RuntimeError(error, end+1, dbus_message_get_reply_serial(&msg)));
-      }
-      else
-         ex_.reset(new TransportError(EIO, dbus_message_get_reply_serial(&msg)));
+      ex_ = Error::from_message(msg);
    }
    else
-      sequence_nr_ = dbus_message_get_reply_serial(&msg);
+      serial_ = dbus_message_get_reply_serial(&msg);
 }
 
 

@@ -44,8 +44,8 @@ simppl::dbus::Dispatcher* gbl_disp = nullptr;
 
 struct Client : simppl::dbus::Stub<Timeout>
 {
-   Client()
-    : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
+   Client(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Timeout>(d, "tm")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
       eval >> std::bind(&Client::handleEval, this, _1, _2);
@@ -70,9 +70,7 @@ struct Client : simppl::dbus::Stub<Timeout>
    {
       EXPECT_FALSE((bool)state);
 
-      EXPECT_TRUE(state.isTransportError());
-      EXPECT_FALSE(state.isRuntimeError());
-      EXPECT_EQ(EIO, static_cast<const simppl::dbus::TransportError&>(state.exception()).getErrno());
+      EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
 
       int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
       EXPECT_GE(millis, 500);
@@ -90,8 +88,8 @@ struct Client : simppl::dbus::Stub<Timeout>
 
 struct DisconnectClient : simppl::dbus::Stub<Timeout>
 {
-   DisconnectClient()
-    : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
+   DisconnectClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Timeout>(d, "tm")
    {
       connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
       eval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
@@ -112,10 +110,7 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
    void handleEval(simppl::dbus::CallState state, double)
    {
       EXPECT_FALSE((bool)state);
-
-      EXPECT_TRUE(state.isTransportError());
-      EXPECT_EQ(ECONNABORTED, static_cast<const simppl::dbus::TransportError&>(state.exception()).getErrno());
-      EXPECT_FALSE(state.isRuntimeError());
+      EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
 
       disp().stop();
    }
@@ -126,8 +121,8 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
 
 struct OnewayClient : simppl::dbus::Stub<Timeout>
 {
-   OnewayClient()
-    : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
+   OnewayClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Timeout>(d, "tm")
    {
       connected >> std::bind(&OnewayClient::handleConnected, this, _1);
    }
@@ -152,8 +147,8 @@ struct OnewayClient : simppl::dbus::Stub<Timeout>
 
 struct NeverConnectedClient : simppl::dbus::Stub<Timeout>
 {
-   NeverConnectedClient(simppl::dbus::ConnectionState expected = simppl::dbus::ConnectionState::Timeout)
-    : simppl::dbus::Stub<Timeout>("tm", "unix:TimeoutTest")
+   NeverConnectedClient(simppl::dbus::Dispatcher& d, simppl::dbus::ConnectionState expected = simppl::dbus::ConnectionState::Timeout)
+    : simppl::dbus::Stub<Timeout>(d, "tm")
     , expected_(expected)
    {
       connected >> std::bind(&NeverConnectedClient::handleConnected, this, _1);
@@ -171,8 +166,8 @@ struct NeverConnectedClient : simppl::dbus::Stub<Timeout>
 
 struct Server : simppl::dbus::Skeleton<Timeout>
 {
-   Server()
-    : simppl::dbus::Skeleton<Timeout>("tm")
+   Server(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Timeout>(d, "tm")
    {
       eval >> std::bind(&Server::handleEval, this, _1);
       oneway >> std::bind(&Server::handleOneway, this, _1);
@@ -211,8 +206,7 @@ void runServer()
 
    try
    {
-      Server s;
-      d.addServer(s);
+      Server s(d);
 
       d.run();
    }
@@ -226,9 +220,8 @@ void runServer()
 void runClient()
 {
    simppl::dbus::Dispatcher d;
-   DisconnectClient c;
+   DisconnectClient c(d);
 
-   d.addClient(c);
    d.run();
 }
 
@@ -240,11 +233,10 @@ TEST(Timeout, method)
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d;
-   Client c;
+   Client c(d);
 
    d.setRequestTimeout(500ms);
 
-   d.addClient(c);
    d.run();
 
    serverthread.join();
@@ -256,11 +248,10 @@ TEST(Timeout, oneway)
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d;
-   OnewayClient c;
+   OnewayClient c(d);
 
    d.setRequestTimeout(500ms);
 
-   d.addClient(c);
    d.run();
 
    serverthread.join();
@@ -285,11 +276,10 @@ TEST(Timeout, request_specific)
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d("dbus:session");
-   simppl::dbus::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   simppl::dbus::Stub<Timeout> stub(d, "tm");
 
    // default timeout
    d.setRequestTimeout(500ms);
-   d.addClient(stub);
 
    stub.connect();
 
@@ -303,11 +293,11 @@ TEST(Timeout, request_specific)
       // never arrive here!
       EXPECT_FALSE(true);
    }
-   catch(simppl::dbus::TransportError& err)
+   catch(simppl::dbus::Error& err)
    {
-      EXPECT_EQ(EIO, err.getErrno());
+      EXPECT_STREQ(err.name(), "org.freedesktop.DBus.Error.NoReply");
    }
-   
+
    int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
    EXPECT_GE(millis, 700);
    EXPECT_LT(millis, 750);
@@ -321,10 +311,9 @@ TEST(Timeout, request_specific)
 TEST(Timeout, blocking_connect)
 {
    simppl::dbus::Dispatcher d;
-   simppl::dbus::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   simppl::dbus::Stub<Timeout> stub(d, "tm");
 
    d.setRequestTimeout(500ms);
-   d.addClient(stub);
 
    try
    {
@@ -333,9 +322,9 @@ TEST(Timeout, blocking_connect)
       // never arrive here!
       EXPECT_FALSE(true);
    }
-   catch(const simppl::dbus::TransportError& err)
+   catch(const simppl::dbus::Error& err)
    {
-      EXPECT_EQ(ETIMEDOUT, err.getErrno());
+      EXPECT_STREQ(err.name(), "org.freedesktop.DBus.Error.Timeout");
    }
 }
 
@@ -345,10 +334,9 @@ TEST(Timeout, blocking_api)
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d;
-   simppl::dbus::Stub<Timeout> stub("tm", "unix:TimeoutTest");
+   simppl::dbus::Stub<Timeout> stub(d, "tm");
 
    d.setRequestTimeout(500ms);
-   d.addClient(stub);
 
    stub.connect();
 
@@ -359,9 +347,9 @@ TEST(Timeout, blocking_api)
       // never arrive here!
       EXPECT_FALSE(true);
    }
-   catch(const simppl::dbus::TransportError& err)
+   catch(const simppl::dbus::Error& err)
    {
-      EXPECT_EQ(EIO, err.getErrno());
+      EXPECT_STREQ(err.name(), "org.freedesktop.DBus.Error.NoReply");
    }
 
    // cleanup server

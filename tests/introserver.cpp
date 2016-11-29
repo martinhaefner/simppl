@@ -20,7 +20,7 @@ enum ident_t {
 struct NumericEntry
 {
    typedef simppl::dbus::make_serializer<int, int, int>::type serializer_type;
-   
+
    NumericEntry() = default;
    NumericEntry(int min, int max, int step)
     : min_(min)
@@ -29,7 +29,7 @@ struct NumericEntry
    {
       // NOOP
    }
-   
+
    int min_;
    int max_;
    int step_;
@@ -39,7 +39,7 @@ struct NumericEntry
 struct StringEntry
 {
    typedef simppl::dbus::make_serializer<int, int>::type serializer_type;
-   
+
    StringEntry() = default;
    StringEntry(int min, int max)
     : min_(min)
@@ -47,7 +47,7 @@ struct StringEntry
    {
       // NOOP
    }
-   
+
    int min_;
    int max_;
 };
@@ -56,14 +56,14 @@ struct StringEntry
 struct ComboEntry
 {
    typedef simppl::dbus::make_serializer<std::vector<std::string>>::type serializer_type;
-   
+
    ComboEntry() = default;
    ComboEntry(std::vector<std::string> entries)
     : entries_(entries)
    {
       // NOOP
    }
-   
+
    std::vector<std::string> entries_;
 };
 
@@ -72,11 +72,11 @@ struct Menu
 {
    typedef simppl::Variant<NumericEntry, StringEntry, ComboEntry, Menu> entry_type;
 
-   typedef std::map<std::string, 
+   typedef std::map<std::string,
                     std::tuple<int/*=id*/, entry_type>> menu_entries_type;
-                    
+
    typedef simppl::dbus::make_serializer<menu_entries_type>::type serializer_type;
-                    
+
    menu_entries_type entries_;
 };
 
@@ -87,10 +87,10 @@ INTERFACE(Attributes)
    Request<> shutdown;
 
    Request<out<Menu>> get_all;
-   
+
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
-   
+
    Signal<int> mayShutdown;
    Signal<> hi;
 
@@ -115,8 +115,8 @@ using namespace test;
 
 struct Server : simppl::dbus::Skeleton<Attributes>
 {
-   Server(const char* rolename)
-    : simppl::dbus::Skeleton<Attributes>(rolename)
+   Server(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Attributes>(d, rolename)
    {
       shutdown >> std::bind(&Server::handleShutdown, this);
       set >> std::bind(&Server::handleSet, this, _1, _2);
@@ -146,30 +146,30 @@ struct Server : simppl::dbus::Skeleton<Attributes>
       mayShutdown.emit(42);
       hi.emit();
    }
-   
+
    void handle_get_all()
    {
       Menu mainmenu;
-      
+
       Menu printing;
       printing.entries_["Speed"] = std::make_tuple(1, Menu::entry_type(NumericEntry(50, 250, 25)));
       printing.entries_["Heat Level"] = std::make_tuple(2, Menu::entry_type(NumericEntry(-20, 20, 1)));
-      
+
       Menu display;
       display.entries_["Orientation"] = std::make_tuple(3, Menu::entry_type(ComboEntry({"0", "90", "180", "270"})));
       display.entries_["Powersave"] = std::make_tuple(4, Menu::entry_type(NumericEntry(0, 10, 1)));
-      
+
       Menu settings;
       settings.entries_["Printing"] = std::make_tuple(9, Menu::entry_type(printing));
       settings.entries_["Display"] = std::make_tuple(10, Menu::entry_type(display));
-      
+
       Menu security;
       security.entries_["PIN"] = std::make_tuple(7, Menu::entry_type(StringEntry(6, 255)));
       security.entries_["FTP Password"] = std::make_tuple(8, Menu::entry_type(StringEntry(6, 255)));
-      
+
       mainmenu.entries_["Settings"] = std::make_tuple(5, Menu::entry_type(settings));
       mainmenu.entries_["Security"] = std::make_tuple(6, Menu::entry_type(security));
-      
+
       respondWith(get_all(mainmenu));
    }
 
@@ -180,9 +180,8 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 int main()
 {
    simppl::dbus::Dispatcher d("dbus:session");
-   Server s("s");
+   Server s(d, "s");
 
-   d.addServer(s);
    d.run();
 
    return 0;

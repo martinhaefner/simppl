@@ -47,6 +47,9 @@ struct Dispatcher
    friend struct StubBase;
    friend struct SkeletonBase;
 
+   friend void dispatcher_add_stub(Dispatcher&, StubBase&);
+   friend void dispatcher_add_skeleton(Dispatcher&, SkeletonBase&);
+
    Dispatcher(const Dispatcher&) = delete;
    Dispatcher& operator=(const Dispatcher&) = delete;
 
@@ -57,16 +60,6 @@ struct Dispatcher
 
    ~Dispatcher();
 
-   /// Add a client to the dispatcher. This is also necessary if blocking
-   /// should be used.
-   void addClient(StubBase& clnt);
-
-   /// Remove the client.
-   void removeClient(StubBase& clnt);
-
-   /// add a server
-   void addServer(SkeletonBase& server);
-   
    template<typename RepT, typename PeriodT>
    inline
    void setRequestTimeout(std::chrono::duration<RepT, PeriodT> duration)
@@ -103,10 +96,10 @@ struct Dispatcher
    {
       return request_timeout_;
    }
-   
+
    /// propagate exception
    void propagate(CallState state);
-   
+
    inline
    DBusConnection& connection()
    {
@@ -114,6 +107,16 @@ struct Dispatcher
    }
 
 private:
+
+   /// Add a client to the dispatcher. This is also necessary if blocking
+   /// should be used.
+   void addClient(StubBase& clnt);
+
+   /// Remove the client.
+   void removeClient(StubBase& clnt);
+
+   /// add a server
+   void addServer(SkeletonBase& server);
 
    int step_ms(int millis);
 

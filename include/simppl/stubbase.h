@@ -53,16 +53,13 @@ public:
 
    StubBase(const char* iface, const char* role);
 
+   // FIXME use ObjectPath instead of const char*
+   StubBase(const char* iface, const char* busname, const char* objectpath);
+
    inline
    const char* iface() const
    {
       return iface_;
-   }
-
-   inline
-   const char* role() const
-   {
-      return role_;
    }
 
    inline
@@ -99,7 +96,7 @@ protected:
    DBusPendingCall* sendRequest(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    inline
-   std::string boundname() const
+   std::string busname() const
    {
       return busname_;
    }
@@ -112,10 +109,12 @@ protected:
    // blocking version
    DBusMessage* getProperty(const char* name);
 
+   /**
+    * Currently only via this blocking call.
+    */
    void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
 
    char* iface_;
-   char* role_;
    char* objectpath_;
    std::string busname_;
    ConnectionState conn_state_;

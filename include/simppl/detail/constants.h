@@ -2,8 +2,7 @@
 #define SIMPPL_DETAIL_CONSTANTS_H
 
 
-// FIXME still need this?
-#define INVALID_SEQUENCE_NR 0xFFFFFFFF
+#define SIMPPL_INVALID_SERIAL 0
 
 
 #endif   // SIMPPL_DETAIL_CONSTANTS_H

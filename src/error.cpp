@@ -1,89 +1,124 @@
 #include "simppl/error.h"
 
-
+#include <iostream>
 #include <cassert>
 #include <cstring>
+
+#include "simppl/serialization.h"
 
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
-RuntimeError::RuntimeError(int error)
- : Error()
- , error_(error)
- , message_(nullmsg_)
+
+/*static*/
+std::unique_ptr<Error> Error::from_error(const DBusError& err)
 {
-   assert(error);   // zero is reserved value for "no error"
+    return std::unique_ptr<Error>(new Error(err.name, err.message));
 }
 
 
-RuntimeError::RuntimeError(int error, const char* message)
- : Error()
- , error_(error)
- , message_(message ? new char[::strlen(message)+1] : nullmsg_)
+/*static*/
+std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
 {
-   assert(error);
-   
-   if (message)
-      ::strcpy(message_, message);
+    detail::Deserializer d(&msg);
+    std::string text;
+    d >> text;
+
+    return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
 }
 
 
-RuntimeError::~RuntimeError() throw()
+Error::Error(const char* name, const char* msg, uint32_t serial)
+ : serial_(serial)
 {
-   if (message_ != nullmsg_)
-      delete[] message_;
+    assert(name);
+    // FIXME check name for valid dbus name (<atom>.<atom>)
+
+    size_t capacity = strlen(name) + 1;
+
+    if (msg && strlen(msg))
+        capacity += strlen(msg)+1;
+
+    name_and_message_ = new char[capacity];
+
+    strcpy(name_and_message_, name);
+
+    if (msg && strlen(msg))
+    {
+        message_ = name_and_message_ + strlen(name) + 1;
+        strcpy(message_, msg);
+    }
+    else
+        message_ = name_and_message_ + strlen(name_and_message_);
 }
 
 
-RuntimeError::RuntimeError(const RuntimeError& rhs)
- : Error()
- , error_(rhs.error_)
- , message_(rhs.message_)
+Error::Error(const Error& rhs)
+ : serial_(rhs.serial_)
 {
-   RuntimeError& that = const_cast<RuntimeError&>(rhs);
-   that.error_ = 0;
-   that.message_ = nullptr;
+    size_t capacity = strlen(rhs.name_and_message_) + strlen(rhs.message_) + 2;
+
+    name_and_message_ = new char[capacity];
+    memset(name_and_message_, 0, capacity);
+
+    message_ = name_and_message_ + (rhs.message_ - rhs.name_and_message_);
+
+    char* p_to = name_and_message_;
+    char* p_from = rhs.name_and_message_;
+
+    while(*p_from)
+        *p_to++ = *p_from++;
+
+    p_to = message_;
+    p_from = rhs.message_;
+
+    while(*p_from)
+        *p_to++ = *p_from++;
 }
 
 
-RuntimeError::RuntimeError(int error, const char* message, uint32_t sequence_nr)
- : Error(sequence_nr)
- , error_(error)
- , message_(message ? new char[::strlen(message)+1] : nullmsg_)
+Error::~Error()
 {
-   assert(error);
-   
-   if (message)
-      ::strcpy(message_, message);
-}
-   
-   
-// ---------------------------------------------------------------------------
-   
+    delete[] name_and_message_;
 
-TransportError::TransportError(int errno__, uint32_t sequence_nr)
- : Error(sequence_nr)
- , errno_(errno__)
-{
-   buf_[0] = '\0';
+    name_and_message_ = nullptr;
+    message_ = nullptr;
 }
 
 
-
-const char* TransportError::what() const throw()
+dbus_message_ptr_t Error::make_reply_for(DBusMessage& req) const
 {
-   if (!buf_[0])
-   {
-      char buf[128];
-      strcpy(buf_, strerror_r(errno_, buf, sizeof(buf)));
-   }
-   
-   return buf_;
+    return dbus_message_ptr_t(dbus_message_new_error(&req, name(), message()), dbus_message_unref);
 }
+
+
+void Error::_throw()
+{
+    throw Error(*this);
+}
+
+
+const char* Error::what() const throw()
+{
+    return name_and_message_;
+}
+
+
+const char* Error::name() const
+{
+    return name_and_message_;
+}
+
+
+const char* Error::message() const
+{
+    return message_;
+}
+
 
 }   // namespace dbus
 

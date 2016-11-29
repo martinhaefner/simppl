@@ -15,35 +15,42 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
 // forward decl
-template<typename> struct InterfaceNamer;
+void dispatcher_add_stub(Dispatcher&, StubBase&);
 
 
-template<template<template<typename...> class, 
+template<template<template<typename...> class,
                   template<typename...> class,
-                  template<typename,int> class> 
+                  template<typename,int> class>
    class IfaceT>
 struct Stub : StubBase, IfaceT<ClientRequest, ClientSignal, ClientAttribute>
-{   
+{
    friend struct Dispatcher;
-   
+
 private:
 
    typedef IfaceT<ClientRequest, ClientSignal, ClientAttribute> interface_type;
-   
+
 public:
-   
-   /**
-    * @param unused For compatibility reason to socket based simppl only. Unused on dbus.
-    */
-   Stub(const char* role, const char* unused = nullptr)
-    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0)/*InterfaceNamer<interface_type>::name()*/, role)
+
+   // FIXME add dispatcher as argument to stub and skeleton, remove the addXXX methods from dispatcher
+   inline
+   Stub(Dispatcher& disp, const char* role)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)
    {
-      (void)unused;   // make compiler happy
+       dispatcher_add_stub(disp, *this);
+   }
+
+
+   inline
+   Stub(Dispatcher& disp, const char* busname, const char* objectpath)
+    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), busname, objectpath)
+   {
+      dispatcher_add_stub(disp, *this);
    }
 };
 
