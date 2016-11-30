@@ -172,7 +172,7 @@ struct Variant
             // append if necessary
        };
        if (idx_ >= 0 && idx_ < Size<typelist_type>::value)
-           funcs[idx_](&data_);
+           funcs[(int)idx_](&data_);
    }
 
    // with an ordinary union only simple data types could be stored in here

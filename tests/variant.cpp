@@ -174,7 +174,7 @@ TEST(Variant, map)
 
 TEST(Variant, method)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c(d);
    Server s(d);
 

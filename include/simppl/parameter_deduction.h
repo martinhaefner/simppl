@@ -4,16 +4,16 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
 
-struct Oneway 
+
+struct oneway
 {
-   typedef Oneway real_type;
+   typedef oneway real_type;
 };
- 
+
 
 // marker
 template<typename T>
