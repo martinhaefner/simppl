@@ -316,7 +316,7 @@ struct ClientRequest
 
     typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
 
-    static_assert(!is_oneway || is_oneway && std::is_same<return_type, void>::value, "oneway check");
+    static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
     inline
@@ -359,6 +359,8 @@ struct ClientRequest
       }
       else
          dbus_connection_flush(stub->conn());
+
+      return return_type();
    }
 
 

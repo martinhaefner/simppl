@@ -21,7 +21,7 @@ INTERFACE(Simple)
 {
    Request<> hello;
 
-   Request<in<int>, simppl::dbus::Oneway> oneway;
+   Request<in<int>, simppl::dbus::oneway> oneway;
 
    Request<in<int>, in<double>, out<double>> add;
    Request<in<int>, in<double>, out<int>, out<double>> echo;
@@ -238,7 +238,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
 
 TEST(Simple, methods)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c(d);
    Server s(d, "s");
 
@@ -248,7 +248,7 @@ TEST(Simple, methods)
 
 TEST(Simple, signal)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    SignalClient c(d);
    Server s(d, "ss");
 
@@ -260,7 +260,7 @@ TEST(Simple, signal)
 
 TEST(Simple, attribute)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    AttributeClient c(d);
    Server s(d, "sa");
 
@@ -270,7 +270,7 @@ TEST(Simple, attribute)
 
 void blockrunner()
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    Server s(d, "sb");
 
@@ -282,7 +282,7 @@ void blockrunner()
 
 TEST(Simple, blocking)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    std::thread t(blockrunner);
 
@@ -332,7 +332,7 @@ TEST(Simple, disconnect)
    DisconnectClient c(clientd);
 
    {
-      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("dbus:session");
+      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("bus:session");
       Server* s = new Server(*serverd, "s");
 
       std::thread serverthread([serverd, s](){

@@ -19,7 +19,7 @@ namespace test
 
 INTERFACE(Errors)
 {
-   Request<simppl::dbus::Oneway> stop;
+   Request<simppl::dbus::oneway> stop;
 
    Request<> hello;
    Request<in<int>, out<int>> hello1;
@@ -112,7 +112,7 @@ struct Server : simppl::dbus::Skeleton<Errors>
 
 TEST(Errors, methods)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c(d);
    Server s(d, "s");
 
@@ -122,7 +122,7 @@ TEST(Errors, methods)
 
 static void blockrunner()
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Server s(d, "s");
 
    d.run();
@@ -133,7 +133,7 @@ TEST(Errors, blocking)
 {
    std::thread t(blockrunner);
 
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    simppl::dbus::Stub<Errors> stub(d, "s");
 

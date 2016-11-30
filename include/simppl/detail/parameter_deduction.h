@@ -232,7 +232,7 @@ struct gen_dummy_return_value<void>
 template<typename... ArgsT>
 struct is_oneway_request
 {
-   enum { value = Find<simppl::dbus::Oneway, typename make_typelist<ArgsT...>::type>::value != -1 };
+   enum { value = Find<simppl::dbus::oneway, typename make_typelist<ArgsT...>::type>::value != -1 };
 };
 
 
@@ -306,7 +306,7 @@ struct IntrospectionHelper
 };
 
 template<>
-struct IntrospectionHelper<::simppl::dbus::Oneway>
+struct IntrospectionHelper<::simppl::dbus::oneway>
 {
    static inline void eval(std::ostream& os, int i)
    {

@@ -19,7 +19,7 @@ namespace test {
 INTERFACE(AsyncServer)
 {
    // FIXME validate all parameters to be either in or out or oneway
-   Request<in<int>, simppl::dbus::Oneway> oneway;
+   Request<in<int>, simppl::dbus::oneway> oneway;
 
    Request<in<int>, in<double>, out<double>> add;
    Request<in<int>, in<double>, out<int>, out<double>> echo;
@@ -153,7 +153,7 @@ struct Server : simppl::dbus::Skeleton<AsyncServer>
 /// one response can overtake another
 TEST(AServer, trivial)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c(d);
    Server s(d, "s");
 
@@ -167,7 +167,7 @@ TEST(AServer, trivial)
 /// with a transport error
 TEST(AServer, outstanding)
 {
-   std::unique_ptr<simppl::dbus::Dispatcher> sd(new simppl::dbus::Dispatcher("dbus:session"));
+   std::unique_ptr<simppl::dbus::Dispatcher> sd(new simppl::dbus::Dispatcher("bus:session"));
    simppl::dbus::Dispatcher cd;
 
    ShutdownClient c(cd);

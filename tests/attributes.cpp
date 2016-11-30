@@ -31,7 +31,7 @@ struct gaga
 INTERFACE(Attributes)
 {
    Request<in<int>, in<std::string>> set;
-   Request<simppl::dbus::Oneway> shutdown;
+   Request<simppl::dbus::oneway> shutdown;
 
    Attribute<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Attribute<std::map<ident_t, std::string>> props;
@@ -249,7 +249,7 @@ struct Server : simppl::dbus::Skeleton<Attributes>
 
 TEST(Attributes, attr)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    Client c(d);
    Server s(d, "s");
 
@@ -262,7 +262,7 @@ TEST(Attributes, attr)
 
 TEST(Attributes, multiple_attach)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    MultiClient c1(d, true);
    MultiClient c2(d, false);
    Server s(d, "s");
@@ -278,7 +278,7 @@ namespace
 {
     void blockrunner()
     {
-       simppl::dbus::Dispatcher d("dbus:session");
+       simppl::dbus::Dispatcher d("bus:session");
        Server s(d, "s");
 
        d.run();
@@ -288,7 +288,7 @@ namespace
 
 TEST(Attributes, blocking_set)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    std::thread t(blockrunner);
 
@@ -308,7 +308,7 @@ TEST(Attributes, blocking_set)
 
 TEST(Attributes, set)
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
 
    Server s(d, "s");
    SetterClient c(d);

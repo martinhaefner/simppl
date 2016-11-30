@@ -21,7 +21,7 @@ namespace test
 INTERFACE(Timeout)
 {
    Request<in<int>, out<double>> eval;
-   Request<in<int>, simppl::dbus::Oneway> oneway;
+   Request<in<int>, simppl::dbus::oneway> oneway;
 
    inline
    Timeout()
@@ -201,7 +201,7 @@ struct Server : simppl::dbus::Skeleton<Timeout>
 
 void runServer()
 {
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    gbl_disp = &d;
 
    try
@@ -275,7 +275,7 @@ TEST(Timeout, request_specific)
 {
    std::thread serverthread(&runServer);
 
-   simppl::dbus::Dispatcher d("dbus:session");
+   simppl::dbus::Dispatcher d("bus:session");
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
    // default timeout
