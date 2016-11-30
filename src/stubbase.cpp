@@ -228,7 +228,7 @@ void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, v
 }
 
 
-DBusMessage* StubBase::getProperty(const char* name)
+dbus_message_ptr_t StubBase::getProperty(const char* name)
 {
    dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
@@ -243,7 +243,7 @@ DBusMessage* StubBase::getProperty(const char* name)
    msg.reset(dbus_pending_call_steal_reply(pending));
    dbus_pending_call_unref(pending);
 
-   return msg.release();
+   return msg;
 }
 
 
@@ -277,11 +277,10 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
         // check for reponse
         if (dbus_error_is_set(&err))
         {
-           // FIXME create classes for each defined dbus error message
-           //UserError ex(err.name, err.message);
+           Error ex(err.name, err.message);
 
            dbus_error_free(&err);
-           //throw ex;
+           throw ex;
         }
     }
 }

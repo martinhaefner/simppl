@@ -216,7 +216,7 @@ struct ClientAttribute
    // in a similar way as it is done on server side...
    const DataT& get()
    {
-      dbus_message_ptr_t msg = make_message(stub().getProperty(signal_.name()));
+      dbus_message_ptr_t msg = stub().getProperty(signal_.name());
 
       detail::Deserializer ds(msg.get());
 

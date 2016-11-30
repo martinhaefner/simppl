@@ -107,7 +107,7 @@ protected:
    void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
 
    // blocking version
-   DBusMessage* getProperty(const char* name);
+   dbus_message_ptr_t getProperty(const char* name);
 
    /**
     * Currently only via this blocking call.
