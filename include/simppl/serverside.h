@@ -12,7 +12,6 @@
 #include "simppl/skeletonbase.h"
 #include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
-#include "simppl/variant.h"
 
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/basicinterface.h"
@@ -106,13 +105,12 @@ struct ServerSignal : ServerSignalBase
       if (parent_->conn_)
       {
          SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-         DBusMessage* msg = dbus_message_new_signal(skel->objectpath(), skel->iface(), name_);
+         dbus_message_ptr_t msg = make_message(dbus_message_new_signal(skel->objectpath(), skel->iface(), name_));
 
-         detail::Serializer s(msg);
+         detail::Serializer s(msg.get());
          serialize(s, args...);
 
-         dbus_connection_send(parent_->conn_, msg, nullptr);
-         dbus_message_unref(msg);
+         dbus_connection_send(parent_->conn_, msg.get(), nullptr);
       }
    }
 

@@ -10,13 +10,16 @@
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/serverrequestbasesetter.h"
 
+#include "simppl/variant.h"
+#include "simppl/objectpath.h"
+
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
+
 // forward decls
 template<typename...> struct ClientRequest;
 template<typename...> struct ClientSignal;

@@ -5,10 +5,10 @@
 #include <cassert>
 #include <functional>
 #include <map>
-#include <iostream>  // FIXME remove this
 
 #include <dbus/dbus.h>
 
+#include "simppl/callstate.h"
 #include "simppl/detail/constants.h"
 #include "simppl/detail/parented.h"
 
@@ -112,7 +112,7 @@ protected:
    /**
     * Currently only via this blocking call.
     */
-   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
+   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f, const std::function<void(CallState)>* callback);
 
    char* iface_;
    char* objectpath_;

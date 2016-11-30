@@ -125,6 +125,7 @@ struct ClientAttributeWritableMixin
    typedef typename CallTraits<DataT>::param_type arg_type;
 
 
+   /// blocking version
    void set(arg_type t)
    {
       AttributeT* that = (AttributeT*)this;
@@ -136,7 +137,23 @@ struct ClientAttributeWritableMixin
          simppl::dbus::detail::serialize(s, vt);
       };
 
-      that->stub().setProperty(that->signal_.name(), f);
+      that->stub().setProperty(that->signal_.name(), f, nullptr);
+   }
+
+
+   /// async version
+   void set_async(arg_type t, const std::function<void(CallState)>& callback)
+   {
+      AttributeT* that = (AttributeT*)this;
+      that->data_ = t;
+
+      Variant<data_type> vt(t);
+
+      std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
+         simppl::dbus::detail::serialize(s, vt);
+      };
+
+      that->stub().setProperty(that->signal_.name(), f, &callback);
    }
 };
 
@@ -199,7 +216,7 @@ struct ClientAttribute
    // in a similar way as it is done on server side...
    const DataT& get()
    {
-      dbus_message_ptr_t msg(stub().getProperty(signal_.name()), dbus_message_unref);
+      dbus_message_ptr_t msg = make_message(stub().getProperty(signal_.name()));
 
       detail::Deserializer ds(msg.get());
 
@@ -218,6 +235,7 @@ struct ClientAttribute
    }
 
 
+   /// blocking version
    ClientAttribute& operator=(arg_type t)
    {
       this->set(t);
@@ -237,8 +255,8 @@ struct ClientAttribute
     static
     void pending_notify(DBusPendingCall* pc, void* user_data)
     {
-        std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
-        dbus_message_ptr_t msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+        dbus_pending_call_ptr_t upc = make_pending_call(pc);
+        dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
 
         CallState cs(*msg);
 
@@ -323,7 +341,7 @@ struct ClientRequest
          simppl::dbus::detail::serialize(s, t...);
       };
 
-      std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> p(stub->sendRequest(method_name_, f, is_oneway), dbus_pending_call_unref);
+      dbus_pending_call_ptr_t p = make_pending_call(stub->sendRequest(method_name_, f, is_oneway));
 
       // FIXME move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
@@ -331,7 +349,7 @@ struct ClientRequest
       {
          dbus_pending_call_block(p.get());
 
-         dbus_message_ptr_t msg(dbus_pending_call_steal_reply(p.get()), dbus_message_unref);
+         dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.get()));
          CallState cs(*msg);
 
          if (!cs)
@@ -365,8 +383,8 @@ struct ClientRequest
    static
    void pending_notify(DBusPendingCall* pc, void* data)
    {
-       std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> upc(pc, dbus_pending_call_unref);
-       dbus_message_ptr_t msg(dbus_pending_call_steal_reply(pc), dbus_message_unref);
+       dbus_pending_call_ptr_t upc = make_pending_call(pc);
+       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
 
        ClientRequest* that = (ClientRequest*)data;
        assert(that->f_);

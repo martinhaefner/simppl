@@ -181,7 +181,12 @@ struct SetterClient : simppl::dbus::Stub<Attributes>
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       data.attach() >> std::bind(&SetterClient::handleData, this, _1, _2);
 
-      data = 5555;
+      // never use operator= here, it's blocking!
+      data.set_async(5555, [this](simppl::dbus::CallState cs){
+          EXPECT_TRUE((bool)cs);
+
+          disp().stop();
+      });
    }
 
 
@@ -196,7 +201,6 @@ struct SetterClient : simppl::dbus::Stub<Attributes>
       else if (callback_count_ == 2)   // the response on the assignment
       {
          EXPECT_EQ(5555, i);
-         disp().stop();
       }
    }
 
@@ -282,8 +286,7 @@ namespace
 }
 
 
-// FIXME currently, set is only possible within blocking calls, no eventloop driven client
-TEST(Attributes, set)
+TEST(Attributes, blocking_set)
 {
    simppl::dbus::Dispatcher d("dbus:session");
 
@@ -300,4 +303,15 @@ TEST(Attributes, set)
 
    c.shutdown();   // stop server
    t.join();
+}
+
+
+TEST(Attributes, set)
+{
+   simppl::dbus::Dispatcher d("dbus:session");
+
+   Server s(d, "s");
+   SetterClient c(d);
+
+   d.run();
 }

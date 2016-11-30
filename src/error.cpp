@@ -92,7 +92,7 @@ Error::~Error()
 
 dbus_message_ptr_t Error::make_reply_for(DBusMessage& req) const
 {
-    return dbus_message_ptr_t(dbus_message_new_error(&req, name(), message()), dbus_message_unref);
+    return make_message(dbus_message_new_error(&req, name(), message()));
 }
 
 

@@ -133,17 +133,16 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
    assert(current_request_);
    //assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
 
-   DBusMessage* rmsg = dbus_message_new_method_return(current_request_.msg_);
+   dbus_message_ptr_t rmsg = make_message(dbus_message_new_method_return(current_request_.msg_));
 
    if (response.f_)
    {
-      detail::Serializer s(rmsg);
+      detail::Serializer s(rmsg.get());
       response.f_(s);
    }
 
-   dbus_connection_send(disp_->conn_, rmsg, nullptr);
+   dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
-   dbus_message_unref(rmsg);
    current_request_.clear();   // only respond once!!!
 }
 
@@ -153,17 +152,16 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
    assert(req);
    //assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
-   DBusMessage* rmsg = dbus_message_new_method_return(req.msg_);
+   dbus_message_ptr_t rmsg = make_message(dbus_message_new_method_return(req.msg_));
 
    if (response.f_)
    {
-      detail::Serializer s(rmsg);
+      detail::Serializer s(rmsg.get());
       response.f_(s);
    }
 
-   dbus_connection_send(disp_->conn_, rmsg, nullptr);
+   dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
-   dbus_message_unref(rmsg);
    req.clear();
 }
 
@@ -285,19 +283,17 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
           {
              if (method[0] == 'G')
              {
-                DBusMessage* response = dbus_message_new_method_return(msg);
-                iter->second->eval(response);
+                dbus_message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                iter->second->eval(response.get());
 
-                dbus_connection_send(disp_->conn_, response, nullptr);
-                dbus_message_unref(response);
+                dbus_connection_send(disp_->conn_, response.get(), nullptr);
              }
              else
              {
                 iter->second->evalSet(ds);
 
-                DBusMessage* response = dbus_message_new_method_return(msg);
-                dbus_connection_send(disp_->conn_, response, nullptr);
-                dbus_message_unref(response);
+                dbus_message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                dbus_connection_send(disp_->conn_, response.get(), nullptr);
              }
 
              return DBUS_HANDLER_RESULT_HANDLED;
