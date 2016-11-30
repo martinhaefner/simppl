@@ -54,7 +54,7 @@ struct Dispatcher
    Dispatcher& operator=(const Dispatcher&) = delete;
 
    /**
-    * @param busname the busname to use, e.g. "dbus:session" or "dbus:system. nullptr means session.
+    * @param busname the busname to use, e.g. "bus:session" or "bus:system. nullptr means session.
     */
    Dispatcher(const char* busname = nullptr);
 

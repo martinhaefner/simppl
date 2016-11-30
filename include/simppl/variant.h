@@ -67,6 +67,8 @@ struct Variant
    enum { size = Max<typelist_type, SizeFunc>::value };
    enum { alignment = Max<typelist_type, AlignFunc>::value };
 
+   static_assert(sizeof...(T) <= 7, "currently only 7 variant entries supported");
+
    /*private*/ enum { unset = -1 };
 
    inline
@@ -162,7 +164,11 @@ struct Variant
             &variant_destroy<0>,
             &variant_destroy<1>,
             &variant_destroy<2>,
-            &variant_destroy<3>
+            &variant_destroy<3>,
+            &variant_destroy<4>,
+            &variant_destroy<5>,
+            &variant_destroy<6>,
+            &variant_destroy<7>
             // append if necessary
        };
        if (idx_ >= 0 && idx_ < Size<typelist_type>::value)
@@ -171,7 +177,7 @@ struct Variant
 
    // with an ordinary union only simple data types could be stored in here
    typename std::aligned_storage<size, alignment>::type data_;
-   char idx_;
+   int8_t idx_;
 };
 
 
@@ -212,6 +218,7 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
    // FIXME recursive iterate
    switch(variant.idx_)
    {
+   // FIXME case -1:
    case 0:
        return Callfunc<typename RelaxedTypeAt<0, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
@@ -223,6 +230,18 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
 
    case 3:
        return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 4:
+       return Callfunc<typename RelaxedTypeAt<4, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 5:
+       return Callfunc<typename RelaxedTypeAt<5, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 6:
+       return Callfunc<typename RelaxedTypeAt<6, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 7:
+      return Callfunc<typename RelaxedTypeAt<7, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    default:
       //std::cerr << "Hey, ugly!" << std::endl;
@@ -250,6 +269,18 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, const VariantT& va
 
    case 3:
        return Callfunc<typename RelaxedTypeAt<3, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 4:
+       return Callfunc<typename RelaxedTypeAt<4, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 5:
+       return Callfunc<typename RelaxedTypeAt<5, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 6:
+       return Callfunc<typename RelaxedTypeAt<6, typename VariantT::typelist_type>::type>::eval(visitor, variant);
+
+   case 7:
+       return Callfunc<typename RelaxedTypeAt<7, typename VariantT::typelist_type>::type>::eval(visitor, variant);
 
    default:
       //std::cerr << "Hey, ugly!" << std::endl;

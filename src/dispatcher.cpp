@@ -351,9 +351,9 @@ Dispatcher::Dispatcher(const char* busname)
    DBusError err;
    dbus_error_init(&err);
 
-   assert(!busname || !strncmp(busname, "dbus:", 5));
+   assert(!busname || !strncmp(busname, "bus:", 4));
 
-   if (!busname || !strcmp(busname, "dbus:session"))
+   if (!busname || !strcmp(busname, "bus:session"))
    {
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
