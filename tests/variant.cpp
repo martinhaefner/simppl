@@ -70,31 +70,27 @@ namespace {
        : simppl::dbus::Stub<test::variant::VServer>(d, "role")
       {
          connected >> std::bind(&Client::handleConnected, this, _1);
-         getData >> std::bind(&Client::handleGetData, this, _1, _2);
       }
 
       void handleConnected(simppl::dbus::ConnectionState s)
       {
-         getData.async();
-      }
+         getData.async() >> [this](simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping){
+            EXPECT_EQ(3, mapping.size());
 
-      void handleGetData(simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping)
-      {
-         EXPECT_EQ(3, mapping.size());
+            auto hello = mapping.find("Hello");
+            auto world = mapping.find("World");
+            auto toll = mapping.find("Tolle");
 
-         auto hello = mapping.find("Hello");
-         auto world = mapping.find("World");
-         auto toll = mapping.find("Tolle");
+            EXPECT_NE(mapping.end(), hello);
+            EXPECT_NE(mapping.end(), world);
+            EXPECT_NE(mapping.end(), toll);
 
-         EXPECT_NE(mapping.end(), hello);
-         EXPECT_NE(mapping.end(), world);
-         EXPECT_NE(mapping.end(), toll);
+            EXPECT_EQ(42, *hello->second.get<int>());
+            EXPECT_EQ(4711, *world->second.get<int>());
+            EXPECT_EQ(std::string("Show"), *toll->second.get<std::string>());
 
-         EXPECT_EQ(42, *hello->second.get<int>());
-         EXPECT_EQ(4711, *world->second.get<int>());
-         EXPECT_EQ(std::string("Show"), *toll->second.get<std::string>());
-
-         disp().stop();
+            disp().stop();
+         };
       }
    };
 

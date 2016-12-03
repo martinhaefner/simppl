@@ -298,6 +298,63 @@ struct ClientAttribute
 // --------------------------------------------------------------------------------
 
 
+template<typename FuncT, typename ReturnT>
+struct CallbackHolder 
+{
+   CallbackHolder(const CallbackHolder&) = delete;
+   CallbackHolder& operator=(const CallbackHolder&) = delete;
+   
+
+   explicit
+   CallbackHolder(const FuncT& f)
+    : f_(f)
+   {
+      // NOOP
+   }
+   
+   static 
+   void _delete(void* p)
+   {
+      auto that = (CallbackHolder*)p;
+      delete that;
+   }
+   
+   static
+   void pending_notify(DBusPendingCall* pc, void* data)
+   {
+       dbus_pending_call_ptr_t upc = make_pending_call(pc);
+       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
+
+       auto that = (CallbackHolder*)data;
+       assert(that->f_);
+
+       CallState cs(*msg);
+
+       detail::Deserializer d(msg.get());
+       detail::GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);
+   }
+
+   
+   FuncT f_;
+};
+
+
+template<typename HolderT>
+struct InterimCallbackHolder
+{
+   typedef HolderT holder_type;
+   
+   explicit inline
+   InterimCallbackHolder(DBusPendingCall* pc)
+    : pc_(make_pending_call(pc))
+   {
+      // NOOP
+   }
+   
+   dbus_pending_call_ptr_t pc_;
+};
+
+
 template<typename... ArgsT>
 struct ClientRequest
 {
@@ -315,6 +372,7 @@ struct ClientRequest
     typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
 
     typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
+    typedef CallbackHolder<callback_type, return_type>                             holder_type;
 
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
@@ -328,7 +386,7 @@ struct ClientRequest
     }
 
 
-   // blocking call
+   /// blocking call
    template<typename... T>
    return_type operator()(const T&... t)
    {
@@ -365,9 +423,9 @@ struct ClientRequest
    }
 
 
-   // async call
+   /// asynchronous call
    template<typename... T>
-   void async(const T&... t)
+   InterimCallbackHolder<holder_type> async(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
@@ -379,30 +437,7 @@ struct ClientRequest
          simppl::dbus::detail::serialize(s, t...);
       };
 
-      dbus_pending_call_set_notify(stub->sendRequest(method_name_, f, false), &ClientRequest::pending_notify, this, 0);
-   }
-
-
-   static
-   void pending_notify(DBusPendingCall* pc, void* data)
-   {
-       dbus_pending_call_ptr_t upc = make_pending_call(pc);
-       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
-
-       ClientRequest* that = (ClientRequest*)data;
-       assert(that->f_);
-
-       CallState cs(*msg);
-
-       detail::Deserializer d(msg.get());
-       detail::GetCaller<return_type>::type::template evalResponse(d, that->f_, cs);
-   }
-
-
-   template<typename FunctorT>
-   void handledBy(FunctorT f)
-   {
-      f_ = f;
+      return InterimCallbackHolder<holder_type>(stub->sendRequest(method_name_, f, false));
    }
 
 
@@ -421,8 +456,6 @@ struct ClientRequest
    // FIXME do we really need connection in BasicInterface?
    // FIXME do we need BasicInterface at all?
    detail::BasicInterface* parent_;
-
-   callback_type f_;   ///< nonblocking asynchronous call needs a callback function
 };
 
 
@@ -434,12 +467,12 @@ struct ClientRequest
 }   // namespace simppl
 
 
-template<typename FunctorT, typename... T>
+template<typename HolderT, typename FunctorT>
 inline
-simppl::dbus::ClientRequest<T...>& operator>>(simppl::dbus::ClientRequest<T...>& r, const FunctorT& f)
+void operator>>(simppl::dbus::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
 {
-   r.handledBy(f);
-   return r;
+   // TODO static_assert FunctorT and HolderT::f_ convertible?
+   dbus_pending_call_set_notify(r.pc_.release(), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
 }
 
 

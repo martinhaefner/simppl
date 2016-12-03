@@ -56,20 +56,17 @@ struct Client : simppl::dbus::Stub<Simple>
    Client(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Simple>(d, "s")
    {
-      connected >> [this](simppl::dbus::ConnectionState s)
-      {
+      connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         this->hello.async();
-      };
+         
+         this->hello.async() >> [this](simppl::dbus::CallState state){
+            EXPECT_TRUE((bool)state);
 
-      hello >> [this](simppl::dbus::CallState state)
-      {
-         EXPECT_TRUE((bool)state);
+            this->oneway(42);
 
-         this->oneway(42);
-
-         // shutdown
-         this->oneway(7777);
+            // shutdown
+            this->oneway(7777);
+         };
       };
    }
 };

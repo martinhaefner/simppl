@@ -48,34 +48,24 @@ struct Client : simppl::dbus::Stub<Errors>
     : simppl::dbus::Stub<Errors>(d, "s")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
-
-      hello >> std::bind(&Client::handleHello, this, _1);
-      hello1 >> std::bind(&Client::handleHello1, this, _1, _2);
    }
 
 
    void handleConnected(simppl::dbus::ConnectionState s)
    {
       EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-      hello.async();
-   }
+      
+      hello.async() >> [this](simppl::dbus::CallState state){
+         EXPECT_FALSE((bool)state);
+         EXPECT_STREQ(state.exception().name(), "shit.happens");
 
+         hello1.async(42) >> [this](simppl::dbus::CallState state, int){
+            EXPECT_FALSE((bool)state);
+            EXPECT_STREQ(state.exception().name(), "also.shit");
 
-   void handleHello(simppl::dbus::CallState state)
-   {
-      EXPECT_FALSE((bool)state);
-      EXPECT_STREQ(state.exception().name(), "shit.happens");
-
-      hello1.async(42);
-   }
-
-
-   void handleHello1(simppl::dbus::CallState state, int)
-   {
-      EXPECT_FALSE((bool)state);
-      EXPECT_STREQ(state.exception().name(), "also.shit");
-
-      disp().stop();
+            disp().stop();
+         };
+      };
    }
 };
 

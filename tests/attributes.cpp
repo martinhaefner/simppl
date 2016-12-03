@@ -182,6 +182,7 @@ struct SetterClient : simppl::dbus::Stub<Attributes>
       data.attach() >> std::bind(&SetterClient::handleData, this, _1, _2);
 
       // never use operator= here, it's blocking!
+      // FIXME change set_async interface to same way as async requests
       data.set_async(5555, [this](simppl::dbus::CallState cs){
           EXPECT_TRUE((bool)cs);
 

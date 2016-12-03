@@ -117,9 +117,10 @@ provided under
    /test/EchoService/myEcho
 
 
-Currently, this mapping is done automatically by simppl and cannot be changed.
-This also means that only one interface can be provided by a distinct
-objectpath, at least other than the properties interface needed for
+This mapping is done automatically by simppl, for servers this is currently
+fix. But clients may connect to any bus/objectpath layout in order to connect
+any D-Bus service. This also means that only one interface can be provided 
+by a distinct objectpath, at least other than the properties interface needed for
 providing service attributes/properties. But we will ignore signals and
 properties for now and continue with our EchoService. Let's instantiate the
 service server by inheriting our implementation class from simppl's
@@ -128,8 +129,8 @@ Skeleton:
 
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
-      MyEcho()
-       : simppl::dbus::Skeleton<EchoService>("myEcho")
+      MyEcho(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
       {
       }
    };
@@ -142,21 +143,19 @@ Let's provide an implementation for the echo method:
 
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
-      MyEcho()
-       : simppl::dbus::Skeleton<EchoService>("myEcho")
+      MyEcho(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
       {
-         echo >> std::bind(&handle_echo, this, _1);
-      }
-
-      void handle_echo(const std::string& echo_string)
-      {
-         std::cout << "Client says '" << echo_string << "'" << std::endl;
+         echo >> [](const std::string& echo_string){
+            std::cout << "Client says '" << echo_string << "'" << std::endl;
+         };
       }
    };
 
 
 Now, simppl will receive the echo request, unmarshall the argument and
-forward the request to the provided handle_echo method. But there is still
+forward the request to the provided lambda function (of course, you may 
+also bind any other function via std::bind). But there is still
 no response yet. Let's send a response back to the client:
 
 
@@ -165,13 +164,10 @@ no response yet. Let's send a response back to the client:
       MyEcho()
        : simppl::dbus::Skeleton<EchoService>("myEcho")
       {
-         echo >> std::bind(&MyEcho::handle_echo, this, _1);
-      }
-
-      void handle_echo(const std::string& echo_string)
-      {
-         std::cout << "Client says '" << echo_string << "'" << std::endl;
-         respond_with(echo(echo_string));
+         echo >> [this](const std::string& echo_string){
+            std::cout << "Client says '" << echo_string << "'" << std::endl;
+            respond_with(echo(echo_string));
+         };
       }
    };
 
@@ -182,9 +178,8 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
    int main()
    {
       simppl::dbus::Dispatcher disp("bus::session");
-      MyEcho instance;
-
-      disp.addServer(instance);
+      MyEcho instance(disp);
+      
       disp.run();
 
       return EXIT_SUCCESS;
@@ -201,9 +196,7 @@ with a simple blocking client:
    {
       simppl::dbus::Dispatcher disp("bus:session");
 
-      simppl::dbus::Stub<EchoService> stub("myEcho");
-      disp.addClient(stub);
-
+      simppl::dbus::Stub<EchoService> stub(disp, "myEcho");
       stub.connect();
 
       std::string echoed = stub.echo("Hello world!");
@@ -227,30 +220,26 @@ member function.
 
    class MyEchoClient : simppl::dbus::Stub<EchoService>
    {
-      MyEchoClient()
-       : simppl::dbus::Stub<EchoService>("myEcho")
+      MyEchoClient(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Stub<EchoService>(disp, "myEcho")
       {
          connected >> std::bind(&MyEchoClient::handle_connected, this, _1);
-         echo_response >> std::bind(&MyEchoClient::handle_echo, this, _1);
       }
 
       void handle_connected(simppl::dbus::ConnectionState st)
       {
          if (st == simppl::dbus::ConnectionState::Connected)
          {
-            echo.async("Hello World!);
+            echo.async("Hello World!) >> [](const simppl::dbus::Callstate st, const std::string& echo_string){
+               if (st)
+               {
+                  std::cout << "Server says '" << echo_string << "'" << std::endl;
+                  respond_with(echo(echo_string));
+               }
+               else
+                  std::cout << "Got error: " << st.what() << std::endl;
+            };
          }
-      }
-
-      void handle_echo(const simppl::dbus::Callstate st, const std::string& echo_string)
-      {
-         if (st)
-         {
-            std::cout << "Server says '" << echo_string << "'" << std::endl;
-            respond_with(echo(echo_string));
-         }
-         else
-            std::cout << "Got error: " << st.what() << std::endl;
       }
    };
 
@@ -269,9 +258,8 @@ blocking example:
    {
       simppl::dbus::Dispatcher disp("bus:session");
 
-      MyEchoClient client;
-      disp.addClient(client);
-
+      MyEchoClient client(disp);
+      
       disp.run();
 
       return EXIT_SUCCESS;
@@ -324,9 +312,8 @@ the structure, i.e. the structure can be used as any simple data type:
    {
       simppl::dbus::Dispatcher disp("bus:session");
 
-      simppl::dbus::Stub<ComplexTest> teststub("test");
-      disp.addClient(teststub);
-
+      simppl::dbus::Stub<ComplexTest> teststub(disp, "test");
+      
       Data d({ 42, "Hallo", ... });
 
       int i_ret;
@@ -355,8 +342,8 @@ on server side. See the clients connected callback:
 
    class MyComplexClient : simppl::dbus::Stub<ComplexTest>
    {
-      MyComplexClient()
-       : simppl::dbus::Stub<ComplexTest>("myEcho")
+      MyComplexClient(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Stub<ComplexTest>(disp, "myEcho")
       {
          connected >> std::bind(&MyComplexClient::handle_connected, this, _1);
       }

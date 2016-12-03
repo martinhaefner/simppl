@@ -48,7 +48,6 @@ struct Client : simppl::dbus::Stub<Timeout>
     : simppl::dbus::Stub<Timeout>(d, "tm")
    {
       connected >> std::bind(&Client::handleConnected, this, _1);
-      eval >> std::bind(&Client::handleEval, this, _1, _2);
    }
 
 
@@ -59,25 +58,22 @@ struct Client : simppl::dbus::Stub<Timeout>
       if (s == simppl::dbus::ConnectionState::Connected)
       {
          start_ = std::chrono::steady_clock::now();
-         eval.async(42);
+         
+         eval.async(42) >> [this](simppl::dbus::CallState state, double){
+            EXPECT_FALSE((bool)state);
+
+            EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
+
+            int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
+            EXPECT_GE(millis, 500);
+            EXPECT_LT(millis, 600);
+
+            gbl_disp->stop();   // servers dispatcher
+            disp().stop();
+         };
       }
 
       expect_ = simppl::dbus::ConnectionState::Disconnected;
-   }
-
-
-   void handleEval(simppl::dbus::CallState state, double)
-   {
-      EXPECT_FALSE((bool)state);
-
-      EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
-
-      int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
-      EXPECT_GE(millis, 500);
-      EXPECT_LT(millis, 600);
-
-      gbl_disp->stop();   // servers dispatcher
-      disp().stop();
    }
 
    std::chrono::steady_clock::time_point start_;
@@ -92,7 +88,6 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
     : simppl::dbus::Stub<Timeout>(d, "tm")
    {
       connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
-      eval >> std::bind(&DisconnectClient::handleEval, this, _1, _2);
    }
 
 
@@ -101,19 +96,18 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
       EXPECT_EQ(expect_, s);
 
       if (s == simppl::dbus::ConnectionState::Connected)
-         eval.async(777);
+      {
+         eval.async(777) >> [this](simppl::dbus::CallState state, double){
+            EXPECT_FALSE((bool)state);
+            EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
+
+            disp().stop();
+         };
+      }
 
       expect_ = simppl::dbus::ConnectionState::Disconnected;
    }
 
-
-   void handleEval(simppl::dbus::CallState state, double)
-   {
-      EXPECT_FALSE((bool)state);
-      EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
-
-      disp().stop();
-   }
 
    simppl::dbus::ConnectionState expect_ = simppl::dbus::ConnectionState::Connected;
 };
