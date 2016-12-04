@@ -194,11 +194,9 @@ struct ClientAttributeWritableMixin
 
       Variant<data_type> vt(t);
 
-      std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
+      that->stub().setProperty(that->signal_.name(), [&vt](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, vt);
-      };
-
-      that->stub().setProperty(that->signal_.name(), f);
+      });
    }
 
 
@@ -210,11 +208,9 @@ struct ClientAttributeWritableMixin
 
       Variant<data_type> vt(t);
 
-      std::function<void(detail::Serializer&)> f = [&vt](detail::Serializer& s){
+      return InterimCallbackHolder<holder_type>(that->stub().setPropertyAsync(that->signal_.name(), [&vt](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, vt);
-      };
-
-      return InterimCallbackHolder<holder_type>(that->stub().setPropertyAsync(that->signal_.name(), f));
+      }));
    }
 };
 
@@ -399,11 +395,9 @@ struct ClientRequest
 
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
-      std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
+      dbus_pending_call_ptr_t p = make_pending_call(stub->sendRequest(method_name_, [&](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, t...);
-      };
-
-      dbus_pending_call_ptr_t p = make_pending_call(stub->sendRequest(method_name_, f, is_oneway));
+      }, is_oneway));
 
       // FIXME move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
@@ -437,11 +431,9 @@ struct ClientRequest
 
       StubBase* stub = dynamic_cast<StubBase*>(parent_);
 
-      std::function<void(detail::Serializer&)> f = [&](detail::Serializer& s){
+      return InterimCallbackHolder<holder_type>(stub->sendRequest(method_name_, [&](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, t...);
-      };
-
-      return InterimCallbackHolder<holder_type>(stub->sendRequest(method_name_, f, false));
+      }, false));
    }
 
 
