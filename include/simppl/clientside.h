@@ -115,6 +115,66 @@ struct ClientSignal : ClientSignalBase
 };
 
 
+template<typename HolderT>
+struct InterimCallbackHolder
+{
+   typedef HolderT holder_type;
+   
+   explicit inline
+   InterimCallbackHolder(DBusPendingCall* pc)
+    : pc_(make_pending_call(pc))
+   {
+      // NOOP
+   }
+   
+   dbus_pending_call_ptr_t pc_;
+};
+
+
+// ---------------------------------------------------------------------------------------------
+
+
+template<typename FuncT, typename ReturnT>
+struct CallbackHolder 
+{
+   CallbackHolder(const CallbackHolder&) = delete;
+   CallbackHolder& operator=(const CallbackHolder&) = delete;
+   
+
+   explicit inline
+   CallbackHolder(const FuncT& f)
+    : f_(f)
+   {
+      // NOOP
+   }
+   
+   static inline 
+   void _delete(void* p)
+   {
+      auto that = (CallbackHolder*)p;
+      delete that;
+   }
+   
+   static
+   void pending_notify(DBusPendingCall* pc, void* data)
+   {
+       dbus_pending_call_ptr_t upc = make_pending_call(pc);
+       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
+
+       auto that = (CallbackHolder*)data;
+       assert(that->f_);
+
+       CallState cs(*msg);
+
+       detail::Deserializer d(msg.get());
+       detail::GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);
+   }
+
+   
+   FuncT f_;
+};
+
+
 // ---------------------------------------------------------------------------------------------
 
 
@@ -123,6 +183,7 @@ struct ClientAttributeWritableMixin
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
+   typedef CallbackHolder<std::function<void(CallState)>, void> holder_type;
 
 
    /// blocking version
@@ -137,12 +198,12 @@ struct ClientAttributeWritableMixin
          simppl::dbus::detail::serialize(s, vt);
       };
 
-      that->stub().setProperty(that->signal_.name(), f, nullptr);
+      that->stub().setProperty(that->signal_.name(), f);
    }
 
 
    /// async version
-   void set_async(arg_type t, const std::function<void(CallState)>& callback)
+   InterimCallbackHolder<holder_type> set_async(arg_type t)
    {
       AttributeT* that = (AttributeT*)this;
       that->data_ = t;
@@ -153,7 +214,7 @@ struct ClientAttributeWritableMixin
          simppl::dbus::detail::serialize(s, vt);
       };
 
-      that->stub().setProperty(that->signal_.name(), f, &callback);
+      return InterimCallbackHolder<holder_type>(that->stub().setPropertyAsync(that->signal_.name(), f));
    }
 };
 
@@ -296,63 +357,6 @@ struct ClientAttribute
 
 
 // --------------------------------------------------------------------------------
-
-
-template<typename FuncT, typename ReturnT>
-struct CallbackHolder 
-{
-   CallbackHolder(const CallbackHolder&) = delete;
-   CallbackHolder& operator=(const CallbackHolder&) = delete;
-   
-
-   explicit
-   CallbackHolder(const FuncT& f)
-    : f_(f)
-   {
-      // NOOP
-   }
-   
-   static 
-   void _delete(void* p)
-   {
-      auto that = (CallbackHolder*)p;
-      delete that;
-   }
-   
-   static
-   void pending_notify(DBusPendingCall* pc, void* data)
-   {
-       dbus_pending_call_ptr_t upc = make_pending_call(pc);
-       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
-
-       auto that = (CallbackHolder*)data;
-       assert(that->f_);
-
-       CallState cs(*msg);
-
-       detail::Deserializer d(msg.get());
-       detail::GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);
-   }
-
-   
-   FuncT f_;
-};
-
-
-template<typename HolderT>
-struct InterimCallbackHolder
-{
-   typedef HolderT holder_type;
-   
-   explicit inline
-   InterimCallbackHolder(DBusPendingCall* pc)
-    : pc_(make_pending_call(pc))
-   {
-      // NOOP
-   }
-   
-   dbus_pending_call_ptr_t pc_;
-};
 
 
 template<typename... ArgsT>

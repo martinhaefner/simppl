@@ -13,40 +13,6 @@
 using namespace std::literals::chrono_literals;
 
 
-namespace {
-
-    struct PendingAttributeSetHelper
-    {
-        PendingAttributeSetHelper(const std::function<void(simppl::dbus::CallState cs)>& cb)
-         : cb_(cb)
-        {
-            // NOOP
-        }
-
-        static
-        void _delete(void* user_data)
-        {
-            PendingAttributeSetHelper* that = static_cast<PendingAttributeSetHelper*>(user_data);
-            delete that;
-        }
-
-        static
-        void callback(DBusPendingCall* pending, void *user_data)
-        {
-            simppl::dbus::dbus_pending_call_ptr_t upc = simppl::dbus::make_pending_call(pending);
-            simppl::dbus::dbus_message_ptr_t msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pending));
-
-            simppl::dbus::CallState cs(*msg);
-            PendingAttributeSetHelper* that = static_cast<PendingAttributeSetHelper*>(user_data);
-            that->cb_(cs);
-        }
-
-        std::function<void(simppl::dbus::CallState cs)> cb_;
-    };
-
-}   // namespace
-
-
 namespace simppl
 {
 
@@ -247,7 +213,7 @@ dbus_message_ptr_t StubBase::getProperty(const char* name)
 }
 
 
-void StubBase::setProperty(const char* name, std::function<void(detail::Serializer&)> f, const std::function<void(CallState)>* callback)
+void StubBase::setProperty(const char* name, std::function<void(detail::Serializer&)> f)
 {
     dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
@@ -255,34 +221,39 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
     s << iface() << name;
     f(s);   // and now serialize the variant
 
-    if (callback)
-    {
-        DBusPendingCall* pending = nullptr;
+     DBusError err;
+     dbus_error_init(&err);
 
-        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
+     DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg.get(), DBUS_TIMEOUT_USE_DEFAULT, &err);
 
-        PendingAttributeSetHelper* helper = new PendingAttributeSetHelper(*callback);
-        dbus_pending_call_set_notify(pending, &PendingAttributeSetHelper::callback, helper, &PendingAttributeSetHelper::_delete);
+     // drop original message
+     msg.reset(reply);
+
+     // check for reponse
+     if (dbus_error_is_set(&err))
+     {
+        // TODO make static function to throw from DBusError
+        Error ex(err.name, err.message);
+
+        dbus_error_free(&err);
+        throw ex;
     }
-    else
-    {
-        DBusError err;
-        dbus_error_init(&err);
+}
 
-        DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg.get(), DBUS_TIMEOUT_USE_DEFAULT, &err);
 
-        // drop original message
-        msg.reset();
+DBusPendingCall* StubBase::setPropertyAsync(const char* name, std::function<void(detail::Serializer&)> f)
+{
+    dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
-        // check for reponse
-        if (dbus_error_is_set(&err))
-        {
-           Error ex(err.name, err.message);
+    detail::Serializer s(msg.get());
+    s << iface() << name;
+    f(s);   // and now serialize the variant
 
-           dbus_error_free(&err);
-           throw ex;
-        }
-    }
+    DBusPendingCall* pending = nullptr;
+
+    dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
+    
+    return pending;
 }
 
 

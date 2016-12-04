@@ -110,9 +110,11 @@ protected:
    dbus_message_ptr_t getProperty(const char* name);
 
    /**
-    * Currently only via this blocking call.
+    * Blocking call.
     */
-   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f, const std::function<void(CallState)>* callback);
+   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
+   
+   DBusPendingCall* setPropertyAsync(const char* Name, std::function<void(detail::Serializer&)> f);
 
    char* iface_;
    char* objectpath_;
