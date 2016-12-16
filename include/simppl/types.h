@@ -14,21 +14,21 @@ namespace dbus
 {
 
 
-typedef std::unique_ptr<::DBusMessage, void(*)(::DBusMessage*)> dbus_message_ptr_t;
+typedef std::unique_ptr<::DBusMessage, void(*)(::DBusMessage*)> message_ptr_t;
 
 inline
-dbus_message_ptr_t make_message(DBusMessage* p)
+message_ptr_t make_message(DBusMessage* p)
 {
-    return dbus_message_ptr_t(p, &dbus_message_unref);
+    return message_ptr_t(p, &dbus_message_unref);
 }
 
 
-typedef std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> dbus_pending_call_ptr_t;
+typedef std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> pending_call_ptr_t;
 
 inline
-dbus_pending_call_ptr_t make_pending_call(DBusPendingCall* p)
+pending_call_ptr_t make_pending_call(DBusPendingCall* p)
 {
-    return dbus_pending_call_ptr_t(p, &dbus_pending_call_unref);
+    return pending_call_ptr_t(p, &dbus_pending_call_unref);
 }
 
 

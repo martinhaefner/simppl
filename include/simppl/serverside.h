@@ -8,8 +8,9 @@
 
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
-#include "simppl/attribute.h"
+#include "simppl/property.h"
 #include "simppl/skeletonbase.h"
+#include "simppl/serialization.h"
 #include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
 
@@ -51,6 +52,9 @@ struct ServerRequestBase
    virtual void introspect(std::ostream& os) = 0;
 #endif
 
+   ServerRequestBase* next_;
+   const char* name_;
+
 protected:
 
    ServerRequestBase(const char* name, detail::BasicInterface* iface);
@@ -60,8 +64,6 @@ protected:
    {
       // NOOP
    }
-
-   const char* name_;
 };
 
 
@@ -74,6 +76,7 @@ struct ServerSignalBase
 
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) = 0;
+   ServerSignalBase* next_;   // list hook
 #endif
 
 protected:
@@ -105,7 +108,7 @@ struct ServerSignal : ServerSignalBase
       if (parent_->conn_)
       {
          SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-         dbus_message_ptr_t msg = make_message(dbus_message_new_signal(skel->objectpath(), skel->iface(), name_));
+         message_ptr_t msg = make_message(dbus_message_new_signal(skel->objectpath(), skel->iface(), name_));
 
          detail::Serializer s(msg.get());
          serialize(s, args...);
@@ -158,7 +161,7 @@ struct ServerRequest : ServerRequestBase
 
     template<typename FunctorT>
     inline
-    void handledBy(FunctorT func)
+    void handled_by(FunctorT func)
     {
         assert(!f_);
         f_ = func;
@@ -216,9 +219,9 @@ private:
 // -----------------------------------------------------------------------------------------
 
 
-struct ServerAttributeBase
+struct ServerPropertyBase
 {
-   ServerAttributeBase(const char* name, detail::BasicInterface* iface);
+   ServerPropertyBase(const char* name, detail::BasicInterface* iface);
 
    virtual void eval(DBusMessage* msg) = 0;
    virtual void evalSet(detail::Deserializer& ds) = 0;
@@ -227,25 +230,26 @@ struct ServerAttributeBase
    virtual void introspect(std::ostream& os) = 0;
 #endif
 
+   ServerPropertyBase* next_;   ///< list hook
+   const char* name_;
+
 protected:
 
    inline
-   ~ServerAttributeBase()
+   ~ServerPropertyBase()
    {
       // NOOP
    }
-
-   const char* name_;
 };
 
 
 template<typename DataT>
-struct BaseAttribute : ServerAttributeBase
+struct BaseProperty : ServerPropertyBase
 {
    inline
-   BaseAttribute(const char* name, detail::BasicInterface* iface)
+   BaseProperty(const char* name, detail::BasicInterface* iface)
     : sig_(name, iface)
-    , ServerAttributeBase(name, iface)
+    , ServerPropertyBase(name, iface)
    {
       // NOOP
    }
@@ -272,18 +276,18 @@ protected:
 
 
 template<typename DataT, int Flags>
-struct ServerAttribute : BaseAttribute<DataT>
+struct ServerProperty : BaseProperty<DataT>
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
    inline
-   ServerAttribute(const char* name, detail::BasicInterface* iface)
-    : BaseAttribute<DataT>(name, iface)
+   ServerProperty(const char* name, detail::BasicInterface* iface)
+    : BaseProperty<DataT>(name, iface)
    {
       // NOOP
    }
 
-   ServerAttribute& operator=(const DataT& data)
+   ServerProperty& operator=(const DataT& data)
    {
       // FIXME if emitting...
       this->sig_.emit(data);
@@ -307,7 +311,7 @@ protected:
    void introspect(std::ostream& os)
    {
       // FIXME name_ seems to be here multiple times: signal and ABase
-      os << "    <property name=\"" << ServerAttributeBase::name_ << "\" type=\"";
+      os << "    <property name=\"" << ServerPropertyBase::name_ << "\" type=\"";
       detail::make_type_signature<DataT>::eval(os);
       os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }
@@ -324,7 +328,7 @@ template<typename FunctorT, typename... T>
 inline
 void operator>>(simppl::dbus::ServerRequest<T...>& r, const FunctorT& f)
 {
-   r.handledBy(f);
+   r.handled_by(f);
 }
 
 

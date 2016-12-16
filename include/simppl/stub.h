@@ -27,17 +27,16 @@ template<template<template<typename...> class,
                   template<typename...> class,
                   template<typename,int> class>
    class IfaceT>
-struct Stub : StubBase, IfaceT<ClientRequest, ClientSignal, ClientAttribute>
+struct Stub : StubBase, IfaceT<ClientRequest, ClientSignal, ClientProperty>
 {
    friend struct Dispatcher;
 
 private:
 
-   typedef IfaceT<ClientRequest, ClientSignal, ClientAttribute> interface_type;
+   typedef IfaceT<ClientRequest, ClientSignal, ClientProperty> interface_type;
 
 public:
 
-   // FIXME add dispatcher as argument to stub and skeleton, remove the addXXX methods from dispatcher
    inline
    Stub(Dispatcher& disp, const char* role)
     : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)

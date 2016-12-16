@@ -36,7 +36,7 @@ Error::Error(const char* name, const char* msg, uint32_t serial)
  : serial_(serial)
 {
     assert(name);
-    // FIXME check name for valid dbus name (<atom>.<atom>)
+    // TODO check name for valid dbus name (<atom>.<atom>)
 
     size_t capacity = strlen(name) + 1;
 
@@ -90,7 +90,7 @@ Error::~Error()
 }
 
 
-dbus_message_ptr_t Error::make_reply_for(DBusMessage& req) const
+message_ptr_t Error::make_reply_for(DBusMessage& req) const
 {
     return make_message(dbus_message_new_error(&req, name(), message()));
 }

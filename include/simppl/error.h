@@ -31,7 +31,7 @@ struct Error : public std::exception
     ~Error();
 
     // FIXME privates and friend
-    dbus_message_ptr_t make_reply_for(/*FIXME const*/DBusMessage& req) const;
+    message_ptr_t make_reply_for(/*FIXME const*/DBusMessage& req) const;
     void _throw();
 
     const char* what() const throw();

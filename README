@@ -121,7 +121,7 @@ This mapping is done automatically by simppl, for servers this is currently
 fix. But clients may connect to any bus/objectpath layout in order to connect
 any D-Bus service. This also means that only one interface can be provided 
 by a distinct objectpath, at least other than the properties interface needed for
-providing service attributes/properties. But we will ignore signals and
+providing service properties. But we will ignore signals and
 properties for now and continue with our EchoService. Let's instantiate the
 service server by inheriting our implementation class from simppl's
 Skeleton:
@@ -146,7 +146,8 @@ Let's provide an implementation for the echo method:
       MyEcho(simppl::dbus::Dispatcher& disp)
        : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
       {
-         echo >> [](const std::string& echo_string){
+         echo >> [](const std::string& echo_string)
+         {
             std::cout << "Client says '" << echo_string << "'" << std::endl;
          };
       }
@@ -164,7 +165,8 @@ no response yet. Let's send a response back to the client:
       MyEcho()
        : simppl::dbus::Skeleton<EchoService>("myEcho")
       {
-         echo >> [this](const std::string& echo_string){
+         echo >> [this](const std::string& echo_string)
+         {
             std::cout << "Client says '" << echo_string << "'" << std::endl;
             respond_with(echo(echo_string));
          };
@@ -230,7 +232,8 @@ member function.
       {
          if (st == simppl::dbus::ConnectionState::Connected)
          {
-            echo.async("Hello World!) >> [](const simppl::dbus::Callstate st, const std::string& echo_string){
+            echo.async("Hello World!) >> [](const simppl::dbus::Callstate st, const std::string& echo_string)
+            {
                if (st)
                {
                   std::cout << "Server says '" << echo_string << "'" << std::endl;
@@ -267,7 +270,7 @@ blocking example:
 
 
 Easy, isn't it? But with simppl/dbus it is also possible to model signals
-and attributes. Moreover, any complex data can be passed between client
+and properties. Moreover, any complex data can be passed between client
 and server. See the following example:
 
 
@@ -289,7 +292,7 @@ and server. See the following example:
 
          Signal<std::map<int,int>> sig;
 
-         Attribute<Data> data;
+         Property<Data> data;
 
          ComplexTest()
           : INIT(eval)
@@ -329,14 +332,13 @@ Have you notices how methods with more than one return value are mapped
 to a tuple out parameter which can be tie'd to the local variables in
 this blocking call? Isn't that cool?
 
-The signal and attribute in the example above is only sensefully usable
+The signal in the example above is only sensefully usable
 in an event loop driven client. There is a slight difference between
-the attributes concept of simppl and the properties concept of dbus.
-This is due to the history of simppl which was not designed having
-dbus as the native transport in mind. But it's nothing that cannot be
-changed in future. simppl attributes are not writable, from the clients
-perspective attributes are just readable. Clients typically register
-for update notifications in order to receive changes on the attributes
+the properties concepts of simppl and dbus for now: the changed notification
+will not be part of the Properties interface so only get and set may 
+currently be used to access properties of non-simppl services. But this is 
+nothing that cannot be changed in future. See how a client will typically 
+register for update notifications in order to receive changes on the properties
 on server side. See the clients connected callback:
 
 
@@ -345,32 +347,27 @@ on server side. See the clients connected callback:
       MyComplexClient(simppl::dbus::Dispatcher& disp)
        : simppl::dbus::Stub<ComplexTest>(disp, "myEcho")
       {
-         connected >> std::bind(&MyComplexClient::handle_connected, this, _1);
-      }
-
-      void handle_connected(simppl::dbus::ConnectionState st)
-      {
-         if (st == simppl::dbus::ConnectionState::Connected)
+         connected >> [this](simppl::dbus::ConnectionState st)
          {
-            sig.attach() >> std::bind(&MyComplexClient::handle_signal, this, _1);
-            data.attach() >> std::bind(&MyComplexClient::handle_data_change, this, _1);
-         }
-         else
-         {
-            sig.detach();
-            data.detach();
-         }
-      }
-
-      void handle_signal(const std::map<int,int>& m)
-      {
-         ...
-      }
-
-      void handle_data_change(const Data& d)
-      {
-         // first callback is due to the attach!
-         ...
+            if (st == simppl::dbus::ConnectionState::Connected)
+            {
+               sig.attach() >> [](const std::map<int,int>& m)
+               {
+                  ...
+               };
+               
+               data.attach() >> [](const Data& d)
+               {
+                  // first callback is due to the attach!
+                  ...
+               };
+            }
+            else
+            {
+               sig.detach();
+               data.detach();
+            }
+         };
       }
    };
 

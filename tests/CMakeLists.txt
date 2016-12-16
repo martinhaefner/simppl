@@ -15,7 +15,7 @@ add_executable(unittests
    simple.cpp
    errors.cpp
    async_server.cpp
-   attributes.cpp
+   properties.cpp
    variant.cpp
 )
 

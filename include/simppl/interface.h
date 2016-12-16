@@ -3,8 +3,6 @@
 
 
 #include <cstdint>
-#include <vector>
-#include <map>
 
 #include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
@@ -23,14 +21,14 @@ namespace dbus
 // forward decls
 template<typename...> struct ClientRequest;
 template<typename...> struct ClientSignal;
-template<typename, int> struct ClientAttribute;
+template<typename, int> struct ClientProperty;
 
 template<typename...> struct ServerRequest;
 template<typename...> struct ServerSignal;
-template<typename, int> struct ServerAttribute;
+template<typename, int> struct ServerProperty;
 
 struct ServerRequestBase;
-struct ServerAttributeBase;
+struct ServerPropertyBase;
 struct ServerSignalBase;
 struct ServerRequestBaseSetter;
 
@@ -48,12 +46,19 @@ struct InterfaceBase<ClientRequest> : detail::BasicInterface
 template<>
 struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
-   // FIXME maybe use intrusive container here or take char* from static linkage?!
-   std::map<std::string, ServerRequestBase*> methods_;
-   std::map<std::string, ServerAttributeBase*> attributes_;
+   InterfaceBase()
+    : methods_(nullptr)
+    , signals_(nullptr)
+   {
+      // NOOP
+   }
+   
+   // linked list heads
+   ServerRequestBase* methods_;    
+   ServerPropertyBase* properties_;
 
 #if SIMPPL_HAVE_INTROSPECTION
-   std::map<std::string, ServerSignalBase*> signals_;
+   ServerSignalBase* signals_;   
 #endif
 };
 
@@ -66,7 +71,7 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
 #define INTERFACE(iface) \
    template<template<typename...> class Request, \
             template<typename...> class Signal, \
-            template<typename, int Flags=simppl::dbus::Notifying|simppl::dbus::ReadOnly> class Attribute> \
+            template<typename, int Flags=simppl::dbus::Notifying|simppl::dbus::ReadOnly> class Property> \
       struct iface : public simppl::dbus::InterfaceBase<Request>
 
 #define INIT(what) \

@@ -8,8 +8,6 @@
 #include <thread>
 
 
-using namespace std::placeholders;
-
 using simppl::dbus::in;
 using simppl::dbus::out;
 
@@ -47,23 +45,19 @@ struct Client : simppl::dbus::Stub<Errors>
    Client(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Errors>(d, "s")
    {
-      connected >> std::bind(&Client::handleConnected, this, _1);
-   }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       
-      hello.async() >> [this](simppl::dbus::CallState state){
-         EXPECT_FALSE((bool)state);
-         EXPECT_STREQ(state.exception().name(), "shit.happens");
-
-         hello1.async(42) >> [this](simppl::dbus::CallState state, int){
+         hello.async() >> [this](simppl::dbus::CallState state){
             EXPECT_FALSE((bool)state);
-            EXPECT_STREQ(state.exception().name(), "also.shit");
+            EXPECT_STREQ(state.exception().name(), "shit.happens");
 
-            disp().stop();
+            hello1.async(42) >> [this](simppl::dbus::CallState state, int){
+               EXPECT_FALSE((bool)state);
+               EXPECT_STREQ(state.exception().name(), "also.shit");
+
+               disp().stop();
+            };
          };
       };
    }
@@ -75,24 +69,17 @@ struct Server : simppl::dbus::Skeleton<Errors>
    Server(simppl::dbus::Dispatcher& d, const char* rolename)
     : simppl::dbus::Skeleton<Errors>(d, rolename)
    {
-      stop >> std::bind(&Server::handleStop, this);
-      hello >> std::bind(&Server::handleHello, this);
-      hello1 >> std::bind(&Server::handleHello1, this, _1);
-   }
-
-   void handleStop()
-   {
-      disp().stop();
-   }
-
-   void handleHello()
-   {
-      respondWith(simppl::dbus::Error("shit.happens"));
-   }
-
-   void handleHello1(int i)
-   {
-      respondWith(simppl::dbus::Error("also.shit"));
+      stop >> [this](){ 
+         disp().stop(); 
+      };
+      
+      hello >> [this](){
+         respond_with(simppl::dbus::Error("shit.happens"));
+      };
+      
+      hello1 >> [this](int){
+         respond_with(simppl::dbus::Error("also.shit"));
+      };
    }
 };
 

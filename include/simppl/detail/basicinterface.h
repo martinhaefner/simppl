@@ -17,16 +17,14 @@ namespace detail
 
 struct BasicInterface
 {
-    inline
-    BasicInterface()
-     : conn_(nullptr)
-    {
-        // NOOP
-    }
+   BasicInterface(const BasicInterface&) = delete;
+   BasicInterface& operator=(const BasicInterface&) = delete;
+   
+   BasicInterface();
+    
+   virtual ~BasicInterface();
 
-    virtual ~BasicInterface() { /*NOOP*/ }  // FIXME move to .cpp file
-
-    DBusConnection* conn_;
+   DBusConnection* conn_;
 };
 
 }   // namespace detail

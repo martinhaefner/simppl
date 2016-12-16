@@ -35,8 +35,8 @@ struct StubBase
 {
    template<typename... T> friend struct ClientSignal;
    template<typename... T> friend struct ClientRequest;
-   template<typename, int> friend struct ClientAttribute;
-   template<typename, typename> friend struct ClientAttributeWritableMixin;
+   template<typename, int> friend struct ClientProperty;
+   template<typename, typename> friend struct ClientPropertyWritableMixin;
 
    friend struct Dispatcher;
 
@@ -93,7 +93,7 @@ protected:
 
    void cleanup();
 
-   DBusPendingCall* sendRequest(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
+   DBusPendingCall* send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    inline
    std::string busname() const
@@ -101,20 +101,22 @@ protected:
       return busname_;
    }
 
-   void sendSignalRegistration(ClientSignalBase& sigbase);
-   void sendSignalUnregistration(ClientSignalBase& sigbase);
-
-   void getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data);
-
-   // blocking version
-   dbus_message_ptr_t getProperty(const char* name);
+   void register_signal(ClientSignalBase& sigbase);
+   void unregister_signal(ClientSignalBase& sigbase);
 
    /**
     * Blocking call.
     */
-   void setProperty(const char* Name, std::function<void(detail::Serializer&)> f);
+   message_ptr_t get_property(const char* name);
+
+   DBusPendingCall* get_property_async(const char* name);
+
+   /**
+    * Blocking call.
+    */
+   void set_property(const char* Name, std::function<void(detail::Serializer&)> f);
    
-   DBusPendingCall* setPropertyAsync(const char* Name, std::function<void(detail::Serializer&)> f);
+   DBusPendingCall* set_property_async(const char* Name, std::function<void(detail::Serializer&)> f);
 
    char* iface_;
    char* objectpath_;

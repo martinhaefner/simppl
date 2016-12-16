@@ -19,38 +19,29 @@ namespace org
       {
          INTERFACE(Introspectable)
          {
-            //typedef tTrueType introspectable;
-
-            Request<> Introspect;
-            Response<std::string> rIntrospect;
-
+            Request<out<std::string>> Introspect;
+            
             Introspectable()
              : INIT(Introspect)
-             , INIT(rIntrospect)
             {
-               Introspect >> rIntrospect;
-
-               //describe_arguments(rIntrospect, "data");
+               // NOOP
             }
          };
 
+
          INTERFACE(Properties)
          {
-            Request<std::string, std::string> Get;
-            Request<std::string, std::string, Variant<int>> Set;  // FIXME need type any instead!
-
-            Response<Variant<int>> rGet;
-
+            Request<in<std::string>, in<std::string> out<Any>> Get;
+            Request<in<std::string>, in<std::string>, in<Any>> Set;
+            Request<in<std::string>, in<std::string>, out<std::map<std::string, Any>>> GetAll;
+            
+            // TODO Signal<...> PropertiesChanged;
+            
             Properties()
              : INIT(Get)
              , INIT(Set)
-             , INIT(rGet)
             {
-               Get >> rGet;
-
-               //describe_arguments(Get, "interface_name", "property_name");
-               //describe_arguments(rGet, "value");
-               //describe_arguments(Set, "interface_name", "property_name", "value");
+               // NOOP
             }
          };
       }
@@ -70,7 +61,7 @@ namespace dbus
 DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusMessage* msg, void *user_data)
 {
    SkeletonBase* skel = (SkeletonBase*)user_data;
-   return skel->handleRequest(msg);
+   return skel->handle_request(msg);
 }
 
 
@@ -119,7 +110,7 @@ Dispatcher& SkeletonBase::disp()
 }
 
 
-ServerRequestDescriptor SkeletonBase::deferResponse()
+ServerRequestDescriptor SkeletonBase::defer_response()
 {
    assert(current_request_);
   // assert(current_request_.requestor_->hasResponse());
@@ -128,12 +119,12 @@ ServerRequestDescriptor SkeletonBase::deferResponse()
 }
 
 
-void SkeletonBase::respondWith(detail::ServerResponseHolder response)
+void SkeletonBase::respond_with(detail::ServerResponseHolder response)
 {
    assert(current_request_);
    //assert(response.responder_->allowedRequests_.find(current_request_.requestor_) != response.responder_->allowedRequests_.end());
 
-   dbus_message_ptr_t rmsg = make_message(dbus_message_new_method_return(current_request_.msg_));
+   message_ptr_t rmsg = make_message(dbus_message_new_method_return(current_request_.msg_));
 
    if (response.f_)
    {
@@ -147,12 +138,12 @@ void SkeletonBase::respondWith(detail::ServerResponseHolder response)
 }
 
 
-void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response)
+void SkeletonBase::respond_on(ServerRequestDescriptor& req, detail::ServerResponseHolder response)
 {
    assert(req);
    //assert(response.responder_->allowedRequests_.find(req.requestor_) != response.responder_->allowedRequests_.end());
 
-   dbus_message_ptr_t rmsg = make_message(dbus_message_new_method_return(req.msg_));
+   message_ptr_t rmsg = make_message(dbus_message_new_method_return(req.msg_));
 
    if (response.f_)
    {
@@ -166,38 +157,38 @@ void SkeletonBase::respondOn(ServerRequestDescriptor& req, detail::ServerRespons
 }
 
 
-void SkeletonBase::respondWith(const Error& err)
+void SkeletonBase::respond_with(const Error& err)
 {
    assert(current_request_);
    //assert(current_request_.requestor_->hasResponse());
 
-   dbus_message_ptr_t rmsg = err.make_reply_for(*currentRequest().msg_);
+   message_ptr_t rmsg = err.make_reply_for(*current_request().msg_);
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
    current_request_.clear();   // only respond once!!!
 }
 
 
-void SkeletonBase::respondOn(ServerRequestDescriptor& req, const Error& err)
+void SkeletonBase::respond_on(ServerRequestDescriptor& req, const Error& err)
 {
    assert(req);
    //assert(req.requestor_->hasResponse());
 
-   dbus_message_ptr_t rmsg = err.make_reply_for(*req.msg_);
+   message_ptr_t rmsg = err.make_reply_for(*req.msg_);
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
    req.clear();
 }
 
 
-const ServerRequestDescriptor& SkeletonBase::currentRequest() const
+const ServerRequestDescriptor& SkeletonBase::current_request() const
 {
    assert(current_request_);
    return current_request_;
 }
 
 
-DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
+DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 {
    const char* method = dbus_message_get_member(msg);
    const char* interface = dbus_message_get_interface(msg);
@@ -213,24 +204,27 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
              "<node name=\""<< objectpath() << "\">\n"
              "  <interface name=\""<< iface() << "\">\n";
 
-         auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
-         for(auto& method : methods)
+         auto pm = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+         while(pm)
          {
-            method.second->introspect(oss);
+            pm->introspect(oss);
+            pm = pm->next_;
          }
 
-         auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
-         for(auto& attribute : attributes)
+         auto pa = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_;
+         while(pa)
          {
-            attribute.second->introspect(oss);
+            pa->introspect(oss);
+            pa = pa->next_;
          }
-
-         auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
-         for(auto& sig : signals)
+            
+         auto ps = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
+         while(ps)
          {
-            sig.second->introspect(oss);
+            ps->introspect(oss);
+            ps = ps->next_;
          }
-
+         
          // introspectable
          oss << "  </interface>\n"
              "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
@@ -270,7 +264,7 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
    {
        if (!strcmp(method, "Get") || !strcmp(method, "Set"))
        {
-          auto& attributes = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->attributes_;
+          auto p = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_;
 
           std::string interface;
           std::string attribute;
@@ -278,54 +272,59 @@ DBusHandlerResult SkeletonBase::handleRequest(DBusMessage* msg)
           detail::Deserializer ds(msg);
           ds >> interface >> attribute;
 
-          auto iter = attributes.find(attribute);
-          if (iter != attributes.end())
+          while(p)
           {
-             if (method[0] == 'G')
+             if (attribute == p->name_)
              {
-                dbus_message_ptr_t response = make_message(dbus_message_new_method_return(msg));
-                iter->second->eval(response.get());
+                if (method[0] == 'G')
+                {
+                   message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                   p->eval(response.get());
 
-                dbus_connection_send(disp_->conn_, response.get(), nullptr);
+                   dbus_connection_send(disp_->conn_, response.get(), nullptr);
+                }
+                else
+                {
+                   p->evalSet(ds);
+
+                   message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                   dbus_connection_send(disp_->conn_, response.get(), nullptr);
+                }
+                
+                return DBUS_HANDLER_RESULT_HANDLED;
              }
-             else
-             {
-                iter->second->evalSet(ds);
 
-                dbus_message_ptr_t response = make_message(dbus_message_new_method_return(msg));
-                dbus_connection_send(disp_->conn_, response.get(), nullptr);
-             }
-
-             return DBUS_HANDLER_RESULT_HANDLED;
+             p = p->next_;
           }
-          else
-             std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
+          
+          std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
        }
-       else
-          std::cerr << "unsupported Properties call method '" << method << "'" << std::endl;
    }
    else
    {
-      auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
-
-      auto iter = methods.find(method);
-      if (iter != methods.end())
+      auto pm = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+      while(pm)
       {
-          current_request_.set(iter->second, msg);
-          iter->second->eval(msg);
+         if (!strcmp(method, pm->name_))
+         {
+            current_request_.set(pm, msg);
+            pm->eval(msg);
 
-          // current_request_ is only valid if no response handler was called
-          if (current_request_)
-          {
-             // in that case the request must not have a reponse
-             //assert(!current_request_.requestor_->hasResponse());
-             current_request_.clear();
-          }
+            // current_request_ is only valid if no response handler was called
+            if (current_request_)
+            {
+               // in that case the request must not have a reponse
+               //assert(!current_request_.requestor_->hasResponse());
+               current_request_.clear();
+            }
 
-          return DBUS_HANDLER_RESULT_HANDLED;
+            return DBUS_HANDLER_RESULT_HANDLED;
+         }
+         
+         pm = pm->next_;
       }
-      else
-         std::cout << "method '" << method << "' unknown" << std::endl;
+      
+      std::cerr << "method '" << method << "' unknown" << std::endl;
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

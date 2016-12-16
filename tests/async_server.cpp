@@ -8,8 +8,6 @@
 #include <thread>
 
 
-using namespace std::placeholders;
-
 using simppl::dbus::in;
 using simppl::dbus::out;
 
@@ -48,22 +46,18 @@ struct Client : simppl::dbus::Stub<AsyncServer>
    Client(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<AsyncServer>(d, "s")
    {
-      connected >> std::bind(&Client::handleConnected, this, _1);
-   }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
       
-      add.async(42, 777) >> [this](simppl::dbus::CallState s, double d){
-         EXPECT_TRUE((bool)s);
-         oneway(42);
-      };
-      
-      echo.async(42, 3.1415) >> [this](simppl::dbus::CallState s, int i, double d){
-         EXPECT_TRUE((bool)s);
-         haveEcho_ = true;
+         add.async(42, 777) >> [this](simppl::dbus::CallState s, double d){
+            EXPECT_TRUE((bool)s);
+            oneway(42);
+         };
+         
+         echo.async(42, 3.1415) >> [this](simppl::dbus::CallState s, int i, double d){
+            EXPECT_TRUE((bool)s);
+            haveEcho_ = true;
+         };
       };
    }
 
@@ -76,30 +70,25 @@ struct ShutdownClient : simppl::dbus::Stub<AsyncServer>
    ShutdownClient(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<AsyncServer>(d, "s")
    {
-      connected >> std::bind(&ShutdownClient::handleConnected, this, _1);
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(expected_, s);
+
+         if (s == simppl::dbus::ConnectionState::Connected)
+         {
+            add.async(42, 777) >> [this](simppl::dbus::CallState s, double d){
+               EXPECT_FALSE((bool)s);
+               EXPECT_STREQ(s.exception().name(), "org.freedesktop.DBus.Error.NoReply");
+      
+               disp().stop();
+            };
+            
+            oneway(42);
+         }
+
+         expected_ = simppl::dbus::ConnectionState::Disconnected;
+         ++count_;
+      };
    }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expected_, s);
-
-      if (s == simppl::dbus::ConnectionState::Connected)
-      {
-         add.async(42, 777) >> [this](simppl::dbus::CallState s, double d){
-            EXPECT_FALSE((bool)s);
-            EXPECT_STREQ(s.exception().name(), "org.freedesktop.DBus.Error.NoReply");
-   
-            disp().stop();
-         };
-         
-         oneway(42);
-      }
-
-      expected_ = simppl::dbus::ConnectionState::Disconnected;
-      ++count_;
-   }
-
 
    simppl::dbus::ConnectionState expected_ = simppl::dbus::ConnectionState::Connected;
    int count_ = 0;
@@ -111,25 +100,18 @@ struct Server : simppl::dbus::Skeleton<AsyncServer>
    Server(simppl::dbus::Dispatcher& d, const char* rolename)
     : simppl::dbus::Skeleton<AsyncServer>(d, rolename)
    {
-      oneway >> std::bind(&Server::handleOneway, this, _1);
-      add >> std::bind(&Server::handleAdd, this, _1, _2);
-      echo >> std::bind(&Server::handleEcho, this, _1, _2);
-   }
-
-   void handleOneway(int)
-   {
-      disp().stop();
-   }
-
-   void handleAdd(int i, double d)
-   {
-      req_ = deferResponse();
-   }
-
-   void handleEcho(int i, double d)
-   {
-      respondOn(req_, add(d));
-      respondWith(echo(i, d));
+      oneway >> [this](int){
+         disp().stop();
+      };
+      
+      add >> [this](int i, double d){
+         req_ = defer_response();
+      };
+      
+      echo >> [this](int i, double d){
+         respond_on(req_, add(d));
+         respond_with(echo(i, d));
+      };
    }
 
    simppl::dbus::ServerRequestDescriptor req_;

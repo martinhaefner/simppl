@@ -12,6 +12,7 @@
 
 #define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
+#include "simppl/clientside.h"
 #undef SIMPPL_DISPATCHER_CPP
 
 #define USE_POLL
@@ -89,13 +90,13 @@ namespace dbus
 
 void dispatcher_add_stub(Dispatcher& disp, StubBase& stub)
 {
-    disp.addClient(stub);
+    disp.add_client(stub);
 }
 
 
 void dispatcher_add_skeleton(Dispatcher& disp, SkeletonBase& stub)
 {
-    disp.addServer(stub);
+    disp.add_server(stub);
 }
 
 
@@ -345,7 +346,7 @@ Dispatcher::Dispatcher(const char* busname)
  , request_timeout_(DBUS_TIMEOUT_USE_DEFAULT)
  , d(nullptr)
 {
-   // FIXME make this part of the dispatcher interface...
+   // TODO make this part of the dispatcher interface...
    dbus_threads_init_default();
 
    DBusError err;
@@ -427,7 +428,7 @@ void Dispatcher::notify_clients(const std::string& busname, ConnectionState stat
 }
 
 
-void Dispatcher::addServer(SkeletonBase& serv)
+void Dispatcher::add_server(SkeletonBase& serv)
 {
    DBusError err;
    dbus_error_init(&err);
@@ -459,7 +460,7 @@ void Dispatcher::addServer(SkeletonBase& serv)
 }
 
 
-void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
+void Dispatcher::register_signal(StubBase& stub, ClientSignalBase& sigbase)
 {
    DBusError err;
    dbus_error_init(&err);
@@ -470,7 +471,6 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
 
    if (iter == signal_matches_.end())
    {
-       // FIXME do we really need dependency to dispatcher?
        std::ostringstream match_string;
        match_string << "type='signal'";
        match_string << ",sender='" << stub.busname() << "'";
@@ -489,7 +489,7 @@ void Dispatcher::registerSignal(StubBase& stub, ClientSignalBase& sigbase)
 }
 
 
-void Dispatcher::unregisterSignal(StubBase& stub, ClientSignalBase& sigbase)
+void Dispatcher::unregister_signal(StubBase& stub, ClientSignalBase& sigbase)
 {
     std::string signalname(stub.busname() + "." + sigbase.name());
 
@@ -596,13 +596,13 @@ void Dispatcher::stop()
 }
 
 
-bool Dispatcher::isRunning() const
+bool Dispatcher::is_running() const
 {
    return running_.load();
 }
 
 
-void Dispatcher::addClient(StubBase& clnt)
+void Dispatcher::add_client(StubBase& clnt)
 {
    clnt.disp_ = this;
 
@@ -630,7 +630,7 @@ void Dispatcher::addClient(StubBase& clnt)
 }
 
 
-void Dispatcher::removeClient(StubBase& clnt)
+void Dispatcher::remove_client(StubBase& clnt)
 {
    for(auto iter = stubs_.begin(); iter != stubs_.end(); ++iter)
    {
@@ -660,14 +660,6 @@ int Dispatcher::step_ms(int timeout_ms)
     do
     {
        rc = dbus_connection_dispatch(conn_);
-
-       if (!exceptions_.empty())
-       {
-          CallState st(std::move(exceptions_.front()));
-          exceptions_.pop();
-
-          st.throw_exception();
-       }
     }
     while(rc != DBUS_DISPATCH_COMPLETE);
 #else
@@ -675,12 +667,6 @@ int Dispatcher::step_ms(int timeout_ms)
 #endif
 
    return 0;
-}
-
-
-void Dispatcher::propagate(CallState st)
-{
-   exceptions_.push(st);
 }
 
 

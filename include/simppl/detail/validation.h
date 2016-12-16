@@ -181,6 +181,13 @@ struct isString
 };
 
 
+template<typename T>
+struct isObjectPath
+{
+   enum { value = std::is_same<T, simppl::dbus::ObjectPath>::value };
+};
+
+
 // variant
 template<typename T>
 struct isVariant
@@ -226,6 +233,7 @@ struct isValidType<T>
       || isValidTuple<T>::value
       || isValidSerializerTuple<T>::value
       || isVariant<T>::value
+      || isObjectPath<T>::value
    };
 };
 

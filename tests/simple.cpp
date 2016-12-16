@@ -5,13 +5,11 @@
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
-using simppl::dbus::in;
-using simppl::dbus::out;
-
 #include <thread>
 
 
-using namespace std::placeholders;
+using simppl::dbus::in;
+using simppl::dbus::out;
 
 
 namespace test
@@ -26,9 +24,10 @@ INTERFACE(Simple)
    Request<in<int>, in<double>, out<double>> add;
    Request<in<int>, in<double>, out<int>, out<double>> echo;
 
-   Attribute<int> data;
+   Property<int> data;
 
    Signal<int> sig;
+   Signal<int, int> sig2;
 
    inline
    Simple()
@@ -38,6 +37,7 @@ INTERFACE(Simple)
     , INIT(echo)
     , INIT(data)
     , INIT(sig)
+    , INIT(sig2)
    {
       // NOOP
    }
@@ -97,9 +97,9 @@ struct DisconnectClient : simppl::dbus::Stub<Simple>
 };
 
 
-struct AttributeClient : simppl::dbus::Stub<Simple>
+struct PropertyClient : simppl::dbus::Stub<Simple>
 {
-   AttributeClient(simppl::dbus::Dispatcher& d)
+   PropertyClient(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Simple>(d, "sa")
    {
       connected >> [this](simppl::dbus::ConnectionState s)
@@ -122,16 +122,14 @@ struct AttributeClient : simppl::dbus::Stub<Simple>
       {
          // first you get the current value
          EXPECT_EQ(4711, new_value);
-         EXPECT_EQ(4711, data.value());
-
+         
          // now we trigger update on server
          oneway(42);
       }
       else
       {
          EXPECT_EQ(42, new_value);
-         EXPECT_EQ(42, data.value());
-
+         
          oneway(7777);   // stop signal
       }
 
@@ -156,6 +154,11 @@ struct SignalClient : simppl::dbus::Stub<Simple>
          {
             this->handleSignal(value);
          };
+         
+         this->sig2.attach() >> [this](int value1, int value2)
+         {
+            this->handleSignal2(value1, value2);
+         };
 
          this->oneway(100);
       };
@@ -175,9 +178,17 @@ struct SignalClient : simppl::dbus::Stub<Simple>
       // trigger again
       oneway(start_);
    }
+   
+   void handleSignal2(int value1, int value2)
+   {
+      ++count2_;
+      
+      EXPECT_EQ(value1, -value2);
+   }
 
    int start_ = 100;
    int count_ = 0;
+   int count2_ = 0;
 };
 
 
@@ -192,7 +203,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
       // initialize handlers
       hello >> [this]()
       {
-         this->respondWith(hello());
+         this->respond_with(hello());
       };
 
 
@@ -210,19 +221,22 @@ struct Server : simppl::dbus::Skeleton<Simple>
             this->data = 42;
          }
          else
+         {
             this->sig.emit(i);
+            this->sig2.emit(i, -i);
+         }
       };
 
 
       add >> [this](int i, double d)
       {
-         this->respondWith(add(i*d));
+         this->respond_with(add(i*d));
       };
 
 
       echo >> [this](int i, double d)
       {
-         this->respondWith(echo(i, d));
+         this->respond_with(echo(i, d));
       };
    }
 
@@ -252,13 +266,14 @@ TEST(Simple, signal)
    d.run();
 
    EXPECT_EQ(c.count_, 10);
+   EXPECT_GT(c.count_, 0);
 }
 
 
 TEST(Simple, attribute)
 {
    simppl::dbus::Dispatcher d("bus:session");
-   AttributeClient c(d);
+   PropertyClient c(d);
    Server s(d, "sa");
 
    d.run();
@@ -315,7 +330,6 @@ TEST(Simple, blocking)
    int dv = -1;
    dv = stub.data.get();
    EXPECT_EQ(4711, dv);
-   EXPECT_EQ(4711, stub.data.value());
 
    stub.oneway(7777);   // stop server
    t.join();

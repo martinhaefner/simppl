@@ -54,7 +54,7 @@ StubBase::StubBase(const char* iface, const char* busname, const char* objectpat
 StubBase::~StubBase()
 {
    if (disp_)
-      disp_->removeClient(*this);
+      disp_->remove_client(*this);
 
    delete[] iface_;
    delete[] objectpath_;
@@ -100,9 +100,9 @@ Dispatcher& StubBase::disp()
 }
 
 
-DBusPendingCall* StubBase::sendRequest(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
+DBusPendingCall* StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
 {
-    dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
 
     detail::Serializer s(msg.get());
@@ -141,19 +141,19 @@ void StubBase::connection_state_changed(ConnectionState state)
 }
 
 
-void StubBase::sendSignalRegistration(ClientSignalBase& sigbase)
+void StubBase::register_signal(ClientSignalBase& sigbase)
 {
    assert(disp_);
    assert(signals_.find(sigbase.name()) == signals_.end());   // signal already attached by this stub
 
-   disp_->registerSignal(*this, sigbase);
+   disp_->register_signal(*this, sigbase);
 
    // FIXME use intrusive container and iterate instead of using a map -> memory efficiency
    signals_[sigbase.name()] = &sigbase;
 }
 
 
-void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
+void StubBase::unregister_signal(ClientSignalBase& sigbase)
 {
    assert(disp_);
 
@@ -161,7 +161,7 @@ void StubBase::sendSignalUnregistration(ClientSignalBase& sigbase)
 
    if (iter != signals_.end())
    {
-      disp_->unregisterSignal(*this, sigbase);
+      disp_->unregister_signal(*this, sigbase);
       signals_.erase(iter);
    }
 }
@@ -171,7 +171,7 @@ void StubBase::cleanup()
 {
    for (auto& sig_entry : signals_)
    {
-      disp_->unregisterSignal(*this, *sig_entry.second);
+      disp_->unregister_signal(*this, *sig_entry.second);
    }
 
    signals_.clear();
@@ -180,23 +180,23 @@ void StubBase::cleanup()
 }
 
 
-void StubBase::getProperty(const char* name, void(*callback)(DBusPendingCall*, void*), void* user_data)
+DBusPendingCall* StubBase::get_property_async(const char* name)
 {
-   dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
+   message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
 
    detail::Serializer s(msg.get());
    s << iface() << name;
 
-   dbus_connection_send_with_reply(conn(), msg.get(), &pending, -1);
+   dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
-   dbus_pending_call_set_notify(pending, callback, user_data, 0);
+   return pending;
 }
 
 
-dbus_message_ptr_t StubBase::getProperty(const char* name)
+message_ptr_t StubBase::get_property(const char* name)
 {
-   dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
+   message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
 
    detail::Serializer s(msg.get());
@@ -213,9 +213,9 @@ dbus_message_ptr_t StubBase::getProperty(const char* name)
 }
 
 
-void StubBase::setProperty(const char* name, std::function<void(detail::Serializer&)> f)
+void StubBase::set_property(const char* name, std::function<void(detail::Serializer&)> f)
 {
-    dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
     detail::Serializer s(msg.get());
     s << iface() << name;
@@ -241,9 +241,9 @@ void StubBase::setProperty(const char* name, std::function<void(detail::Serializ
 }
 
 
-DBusPendingCall* StubBase::setPropertyAsync(const char* name, std::function<void(detail::Serializer&)> f)
+DBusPendingCall* StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)> f)
 {
-    dbus_message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
     detail::Serializer s(msg.get());
     s << iface() << name;

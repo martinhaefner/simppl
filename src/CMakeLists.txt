@@ -1,4 +1,5 @@
 add_library(simppl
+   basicinterface.cpp
    callstate.cpp
    dispatcher.cpp 
    error.cpp 

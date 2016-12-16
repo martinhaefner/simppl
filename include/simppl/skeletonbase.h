@@ -41,21 +41,21 @@ struct SkeletonBase
    Dispatcher& disp();
 
    /// only valid within request handler - must be called in order to respond to the request later in time
-   ServerRequestDescriptor deferResponse();
+   ServerRequestDescriptor defer_response();
 
    /// only valid to call within request handler
-   void respondWith(detail::ServerResponseHolder response);
+   void respond_with(detail::ServerResponseHolder response);
 
    /// send deferred response as retrieved by calling deferResponse()
-   void respondOn(ServerRequestDescriptor& req, detail::ServerResponseHolder response);
+   void respond_on(ServerRequestDescriptor& req, detail::ServerResponseHolder response);
 
    /// send error response - only valid to call within request handler
-   void respondWith(const Error& err);
+   void respond_with(const Error& err);
 
    /// send deferred error response as retrieved by calling deferResponse()
-   void respondOn(ServerRequestDescriptor& req, const Error& err);
+   void respond_on(ServerRequestDescriptor& req, const Error& err);
 
-   const ServerRequestDescriptor& currentRequest() const;
+   const ServerRequestDescriptor& current_request() const;
 
    inline
    const char* iface() const
@@ -78,7 +78,7 @@ struct SkeletonBase
 
 protected:
 
-   DBusHandlerResult handleRequest(DBusMessage* msg);
+   DBusHandlerResult handle_request(DBusMessage* msg);
 
    /// return a session pointer and destruction function if adequate
    ///virtual std::tuple<void*,void(*)(void*)> clientAttached();

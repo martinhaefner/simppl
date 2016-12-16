@@ -1,5 +1,5 @@
-#ifndef SIMPPL_ATTRIBUTE_H
-#define SIMPPL_ATTRIBUTE_H
+#ifndef SIMPPL_PROPERTY_H
+#define SIMPPL_PROPERTY_H
 
 
 #include "simppl/detail/is_vector.h"
@@ -11,7 +11,7 @@ namespace simppl
 namespace dbus
 {
 
-enum AttributeFlags
+enum PropertyFlags
 {
    ReadOnly     = 0,
    ReadWrite    = (1<<0),
@@ -23,4 +23,4 @@ enum AttributeFlags
 }   // namespace simppl
 
 
-#endif   // SIMPPL_ATTRIBUTE_H
+#endif   // SIMPPL_PROPERTY_H

@@ -9,16 +9,17 @@
 
 #include "simppl/calltraits.h"
 #include "simppl/callstate.h"
-#include "simppl/attribute.h"
+#include "simppl/property.h"
 #include "simppl/serialization.h"
 #include "simppl/stubbase.h"
 #include "simppl/timeout.h"
 #include "simppl/parameter_deduction.h"
 
 #include "simppl/detail/validation.h"
+#include "simppl/detail/callinterface.h"
+#include "simppl/detail/holders.h"
 #include "simppl/detail/basicinterface.h"
 #include "simppl/detail/deserialize_and_return.h"
-#include "simppl/detail/callinterface.h"
 
 
 namespace simppl
@@ -36,6 +37,10 @@ template<typename> struct InterfaceNamer;
 
 struct ClientSignalBase
 {
+   template<typename, int> 
+   friend struct ClientProperty;
+   
+   
    virtual void eval(DBusMessage* msg) = 0;
 
    inline
@@ -53,8 +58,7 @@ struct ClientSignalBase
    }
 
 
-// FIXME protected:
-
+protected:
 
    inline
    ~ClientSignalBase()
@@ -83,7 +87,7 @@ struct ClientSignal : ClientSignalBase
 
    template<typename FunctorT>
    inline
-   void handledBy(FunctorT func)
+   void handled_by(FunctorT func)
    {
       f_ = func;
    }
@@ -92,7 +96,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& attach()
    {
-      dynamic_cast<StubBase*>(iface_)->sendSignalRegistration(*this);
+      dynamic_cast<StubBase*>(iface_)->register_signal(*this);
       return *this;
    }
 
@@ -100,115 +104,56 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& detach()
    {
-      dynamic_cast<StubBase*>(iface_)->sendSignalUnregistration(*this);
+      dynamic_cast<StubBase*>(iface_)->unregister_signal(*this);
       return *this;
    }
 
 
+private:
+
    void eval(DBusMessage* msg)
    {
       detail::Deserializer d(msg);
-      detail::GetCaller<T...>::type::template eval(d, f_);
+      detail::GetCaller<std::tuple<T...>>::type::template eval(d, f_);
    }
 
    function_type f_;
 };
 
 
-template<typename HolderT>
-struct InterimCallbackHolder
-{
-   typedef HolderT holder_type;
-   
-   explicit inline
-   InterimCallbackHolder(DBusPendingCall* pc)
-    : pc_(make_pending_call(pc))
-   {
-      // NOOP
-   }
-   
-   dbus_pending_call_ptr_t pc_;
-};
-
-
 // ---------------------------------------------------------------------------------------------
 
 
-template<typename FuncT, typename ReturnT>
-struct CallbackHolder 
-{
-   CallbackHolder(const CallbackHolder&) = delete;
-   CallbackHolder& operator=(const CallbackHolder&) = delete;
-   
-
-   explicit inline
-   CallbackHolder(const FuncT& f)
-    : f_(f)
-   {
-      // NOOP
-   }
-   
-   static inline 
-   void _delete(void* p)
-   {
-      auto that = (CallbackHolder*)p;
-      delete that;
-   }
-   
-   static
-   void pending_notify(DBusPendingCall* pc, void* data)
-   {
-       dbus_pending_call_ptr_t upc = make_pending_call(pc);
-       dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
-
-       auto that = (CallbackHolder*)data;
-       assert(that->f_);
-
-       CallState cs(*msg);
-
-       detail::Deserializer d(msg.get());
-       detail::GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);
-   }
-
-   
-   FuncT f_;
-};
-
-
-// ---------------------------------------------------------------------------------------------
-
-
-template<typename AttributeT, typename DataT>
-struct ClientAttributeWritableMixin
+template<typename PropertyT, typename DataT>
+struct ClientPropertyWritableMixin
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   typedef CallbackHolder<std::function<void(CallState)>, void> holder_type;
+   typedef std::function<void(CallState)> function_type;
+   typedef detail::CallbackHolder<function_type, void> holder_type;
 
 
    /// blocking version
    void set(arg_type t)
    {
-      AttributeT* that = (AttributeT*)this;
-      that->data_ = t;
-
+      auto that = (PropertyT*)this;
+   
       Variant<data_type> vt(t);
 
-      that->stub().setProperty(that->signal_.name(), [&vt](detail::Serializer& s){
+      that->stub().set_property(that->name(), [&vt](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, vt);
       });
    }
 
 
    /// async version
-   InterimCallbackHolder<holder_type> set_async(arg_type t)
+   detail::InterimCallbackHolder<holder_type> set_async(arg_type t)
    {
-      AttributeT* that = (AttributeT*)this;
-      that->data_ = t;
+      auto that = (PropertyT*)this;
 
       Variant<data_type> vt(t);
 
-      return InterimCallbackHolder<holder_type>(that->stub().setPropertyAsync(that->signal_.name(), [&vt](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(that->stub().set_property_async(that->name(), [&vt](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, vt);
       }));
    }
@@ -221,8 +166,8 @@ struct NoopMixin
 
 
 template<typename DataT, int Flags = Notifying|ReadOnly>
-struct ClientAttribute
- : std::conditional<(Flags & ReadWrite), ClientAttributeWritableMixin<ClientAttribute<DataT, Flags>, DataT>, NoopMixin>::type
+struct ClientProperty
+ : std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, NoopMixin>::type
 {
    static_assert(detail::isValidType<DataT>::value, "invalid attribute type");
 
@@ -230,10 +175,11 @@ struct ClientAttribute
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(CallState, arg_type)> function_type;
    typedef ClientSignal<DataT> signal_type;
+   typedef detail::PropertyCallbackHolder<std::function<void(CallState, arg_type)>, data_type> holder_type;  
 
 
    inline
-   ClientAttribute(const char* name, detail::BasicInterface* iface)
+   ClientProperty(const char* name, detail::BasicInterface* iface)
     : signal_(name, iface)
    {
       // NOOP
@@ -241,7 +187,7 @@ struct ClientAttribute
 
    template<typename FunctorT>
    inline
-   void handledBy(FunctorT func)
+   void handled_by(FunctorT func)
    {
       f_ = func;
    }
@@ -252,48 +198,50 @@ struct ClientAttribute
    }
 
    /// only call this after the server is connected.
-   ClientAttribute& attach()
+   ClientProperty& attach()
    {
-      signal_.handledBy(std::bind(&ClientAttribute<DataT, Flags>::valueChanged, this, std::placeholders::_1));
+      signal_.handled_by([this](arg_type val){
+         if (f_)
+            f_(CallState(42), val);
+      });
 
       (void)signal_.attach();
-
-      stub().getProperty(signal_.name(), &pending_notify, this);
-
+      
+      dbus_pending_call_set_notify(stub().get_property_async(signal_.name()), 
+         &holder_type::pending_notify, 
+         new holder_type([this](CallState cs, const arg_type& val){
+            if (f_)
+               f_(cs, val);
+         }), 
+         &holder_type::_delete);
+      
       return *this;
    }
 
-   inline
-   const DataT& value() const
-   {
-      return data_;
-   }
 
-   // FIXME implement GetAll in Stub needs to store attributesbase in interface
-   // in a similar way as it is done on server side...
-   const DataT& get()
+   // TODO implement GetAll 
+   DataT get()
    {
-      dbus_message_ptr_t msg = stub().getProperty(signal_.name());
+      message_ptr_t msg = stub().get_property(signal_.name());
 
       detail::Deserializer ds(msg.get());
 
       Variant<DataT> v;
       ds >> v;
 
-      data_ = *v.template get<DataT>();
-      return data_;
+      return *v.template get<DataT>();
    }
 
 
-   ClientAttribute& get_async()
+   inline
+   detail::InterimCallbackHolder<holder_type> get_async()
    {
-      stub().getProperty(signal_.name(), &pending_notify, this);
-      return *this;
+      return detail::InterimCallbackHolder<holder_type>(stub().get_property_async(signal_.name()));
    }
 
 
    /// blocking version
-   ClientAttribute& operator=(arg_type t)
+   ClientProperty& operator=(arg_type t)
    {
       this->set(t);
       return *this;
@@ -301,54 +249,23 @@ struct ClientAttribute
 
    /// only call this after the server is connected.
    inline
-   ClientAttribute& detach()
+   ClientProperty& detach()
    {
       (void)signal_.detach();
       return *this;
    }
 
-//FIXME protected:
 
-    static
-    void pending_notify(DBusPendingCall* pc, void* user_data)
-    {
-        dbus_pending_call_ptr_t upc = make_pending_call(pc);
-        dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(pc));
+   inline
+   const char* name() const
+   {
+      return signal_.name();
+   }
 
-        CallState cs(*msg);
-
-        // TODO callstate should be part of the callback
-        if (cs)
-        {
-           ClientAttribute* handler = (ClientAttribute*)user_data;
-           handler->eval(*msg);
-        }
-    }
-
-    void eval(DBusMessage& msg)
-    {
-        detail::Deserializer ds(&msg);
-
-        Variant<DataT> v;
-        ds >> v;
-
-        data_ = *v.template get<DataT>();
-
-        if (f_)
-            f_(CallState(msg), *v.template get<DataT>());
-    }
-
-    void valueChanged(arg_type arg)
-    {
-        data_ = arg;
-
-        if (f_)
-            f_(CallState(42), arg);
-    }
+private:
 
     signal_type signal_;
     function_type f_;
-    DataT data_;
 };
 
 
@@ -372,7 +289,7 @@ struct ClientRequest
     typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
 
     typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
-    typedef CallbackHolder<callback_type, return_type>                             holder_type;
+    typedef detail::CallbackHolder<callback_type, return_type>                             holder_type;
 
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
@@ -393,9 +310,9 @@ struct ClientRequest
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      StubBase* stub = dynamic_cast<StubBase*>(parent_);
+      auto stub = dynamic_cast<StubBase*>(parent_);
 
-      dbus_pending_call_ptr_t p = make_pending_call(stub->sendRequest(method_name_, [&](detail::Serializer& s){
+      auto p = make_pending_call(stub->send_request(method_name_, [&](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, t...);
       }, is_oneway));
 
@@ -405,7 +322,7 @@ struct ClientRequest
       {
          dbus_pending_call_block(p.get());
 
-         dbus_message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.get()));
+         message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.get()));
          CallState cs(*msg);
 
          if (!cs)
@@ -423,15 +340,15 @@ struct ClientRequest
 
    /// asynchronous call
    template<typename... T>
-   InterimCallbackHolder<holder_type> async(const T&... t)
+   detail::InterimCallbackHolder<holder_type> async(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      StubBase* stub = dynamic_cast<StubBase*>(parent_);
+      auto stub = dynamic_cast<StubBase*>(parent_);
 
-      return InterimCallbackHolder<holder_type>(stub->sendRequest(method_name_, [&](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(stub->send_request(method_name_, [&](detail::Serializer& s){
          simppl::dbus::detail::serialize(s, t...);
       }, false));
    }
@@ -447,10 +364,10 @@ struct ClientRequest
       return *this;
    }
 
-    const char* method_name_;
 
-   // FIXME do we really need connection in BasicInterface?
-   // FIXME do we need BasicInterface at all?
+private:
+
+   const char* method_name_;
    detail::BasicInterface* parent_;
 };
 
@@ -465,7 +382,7 @@ struct ClientRequest
 
 template<typename HolderT, typename FunctorT>
 inline
-void operator>>(simppl::dbus::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
+void operator>>(simppl::dbus::detail::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
 {
    // TODO static_assert FunctorT and HolderT::f_ convertible?
    dbus_pending_call_set_notify(r.pc_.release(), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
@@ -474,9 +391,9 @@ void operator>>(simppl::dbus::InterimCallbackHolder<HolderT>&& r, const FunctorT
 
 template<typename DataT, int Flags, typename FuncT>
 inline
-void operator>>(simppl::dbus::ClientAttribute<DataT, Flags>& attr, const FuncT& func)
+void operator>>(simppl::dbus::ClientProperty<DataT, Flags>& attr, const FuncT& func)
 {
-   attr.handledBy(func);
+   attr.handled_by(func);
 }
 
 
@@ -484,7 +401,7 @@ template<typename... T, typename FuncT>
 inline
 void operator>>(simppl::dbus::ClientSignal<T...>& sig, const FuncT& func)
 {
-   sig.handledBy(func);
+   sig.handled_by(func);
 }
 
 

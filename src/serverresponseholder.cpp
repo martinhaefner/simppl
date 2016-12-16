@@ -20,9 +20,9 @@ ServerResponseHolder::ServerResponseHolder(std::function<void(Serializer&)> f)
 
 
 ServerResponseHolder::ServerResponseHolder(ServerResponseHolder&& rhs)
- : f_(rhs.f_)
+ : f_(std::move(rhs.f_))
 {
-   // FIXME implement real move semantics
+   // NOOP
 }
 
 
@@ -35,9 +35,7 @@ ServerResponseHolder::~ServerResponseHolder()
 ServerResponseHolder& ServerResponseHolder::operator=(ServerResponseHolder&& rhs)
 {
    if (this != &rhs)
-   {
       f_ = rhs.f_;
-   }
    
    return *this;
 }

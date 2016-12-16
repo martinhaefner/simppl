@@ -9,7 +9,6 @@
 
 
 using namespace std::literals::chrono_literals;
-using namespace std::placeholders;
 
 using simppl::dbus::in;
 using simppl::dbus::out;
@@ -47,33 +46,29 @@ struct Client : simppl::dbus::Stub<Timeout>
    Client(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Timeout>(d, "tm")
    {
-      connected >> std::bind(&Client::handleConnected, this, _1);
-   }
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(expect_, s);
 
+         if (s == simppl::dbus::ConnectionState::Connected)
+         {
+            start_ = std::chrono::steady_clock::now();
+            
+            eval.async(42) >> [this](simppl::dbus::CallState state, double){
+               EXPECT_FALSE((bool)state);
 
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expect_, s);
+               EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
 
-      if (s == simppl::dbus::ConnectionState::Connected)
-      {
-         start_ = std::chrono::steady_clock::now();
-         
-         eval.async(42) >> [this](simppl::dbus::CallState state, double){
-            EXPECT_FALSE((bool)state);
+               int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
+               EXPECT_GE(millis, 500);
+               EXPECT_LT(millis, 600);
 
-            EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
+               gbl_disp->stop();   // servers dispatcher
+               disp().stop();
+            };
+         }
 
-            int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
-            EXPECT_GE(millis, 500);
-            EXPECT_LT(millis, 600);
-
-            gbl_disp->stop();   // servers dispatcher
-            disp().stop();
-         };
-      }
-
-      expect_ = simppl::dbus::ConnectionState::Disconnected;
+         expect_ = simppl::dbus::ConnectionState::Disconnected;
+      };
    }
 
    std::chrono::steady_clock::time_point start_;
@@ -87,27 +82,22 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
    DisconnectClient(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Timeout>(d, "tm")
    {
-      connected >> std::bind(&DisconnectClient::handleConnected, this, _1);
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(expect_, s);
+
+         if (s == simppl::dbus::ConnectionState::Connected)
+         {
+            eval.async(777) >> [this](simppl::dbus::CallState state, double){
+               EXPECT_FALSE((bool)state);
+               EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
+
+               disp().stop();
+            };
+         }
+
+         expect_ = simppl::dbus::ConnectionState::Disconnected;
+      };
    }
-
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expect_, s);
-
-      if (s == simppl::dbus::ConnectionState::Connected)
-      {
-         eval.async(777) >> [this](simppl::dbus::CallState state, double){
-            EXPECT_FALSE((bool)state);
-            EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
-
-            disp().stop();
-         };
-      }
-
-      expect_ = simppl::dbus::ConnectionState::Disconnected;
-   }
-
 
    simppl::dbus::ConnectionState expect_ = simppl::dbus::ConnectionState::Connected;
 };
@@ -118,21 +108,17 @@ struct OnewayClient : simppl::dbus::Stub<Timeout>
    OnewayClient(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Stub<Timeout>(d, "tm")
    {
-      connected >> std::bind(&OnewayClient::handleConnected, this, _1);
-   }
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(expect_, s);
 
+         if (s == simppl::dbus::ConnectionState::Connected)
+         {
+            gbl_disp = &disp();
+            oneway(42);
+         }
 
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expect_, s);
-
-      if (s == simppl::dbus::ConnectionState::Connected)
-      {
-         gbl_disp = &disp();
-         oneway(42);
-      }
-
-      expect_ = simppl::dbus::ConnectionState::Disconnected;
+         expect_ = simppl::dbus::ConnectionState::Disconnected;
+      };
    }
 
    simppl::dbus::ConnectionState expect_ = simppl::dbus::ConnectionState::Connected;
@@ -145,13 +131,10 @@ struct NeverConnectedClient : simppl::dbus::Stub<Timeout>
     : simppl::dbus::Stub<Timeout>(d, "tm")
     , expected_(expected)
    {
-      connected >> std::bind(&NeverConnectedClient::handleConnected, this, _1);
-   }
-
-   void handleConnected(simppl::dbus::ConnectionState s)
-   {
-      EXPECT_EQ(expected_, s);
-      disp().stop();
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(expected_, s);
+         disp().stop();
+      };
    }
 
    simppl::dbus::ConnectionState expected_;
@@ -163,32 +146,25 @@ struct Server : simppl::dbus::Skeleton<Timeout>
    Server(simppl::dbus::Dispatcher& d)
     : simppl::dbus::Skeleton<Timeout>(d, "tm")
    {
-      eval >> std::bind(&Server::handleEval, this, _1);
-      oneway >> std::bind(&Server::handleOneway, this, _1);
-   }
+      eval >> [this](int i){
+        // generate timeout on client side
+         std::this_thread::sleep_for(1s);
 
-   void handleEval(int i)
-   {
-//      std::cout << "handleeval" << std::endl;
-      // generate timeout on client side
-      std::this_thread::sleep_for(1s);
+         if (i == 42)
+         {
+            respond_with(eval(3.1415));
+         }
+         else
+            (void)defer_response();
+      };
+      
+      oneway >> [this](int i){
+         // generate timeout on client side
+         std::this_thread::sleep_for(1s);
 
-      if (i == 42)
-      {
-  //       std::cout << "response" << std::endl;
-         respondWith(eval(3.1415));
-      }
-      else
-         (void)deferResponse();
-   }
-
-   void handleOneway(int i)
-   {
-      // generate timeout on client side
-      std::this_thread::sleep_for(1s);
-
-      disp().stop();
-      gbl_disp->stop();    // clients dispatcher
+         disp().stop();
+         gbl_disp->stop();    // clients dispatcher
+      };
    }
 };
 
@@ -229,7 +205,7 @@ TEST(Timeout, method)
    simppl::dbus::Dispatcher d;
    Client c(d);
 
-   d.setRequestTimeout(500ms);
+   d.set_request_timeout(500ms);
 
    d.run();
 
@@ -244,7 +220,7 @@ TEST(Timeout, oneway)
    simppl::dbus::Dispatcher d;
    OnewayClient c(d);
 
-   d.setRequestTimeout(500ms);
+   d.set_request_timeout(500ms);
 
    d.run();
 
@@ -273,7 +249,7 @@ TEST(Timeout, request_specific)
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
    // default timeout
-   d.setRequestTimeout(500ms);
+   d.set_request_timeout(500ms);
 
    stub.connect();
 
@@ -307,7 +283,7 @@ TEST(Timeout, blocking_connect)
    simppl::dbus::Dispatcher d;
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
-   d.setRequestTimeout(500ms);
+   d.set_request_timeout(500ms);
 
    try
    {
@@ -330,7 +306,7 @@ TEST(Timeout, blocking_api)
    simppl::dbus::Dispatcher d;
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
-   d.setRequestTimeout(500ms);
+   d.set_request_timeout(500ms);
 
    stub.connect();
 

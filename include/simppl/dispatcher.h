@@ -10,20 +10,10 @@
 #include <atomic>
 #include <queue>
 
+#include <dbus/dbus.h>
+
+#include "simppl/connectionstate.h"
 #include "simppl/detail/constants.h"
-
-// FIXME can this be remroved?
-#include "simppl/clientside.h"
-
-#ifdef NDEBUG
-#   define safe_cast static_cast
-#else
-#   define safe_cast dynamic_cast
-#endif
-
-
-// forward decl
-struct inotify_event;
 
 
 namespace simppl
@@ -32,13 +22,11 @@ namespace simppl
 namespace dbus
 {
 
-extern DBusObjectPathVTable stub_v_table;
-
-
 // forward decls
 struct StubBase;
 struct SkeletonBase;
 struct ClientSignalBase;
+struct CallState;
 
 
 // TODO use pimpl for this...
@@ -62,7 +50,7 @@ struct Dispatcher
 
    template<typename RepT, typename PeriodT>
    inline
-   void setRequestTimeout(std::chrono::duration<RepT, PeriodT> duration)
+   void set_request_timeout(std::chrono::duration<RepT, PeriodT> duration)
    {
       request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
@@ -84,21 +72,18 @@ struct Dispatcher
 
    void stop();
 
-   bool isRunning() const;
+   bool is_running() const;
 
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
 
-   void registerSignal(StubBase& stub, ClientSignalBase& sigbase);
-   void unregisterSignal(StubBase& stub, ClientSignalBase& sigbase);
+   void register_signal(StubBase& stub, ClientSignalBase& sigbase);
+   void unregister_signal(StubBase& stub, ClientSignalBase& sigbase);
 
    inline
    int request_timeout() const
    {
       return request_timeout_;
    }
-
-   /// propagate exception
-   void propagate(CallState state);
 
    inline
    DBusConnection& connection()
@@ -110,13 +95,13 @@ private:
 
    /// Add a client to the dispatcher. This is also necessary if blocking
    /// should be used.
-   void addClient(StubBase& clnt);
+   void add_client(StubBase& clnt);
 
    /// Remove the client.
-   void removeClient(StubBase& clnt);
+   void remove_client(StubBase& clnt);
 
    /// add a server
-   void addServer(SkeletonBase& server);
+   void add_server(SkeletonBase& server);
 
    int step_ms(int millis);
 
@@ -131,7 +116,6 @@ private:
 
    /// service registration's list
    std::set<std::string> busnames_;
-   std::queue<CallState> exceptions_;
 
    struct Private;
    Private* d;
