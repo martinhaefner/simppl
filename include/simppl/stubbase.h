@@ -83,11 +83,6 @@ public:
        return conn_state_ == ConnectionState::Connected;
    }
 
-   /**
-    * Blocking connect. Throws exception on timeout.
-    */
-   void connect();
-
 
 protected:
 

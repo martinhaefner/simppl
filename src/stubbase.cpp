@@ -61,32 +61,6 @@ StubBase::~StubBase()
 }
 
 
-void StubBase::connect()
-{
-    std::chrono::milliseconds sum = 0ms;
-    auto finish = std::chrono::steady_clock::now();
-
-    if (disp().request_timeout() > 0)
-    {
-        finish += std::chrono::milliseconds(disp().request_timeout());
-    }
-    else
-        finish = std::chrono::steady_clock::time_point::max();
-
-    while(!is_connected() && std::chrono::steady_clock::now() <= finish)
-    {
-        if (std::chrono::steady_clock::now() < finish)
-        {
-            disp().step(50ms);
-            sum += 50ms;
-        }
-    }
-
-    if (!is_connected())
-       throw Error(DBUS_ERROR_TIMEOUT);
-}
-
-
 DBusConnection* StubBase::conn()
 {
     return disp().conn_;

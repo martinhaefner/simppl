@@ -11,6 +11,8 @@
 #include <thread>
 
 
+using namespace std::literals::chrono_literals;
+
 using simppl::dbus::in;
 using simppl::dbus::out;
 
@@ -274,14 +276,35 @@ TEST(Properties, blocking_set)
 
    std::thread t(blockrunner);
 
-   simppl::dbus::Stub<Properties> c(d, "s");
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
 
-   c.connect();
+   simppl::dbus::Stub<Properties> c(d, "s");
 
    c.data = 5555;
    int val = c.data.get();
 
    EXPECT_EQ(val, 5555);
+
+   c.shutdown();   // stop server
+   t.join();
+}
+
+
+TEST(Properties, blocking_get)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   std::thread t(blockrunner);
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   simppl::dbus::Stub<Properties> c(d, "s");
+
+   int val = c.data.get();
+
+   EXPECT_EQ(val, 4711);
 
    c.shutdown();   // stop server
    t.join();

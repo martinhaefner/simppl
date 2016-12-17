@@ -8,6 +8,8 @@
 #include <thread>
 
 
+using namespace std::literals::chrono_literals;
+
 using simppl::dbus::in;
 using simppl::dbus::out;
 
@@ -110,11 +112,12 @@ TEST(Errors, blocking)
 {
    std::thread t(blockrunner);
 
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
    simppl::dbus::Dispatcher d("bus:session");
 
    simppl::dbus::Stub<Errors> stub(d, "s");
-
-   stub.connect();
 
    try
    {

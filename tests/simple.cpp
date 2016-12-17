@@ -8,6 +8,8 @@
 #include <thread>
 
 
+using namespace std::literals::chrono_literals;
+
 using simppl::dbus::in;
 using simppl::dbus::out;
 
@@ -300,7 +302,8 @@ TEST(Simple, blocking)
 
    simppl::dbus::Stub<Simple> stub(d, "sb");
 
-   stub.connect();
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
 
    stub.oneway(101);
    stub.oneway(102);

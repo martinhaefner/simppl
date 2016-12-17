@@ -26,6 +26,13 @@ struct ObjectPath
     {
         // NOOP
     }
+    
+    inline
+    ObjectPath(const char* p)
+     : path(p)
+    {
+        // NOOP
+    }
 
     inline
     bool operator<(const ObjectPath& rhs) const

@@ -248,11 +248,12 @@ TEST(Timeout, request_specific)
    simppl::dbus::Dispatcher d("bus:session");
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
    // default timeout
    d.set_request_timeout(500ms);
-
-   stub.connect();
-
+   
    auto start = std::chrono::steady_clock::now();
 
    try
@@ -265,7 +266,7 @@ TEST(Timeout, request_specific)
    }
    catch(simppl::dbus::Error& err)
    {
-      EXPECT_STREQ(err.name(), "org.freedesktop.DBus.Error.NoReply");
+      EXPECT_STREQ("org.freedesktop.DBus.Error.NoReply", err.name());
    }
 
    int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
@@ -278,27 +279,6 @@ TEST(Timeout, request_specific)
 }
 
 
-TEST(Timeout, blocking_connect)
-{
-   simppl::dbus::Dispatcher d;
-   simppl::dbus::Stub<Timeout> stub(d, "tm");
-
-   d.set_request_timeout(500ms);
-
-   try
-   {
-      stub.connect();
-
-      // never arrive here!
-      EXPECT_FALSE(true);
-   }
-   catch(const simppl::dbus::Error& err)
-   {
-      EXPECT_STREQ(err.name(), "org.freedesktop.DBus.Error.Timeout");
-   }
-}
-
-
 TEST(Timeout, blocking_api)
 {
    std::thread serverthread(&runServer);
@@ -306,9 +286,10 @@ TEST(Timeout, blocking_api)
    simppl::dbus::Dispatcher d;
    simppl::dbus::Stub<Timeout> stub(d, "tm");
 
-   d.set_request_timeout(500ms);
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
 
-   stub.connect();
+   d.set_request_timeout(500ms);
 
    try
    {
