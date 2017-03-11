@@ -83,6 +83,7 @@ INTERFACE(Properties)
 {
    Request<in<int>, in<std::string>> set;
    Request<> shutdown;
+   Request<> trigger_data;
 
    Request<out<Menu>> get_all;
 
@@ -95,8 +96,9 @@ INTERFACE(Properties)
    inline
    Properties()
     : INIT(set)
-    , INIT(get_all)
     , INIT(shutdown)
+    , INIT(trigger_data)
+    , INIT(get_all)
     , INIT(data)
     , INIT(props)
     , INIT(mayShutdown)
@@ -128,8 +130,8 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          props = new_props;
 
-         mayShutdown.emit(42);
-         hi.emit();
+         mayShutdown.notify(42);
+         hi.notify();
       };
       
       get_all >> [this](){
@@ -155,6 +157,10 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mainmenu.entries_["Security"] = std::make_tuple(6, Menu::entry_type(security));
 
          respond_with(get_all(mainmenu));
+      };
+      
+      trigger_data >> [this](){
+         data = 8888;
       };
 
       // initialize attribute

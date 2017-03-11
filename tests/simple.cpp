@@ -224,8 +224,8 @@ struct Server : simppl::dbus::Skeleton<Simple>
          }
          else
          {
-            this->sig.emit(i);
-            this->sig2.emit(i, -i);
+            this->sig.notify(i);
+            this->sig2.notify(i, -i);
          }
       };
 

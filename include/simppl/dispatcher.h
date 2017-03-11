@@ -79,6 +79,9 @@ struct Dispatcher
    void register_signal(StubBase& stub, ClientSignalBase& sigbase);
    void unregister_signal(StubBase& stub, ClientSignalBase& sigbase);
 
+   void register_properties(StubBase& stub);
+   void unregister_properties(StubBase& stub);
+
    inline
    int request_timeout() const
    {
@@ -92,6 +95,9 @@ struct Dispatcher
    }
 
 private:
+
+   void register_signal_match(const std::string& match_string);
+   void unregister_signal_match(const std::string& match_string);
 
    /// Add a client to the dispatcher. This is also necessary if blocking
    /// should be used.

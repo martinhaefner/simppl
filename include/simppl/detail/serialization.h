@@ -1106,6 +1106,14 @@ Serializer& serialize(Serializer& s, const T1& t1, const T&... t)
    return serialize(s, t...);
 }
 
+template<typename T>
+inline
+void serialize_property(Serializer& s, const T& t)
+{
+   VariantSerializer<Serializer> vs(s);
+   vs(t);
+}
+
 
 }   // namespace detail
 

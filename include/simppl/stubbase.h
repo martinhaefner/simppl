@@ -28,6 +28,7 @@ struct ClientSignalBase;
 namespace detail
 {
    struct Serializer;
+   struct Deserializer;
 };
 
 
@@ -82,6 +83,12 @@ public:
    {
        return conn_state_ == ConnectionState::Connected;
    }
+   
+   inline
+   std::string busname() const
+   {
+      return busname_;
+   }
 
 
 protected:
@@ -90,15 +97,12 @@ protected:
 
    DBusPendingCall* send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
-   inline
-   std::string busname() const
-   {
-      return busname_;
-   }
-
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
+   void attach_property(const char* name, std::function<void(detail::Deserializer&)> f);
+   void detach_property(const char* name);
+   
    /**
     * Blocking call.
     */
@@ -119,7 +123,10 @@ protected:
    ConnectionState conn_state_;
 
    Dispatcher* disp_;
+   
+   // FIXME use linked lists instead of map...
    std::map<std::string, ClientSignalBase*> signals_;
+   std::map<std::string, std::function<void(detail::Deserializer&)>> properties_; 
 };
 
 }   // namespace dbus

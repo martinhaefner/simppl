@@ -49,7 +49,7 @@ struct ServerRequestBase
    virtual void eval(DBusMessage* msg) = 0;
 
 #if SIMPPL_HAVE_INTROSPECTION
-   virtual void introspect(std::ostream& os) = 0;
+   virtual void introspect(std::ostream& os) const = 0;
 #endif
 
    ServerRequestBase* next_;
@@ -75,7 +75,7 @@ struct ServerSignalBase
    ServerSignalBase(const char* name, detail::BasicInterface* iface);
 
 #if SIMPPL_HAVE_INTROSPECTION
-   virtual void introspect(std::ostream& os) = 0;
+   virtual void introspect(std::ostream& os) const = 0;
    ServerSignalBase* next_;   // list hook
 #endif
 
@@ -103,7 +103,7 @@ struct ServerSignal : ServerSignalBase
       // NOOP
    }
 
-   void emit(typename CallTraits<T>::param_type... args)
+   void notify(typename CallTraits<T>::param_type... args)
    {
       if (parent_->conn_)
       {
@@ -118,7 +118,7 @@ struct ServerSignal : ServerSignalBase
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
-   void introspect(std::ostream& os)
+   void introspect(std::ostream& os) const override
    {
       os << "    <signal name=\"" << this->name_ << "\">";
       detail::introspect_args<T...>(os);
@@ -186,7 +186,7 @@ struct ServerRequest : ServerRequestBase
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
-   void introspect(std::ostream& os)
+   void introspect(std::ostream& os) const override
    {
       os << "    <method name=\"" << this->name_ << "\">";
       detail::introspect_args<ArgsT...>(os);
@@ -227,11 +227,12 @@ struct ServerPropertyBase
    virtual void evalSet(detail::Deserializer& ds) = 0;
 
 #if SIMPPL_HAVE_INTROSPECTION
-   virtual void introspect(std::ostream& os) = 0;
+   virtual void introspect(std::ostream& os) const = 0;
 #endif
 
    ServerPropertyBase* next_;   ///< list hook
    const char* name_;
+   detail::BasicInterface* parent_;
 
 protected:
 
@@ -248,8 +249,7 @@ struct BaseProperty : ServerPropertyBase
 {
    inline
    BaseProperty(const char* name, detail::BasicInterface* iface)
-    : sig_(name, iface)
-    , ServerPropertyBase(name, iface)
+    : ServerPropertyBase(name, iface)
    {
       // NOOP
    }
@@ -271,7 +271,6 @@ struct BaseProperty : ServerPropertyBase
 protected:
 
    DataT t_;
-   ServerSignal<DataT> sig_;
 };
 
 
@@ -289,29 +288,39 @@ struct ServerProperty : BaseProperty<DataT>
 
    ServerProperty& operator=(const DataT& data)
    {
-      // FIXME if emitting...
-      this->sig_.emit(data);
+      if (this->t_ != data)
+      {
+         this->t_ = data;
 
-      this->t_ = data;
+         if (Flags & Notifying)
+         {
+            dynamic_cast<SkeletonBase*>(this->parent_)->send_property_change(this->name_, [this](detail::Serializer& s){
+               detail::serialize_property(s, this->t_);
+            });
+         }
+      }
+      
       return *this;
    }
 
+
 protected:
 
-   // FIXME only do something if readwrite enabled!
    void evalSet(detail::Deserializer& ds)
    {
-      Variant<DataT> v;
-      ds >> v;
+      if (Flags & ReadWrite)
+      { 
+         Variant<DataT> v;
+         ds >> v;
 
-      *this = *v.template get<DataT>();
+         *this = *v.template get<DataT>();
+      }
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
-   void introspect(std::ostream& os)
+   void introspect(std::ostream& os) const override
    {
-      // FIXME name_ seems to be here multiple times: signal and ABase
-      os << "    <property name=\"" << ServerPropertyBase::name_ << "\" type=\"";
+      os << "    <property name=\"" << this->name_ << "\" type=\"";
       detail::make_type_signature<DataT>::eval(os);
       os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }

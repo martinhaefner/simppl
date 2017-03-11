@@ -48,7 +48,10 @@ struct InterfaceBase<ServerRequest> : detail::BasicInterface
 {
    InterfaceBase()
     : methods_(nullptr)
+    , properties_(nullptr)
+#if SIMPPL_HAVE_INTROSPECTION
     , signals_(nullptr)
+#endif
    {
       // NOOP
    }

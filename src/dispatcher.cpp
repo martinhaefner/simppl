@@ -24,6 +24,35 @@ using namespace std::literals::chrono_literals;
 namespace
 {
 
+std::string generate_matchstring(simppl::dbus::StubBase& stub, const char* signame)
+{
+   std::ostringstream match_string;
+   
+   match_string 
+      << "type='signal'"
+      << ", sender='" << stub.busname() << "'"
+      << ", interface='" << stub.iface() << "'"
+      << ", member='" << signame << "'";
+      
+   return match_string.str();
+}
+
+
+std::string generate_property_matchstring(simppl::dbus::StubBase& stub)
+{
+   std::ostringstream match_string;
+   
+   match_string 
+      << "type='signal'"
+      << ",sender='" << stub.busname() << "'"
+      << ",interface='org.freedesktop.DBus.Properties'"
+      << ",member='PropertiesChanged'"
+      << ",path='" << stub.objectpath() << "'";
+      
+   return match_string.str();
+}
+
+
 inline
 std::chrono::steady_clock::time_point
 get_lookup_duetime()
@@ -462,65 +491,72 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
 void Dispatcher::register_signal(StubBase& stub, ClientSignalBase& sigbase)
 {
-   DBusError err;
-   dbus_error_init(&err);
-
-   std::string signalname(stub.busname() + "." + sigbase.name());
-
-   auto iter = signal_matches_.find(signalname);
-
-   if (iter == signal_matches_.end())
-   {
-       std::ostringstream match_string;
-       match_string << "type='signal'";
-       match_string << ",sender='" << stub.busname() << "'";
-       match_string << ",interface='" << stub.iface() << "'";
-       match_string << ",member='" << sigbase.name() << "'";
-
-       dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
-       assert(!dbus_error_is_set(&err));
-
-       dbus_error_free(&err);
-
-       signal_matches_[signalname] = 1;
-   }
-   else
-       ++iter->second;
+   register_signal_match(generate_matchstring(stub, sigbase.name()));
 }
 
 
 void Dispatcher::unregister_signal(StubBase& stub, ClientSignalBase& sigbase)
 {
-    std::string signalname(stub.busname() + "." + sigbase.name());
+    unregister_signal_match(generate_matchstring(stub, sigbase.name()));
+}
 
-    auto iter = signal_matches_.find(signalname);
 
-    if (iter != signal_matches_.end())
-    {
-        if (--iter->second == 0)
-        {
-            DBusError err;
-            dbus_error_init(&err);
+void Dispatcher::register_properties(StubBase& stub)
+{
+   register_signal_match(generate_property_matchstring(stub));
+}
 
-            std::ostringstream match_string;
-            match_string << "type='signal'";
-            match_string << ", sender='" << stub.busname() << "'";
-            match_string << ", interface='" << stub.iface() << "'";
-            match_string << ", member='" << sigbase.name() << "'";
 
-            dbus_bus_remove_match(conn_, match_string.str().c_str(), &err);
-            assert(!dbus_error_is_set(&err));
+void Dispatcher::unregister_properties(StubBase& stub)
+{
+   unregister_signal_match(generate_property_matchstring(stub));
+}
 
-            dbus_error_free(&err);
 
-            signal_matches_.erase(iter);
-        }
-    }
+void Dispatcher::register_signal_match(const std::string& match_string)
+{
+   auto iter = signal_matches_.find(match_string);
+
+   if (iter == signal_matches_.end())
+   {
+      DBusError err;
+      dbus_error_init(&err);
+
+      dbus_bus_add_match(conn_, match_string.c_str(), &err);
+      assert(!dbus_error_is_set(&err));
+         
+      dbus_error_free(&err);
+
+      signal_matches_[match_string] = 1;
+   }
+   else
+      ++iter->second;
+}
+
+
+void Dispatcher::unregister_signal_match(const std::string& match_string)
+{
+   auto iter = signal_matches_.find(match_string);
+
+   if (iter != signal_matches_.end())
+   {
+      if (--iter->second == 0)
+      {
+         DBusError err;
+         dbus_error_init(&err);
+
+         dbus_bus_remove_match(conn_, match_string.c_str(), &err);
+         assert(!dbus_error_is_set(&err));
+
+         dbus_error_free(&err);
+      }
+   }
 }
 
 
 DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
+    // FIXME better check!
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
     {
         //std::cout << this << ": having signal '" << dbus_message_get_member(msg) << "'" << std::endl;

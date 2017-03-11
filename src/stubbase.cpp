@@ -55,7 +55,7 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->remove_client(*this);
-
+   
    delete[] iface_;
    delete[] objectpath_;
 }
@@ -122,7 +122,7 @@ void StubBase::register_signal(ClientSignalBase& sigbase)
 
    disp_->register_signal(*this, sigbase);
 
-   // FIXME use intrusive container and iterate instead of using a map -> memory efficiency
+   // TODO use intrusive container and iterate instead of using a map -> memory efficiency
    signals_[sigbase.name()] = &sigbase;
 }
 
@@ -141,14 +141,43 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 }
 
 
+void StubBase::attach_property(const char* name, std::function<void(detail::Deserializer&)> f)
+{
+   assert(disp_);
+   
+   if (properties_.empty())
+      disp_->register_properties(*this);
+   
+   properties_[name] = f;
+}
+
+
+void StubBase::detach_property(const char* name)
+{
+   assert(disp_);
+   
+   properties_.erase(name);
+   
+   if (properties_.empty())
+      disp_->unregister_properties(*this);
+}
+   
+
 void StubBase::cleanup()
 {
+   // cleanup signal registrations
    for (auto& sig_entry : signals_)
    {
       disp_->unregister_signal(*this, *sig_entry.second);
    }
 
    signals_.clear();
+   
+   // cleanup property registration
+   if (!properties_.empty())
+      disp_->unregister_properties(*this);
+
+   properties_.clear();
 
    disp_ = nullptr;
 }
@@ -233,10 +262,43 @@ DBusPendingCall* StubBase::set_property_async(const char* name, std::function<vo
 
 void StubBase::try_handle_signal(DBusMessage* msg)
 {
-   auto iter = signals_.find(dbus_message_get_member(msg));
-   if (iter != signals_.end())
+   // FIXME better check -> include interface!
+   if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
    {
-       iter->second->eval(msg);
+      detail::Deserializer d(msg);
+      
+      std::string iface;
+      d >> iface;
+      // ignore interface name for now
+      
+      DBusMessageIter iter;
+      dbus_message_iter_recurse(d.iter_, &iter);
+
+      while(dbus_message_iter_get_arg_type(&iter) != 0)
+      {
+         DBusMessageIter item_iterator;
+         dbus_message_iter_recurse(&iter, &item_iterator);
+
+         detail::Deserializer s(&item_iterator);
+         
+         std::string property_name;
+         s >> property_name;
+
+         auto found = properties_.find(property_name);
+         if (found != properties_.end())
+            found->second(s);
+         
+         // advance to next element
+         dbus_message_iter_next(&iter);         
+      }
+   }
+   else
+   {
+      auto iter = signals_.find(dbus_message_get_member(msg));
+      if (iter != signals_.end())
+      {
+         iter->second->eval(msg);
+      }
    }
 }
 

@@ -24,8 +24,8 @@ ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* i
  
 ServerPropertyBase::ServerPropertyBase(const char* name, detail::BasicInterface* iface)
  : name_(name)
+ , parent_(iface)
 {
- //  std::cout << "Register " << name_ << std::endl;
    auto& properties = dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->properties_;
    this->next_ = properties;
    properties = this;

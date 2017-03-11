@@ -180,10 +180,12 @@ struct ClientProperty
 
    inline
    ClientProperty(const char* name, detail::BasicInterface* iface)
-    : signal_(name, iface)
+    : name_(name)
+    , iface_(iface)
    {
       // NOOP
    }
+   
 
    template<typename FunctorT>
    inline
@@ -194,20 +196,22 @@ struct ClientProperty
 
    StubBase& stub()
    {
-      return *dynamic_cast<StubBase*>(signal_.iface_);
+      return *dynamic_cast<StubBase*>(iface_);
    }
 
    /// only call this after the server is connected.
    ClientProperty& attach()
    {
-      signal_.handled_by([this](arg_type val){
-         if (f_)
-            f_(CallState(42), val);
+      stub().attach_property(name_, [this](detail::Deserializer& s){
+         
+         Variant<data_type> d;
+         s >> d;
+         
+         if (this->f_)
+            this->f_(CallState(42), *d.template get<data_type>());
       });
-
-      (void)signal_.attach();
       
-      dbus_pending_call_set_notify(stub().get_property_async(signal_.name()), 
+      dbus_pending_call_set_notify(stub().get_property_async(name_), 
          &holder_type::pending_notify, 
          new holder_type([this](CallState cs, const arg_type& val){
             if (f_)
@@ -222,7 +226,7 @@ struct ClientProperty
    // TODO implement GetAll 
    DataT get()
    {
-      message_ptr_t msg = stub().get_property(signal_.name());
+      message_ptr_t msg = stub().get_property(name_);
 
       detail::Deserializer ds(msg.get());
 
@@ -236,7 +240,7 @@ struct ClientProperty
    inline
    detail::InterimCallbackHolder<holder_type> get_async()
    {
-      return detail::InterimCallbackHolder<holder_type>(stub().get_property_async(signal_.name()));
+      return detail::InterimCallbackHolder<holder_type>(stub().get_property_async(name_));
    }
 
 
@@ -251,7 +255,7 @@ struct ClientProperty
    inline
    ClientProperty& detach()
    {
-      (void)signal_.detach();
+      stub().detach_property(name_);
       return *this;
    }
 
@@ -259,13 +263,15 @@ struct ClientProperty
    inline
    const char* name() const
    {
-      return signal_.name();
+      return name_;
    }
 
 private:
 
-    signal_type signal_;
-    function_type f_;
+   const char* name_;
+   detail::BasicInterface* iface_;
+   
+   function_type f_;
 };
 
 
@@ -316,7 +322,7 @@ struct ClientRequest
          simppl::dbus::detail::serialize(s, t...);
       }, is_oneway));
 
-      // FIXME move this stuff into the stub baseclass, including blocking on pending call,
+      // TODO move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
       if (!is_oneway)
       {

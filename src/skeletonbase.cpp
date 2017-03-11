@@ -234,21 +234,29 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
              "  </interface>\n";
 
          // attributes
-         oss <<
-             "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
-             "    <method name=\"Get\">\n"
-             "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
-             "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
-             "      <arg name=\"value\" type=\"v\" direction=\"out\"/>\n"
-             "    </method>\n"
-             "    <method name=\"Set\">\n"
-             "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
-             "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
-             "      <arg name=\"value\" type=\"v\" direction=\"in\"/>\n"
-             "    </method>\n"
-             "  </interface>\n"
-             "</node>\n";
-
+         if (dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_)
+         {
+            oss <<
+               "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
+               "    <method name=\"Get\">\n"
+               "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
+               "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
+               "      <arg name=\"value\" type=\"v\" direction=\"out\"/>\n"
+               "    </method>\n"
+               "    <method name=\"Set\">\n"
+               "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
+               "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
+               "      <arg name=\"value\" type=\"v\" direction=\"in\"/>\n"
+               "    </method>\n"
+               "    <signal name=\"PropertiesChanged\">\n"
+               "      <arg name=\"interface_name\" type=\"s\"/>\n"
+               "      <arg name=\"changed_properties\" type=\"a{sv}\"/>\n"
+               "      <arg name=\"invalidated_properties\" type=\"as\"/>\n"
+               "    </signal>\n"
+               "  </interface>\n"
+               "</node>\n";
+         }
+         
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
          detail::Serializer s(reply);
@@ -328,6 +336,44 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+
+void SkeletonBase::send_property_change(const char* prop, std::function<void(detail::Serializer&)> f)
+{
+   static std::vector<std::string> invalid;
+   
+   message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), "org.freedesktop.DBus.Properties", "PropertiesChanged"));
+
+   detail::Serializer s(msg.get());
+   s << iface();
+   
+   // TODO make once
+   std::ostringstream buf;
+   buf << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+       << DBUS_TYPE_STRING_AS_STRING
+       << DBUS_TYPE_VARIANT_AS_STRING
+       << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
+   
+   DBusMessageIter iter;
+   dbus_message_iter_open_container(s.iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
+
+   DBusMessageIter item_iterator;
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
+
+   detail::Serializer des(&item_iterator);
+   des.write(prop);
+   f(des);
+   
+   // the dict entry
+   dbus_message_iter_close_container(&iter, &item_iterator);
+   
+   // the map
+   dbus_message_iter_close_container(s.iter_, &iter);
+
+   s << invalid;
+
+   dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }
 
 

@@ -216,7 +216,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          props = new_props;
 
-         mayShutdown.emit(42);
+         mayShutdown.notify(42);
       };
 
       // initialize attribute
