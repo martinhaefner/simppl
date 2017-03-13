@@ -55,7 +55,7 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->remove_client(*this);
-   
+
    delete[] iface_;
    delete[] objectpath_;
 }
@@ -93,6 +93,9 @@ DBusPendingCall* StubBase::send_request(const char* method_name, std::function<v
     }
     else
     {
+       // otherwise server would stop reading requests after a while
+       dbus_message_set_no_reply(msg.get(), TRUE);
+
        dbus_connection_send(disp().conn_, msg.get(), nullptr);
        dbus_connection_flush(disp().conn_);
     }
@@ -144,10 +147,10 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 void StubBase::attach_property(const char* name, std::function<void(detail::Deserializer&)> f)
 {
    assert(disp_);
-   
+
    if (properties_.empty())
       disp_->register_properties(*this);
-   
+
    properties_[name] = f;
 }
 
@@ -155,13 +158,13 @@ void StubBase::attach_property(const char* name, std::function<void(detail::Dese
 void StubBase::detach_property(const char* name)
 {
    assert(disp_);
-   
+
    properties_.erase(name);
-   
+
    if (properties_.empty())
       disp_->unregister_properties(*this);
 }
-   
+
 
 void StubBase::cleanup()
 {
@@ -172,7 +175,7 @@ void StubBase::cleanup()
    }
 
    signals_.clear();
-   
+
    // cleanup property registration
    if (!properties_.empty())
       disp_->unregister_properties(*this);
@@ -255,7 +258,7 @@ DBusPendingCall* StubBase::set_property_async(const char* name, std::function<vo
     DBusPendingCall* pending = nullptr;
 
     dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
-    
+
     return pending;
 }
 
@@ -266,11 +269,11 @@ void StubBase::try_handle_signal(DBusMessage* msg)
    if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
    {
       detail::Deserializer d(msg);
-      
+
       std::string iface;
       d >> iface;
       // ignore interface name for now
-      
+
       DBusMessageIter iter;
       dbus_message_iter_recurse(d.iter_, &iter);
 
@@ -280,16 +283,16 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          dbus_message_iter_recurse(&iter, &item_iterator);
 
          detail::Deserializer s(&item_iterator);
-         
+
          std::string property_name;
          s >> property_name;
 
          auto found = properties_.find(property_name);
          if (found != properties_.end())
             found->second(s);
-         
+
          // advance to next element
-         dbus_message_iter_next(&iter);         
+         dbus_message_iter_next(&iter);
       }
    }
    else
