@@ -133,6 +133,7 @@ uint32_t StubBase::sendRequest(ClientRequestBase& req, std::function<void(detail
     }
     else
     {
+       dbus_message_set_no_reply(msg, TRUE);
        dbus_connection_send(disp().conn_, msg, nullptr);
        dbus_connection_flush(disp().conn_);
     }
