@@ -1,10 +1,18 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.0)
 
 project (simppl)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_FLAGS "-DSIMPPL_HAVE_INTROSPECTION=1 -std=c++1y -g -pthread")
+set(CMAKE_CXX_STANDARD 14)
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic")
+
+OPTION(HAVE_INTROSPECTION "Have introspection" ON) # Enabled by default
+
+IF(HAVE_INTROSPECTION)
+    ADD_DEFINITIONS(-DSIMPPL_HAVE_INTROSPECTION)
+ENDIF(HAVE_INTROSPECTION)
 
 include_directories(include)
 
@@ -43,21 +51,11 @@ add_subdirectory(src)
 
 
 # gtest environment 
-if(NOT GTEST_ROOT)
-   message("Searching for gtest installation...")
-   
-   find_path(GTEST_ROOT
-       include/gtest/gtest.h
-       PATHS $ENV{HOME}/*
-       PATHS /usr/share/*
-       ONLY_CMAKE_FIND_ROOT_PATH
-       NO_DEFAULT_PATH
-   )
-endif()
+find_package(GTest)
 
 # having tests?
-if(GTEST_ROOT)
-    message("Building tests against '${GTEST_ROOT}'")
+if(GTEST_FOUND)
+    message("Building tests")
     add_subdirectory(tests)
 else()
     message("Omitting tests!")
