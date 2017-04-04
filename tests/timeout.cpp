@@ -2,7 +2,6 @@
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
-#include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
 #include <thread>
@@ -58,7 +57,7 @@ struct Client : simppl::dbus::Stub<Timeout>
 
                EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
 
-               int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
+               long millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_).count();
                EXPECT_GE(millis, 500);
                EXPECT_LT(millis, 600);
 
@@ -260,7 +259,7 @@ TEST(Timeout, request_specific)
    {
       // request specific timeout -> overrides default
       double rc = stub.eval[simppl::dbus::timeout = 700ms](42);
-
+      (void)rc;  //remove unused warnings
       // never arrive here!
       EXPECT_FALSE(true);
    }
@@ -269,7 +268,7 @@ TEST(Timeout, request_specific)
       EXPECT_STREQ("org.freedesktop.DBus.Error.NoReply", err.name());
    }
 
-   int millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+   long millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
    EXPECT_GE(millis, 700);
    EXPECT_LT(millis, 750);
 
@@ -294,7 +293,7 @@ TEST(Timeout, blocking_api)
    try
    {
       double rc = stub.eval(42);
-
+      (void)rc; // remove unused warnings
       // never arrive here!
       EXPECT_FALSE(true);
    }

@@ -78,7 +78,7 @@ short make_poll_events(int flags)
         rc |= POLLOUT;
 
     // do not expect to have read and write simultaneously from DBus API
-    assert(flags | (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE) != (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE));
+    assert(flags | ((DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE) != (DBUS_WATCH_READABLE&DBUS_WATCH_WRITABLE)));
 
     return rc;
 }
@@ -327,8 +327,6 @@ struct Dispatcher::Private
 
                        if (pfd.revents & make_poll_events(dbus_watch_get_flags(iter->second)))
                        {
-                           int fd = pfd.fd;
-
                            //std::cout << "handle watch" << std::endl;
                            dbus_watch_handle(iter->second, make_dbus_flags(pfd.revents));
                            break;
