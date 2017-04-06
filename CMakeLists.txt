@@ -48,7 +48,7 @@ else()
 endif()
 
 add_subdirectory(src)
-
+add_subdirectory(example)
 
 # gtest environment 
 find_package(GTest)
