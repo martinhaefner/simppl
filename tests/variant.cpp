@@ -2,7 +2,6 @@
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
-#include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
 

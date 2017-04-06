@@ -1,13 +1,10 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0)
 
 include_directories(. ../include)
 
-
-add_subdirectory(${GTEST_ROOT} gtest)
-
 enable_testing()
-
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
 
 
 add_executable(unittests
@@ -19,7 +16,7 @@ add_executable(unittests
    variant.cpp
 )
 
-target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
+target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} simppl rt dbus-1)
 
 
 # This is so you can do 'make test' to see all your tests run, instead of

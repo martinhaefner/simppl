@@ -2,7 +2,6 @@
 
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
-#include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 
 #include <thread>
@@ -138,7 +137,7 @@ TEST(Errors, blocking)
    try
    {
       int res = stub.hello1(101);
-
+      (void)res; //remove unused warning
       // never reach
       ASSERT_FALSE(true);
    }
