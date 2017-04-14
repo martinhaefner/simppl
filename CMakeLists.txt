@@ -6,13 +6,21 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -pthread")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic")
 
-OPTION(HAVE_INTROSPECTION "Have introspection" ON) # Enabled by default
+# enable threading
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+
+
+# enable instrospection by default
+OPTION(HAVE_INTROSPECTION "Have introspection" ON) 
 
 IF(HAVE_INTROSPECTION)
     ADD_DEFINITIONS(-DSIMPPL_HAVE_INTROSPECTION)
 ENDIF(HAVE_INTROSPECTION)
+
 
 include_directories(include)
 

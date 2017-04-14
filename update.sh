@@ -21,7 +21,7 @@ if [ -z "$VAR_GTEST_ROOT" ]; then
    while read DIR; do
       VAR_GTEST_ROOT=$DIR
       break
-   done < <(find ~ -maxdepth 1 -name gtest-*)
+   done < <(find ~ -maxdepth 1 -name gtest_build)
 fi
 
 pushd build

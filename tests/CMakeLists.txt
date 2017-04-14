@@ -16,7 +16,7 @@ add_executable(unittests
    variant.cpp
 )
 
-target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} simppl rt dbus-1)
+target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} Threads::Threads simppl rt dbus-1)
 
 
 # This is so you can do 'make test' to see all your tests run, instead of
