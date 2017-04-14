@@ -52,13 +52,26 @@ public:
 };
 
 
-int main()
+int main(int argc, char** argv)
 {
-    simppl::dbus::Dispatcher disp("bus:session");
-    MyEchoClient client(disp);
-    MyEcho service(disp);
-
-    disp.run();
-
-    return EXIT_SUCCESS;
+   simppl::dbus::Dispatcher disp("bus:session");
+    
+   if (argc == 1)
+   {
+      MyEchoClient client(disp);
+      MyEcho service(disp);
+      disp.run();
+   }
+   else if (!strcmp(argv[1], "--server"))
+   {
+      MyEcho service(disp);
+      disp.run();
+   }
+   else if (!strcmp(argv[1], "--client"))
+   {
+      MyEchoClient client(disp);
+      disp.run();
+   }
+   
+   return EXIT_SUCCESS;
 }
