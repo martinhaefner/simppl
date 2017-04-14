@@ -68,7 +68,7 @@ namespace {
       {
          connected >> [this](simppl::dbus::ConnectionState s){
             getData.async() >> [this](simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping){
-               EXPECT_EQ(3, mapping.size());
+               EXPECT_EQ(3u, mapping.size());
 
                auto hello = mapping.find("Hello");
                auto world = mapping.find("World");
@@ -136,7 +136,7 @@ TEST(Variant, map)
    };
 
    v = m;
-   EXPECT_EQ(2, (v.get<std::map<int, std::string>>()->size()));
+   EXPECT_EQ(2u, (v.get<std::map<int, std::string>>()->size()));
 
    int i=0;
    for(auto& e : *v.get<std::map<int, std::string>>())

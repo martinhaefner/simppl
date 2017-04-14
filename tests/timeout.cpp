@@ -186,13 +186,14 @@ void runServer()
 }
 
 
-void runClient()
+/*void runClient()
 {
    simppl::dbus::Dispatcher d;
    DisconnectClient c(d);
 
    d.run();
 }
+*/
 
 }   // anonymous namespace
 

@@ -712,6 +712,8 @@ int Dispatcher::run()
    {
        step_ms(100);
    }
+   
+   return 0;
 }
 
 }   // namespace dbus

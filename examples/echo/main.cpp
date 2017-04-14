@@ -1,10 +1,8 @@
+#include "echoservice.h"
+
 #include "simppl/stub.h"
-#include "simppl/dispatcher.h"
-
-#include "EchoService.h"
-
-
 #include "simppl/skeleton.h"
+#include "simppl/dispatcher.h"
 
 
 class MyEchoClient : public simppl::dbus::Stub<simppl::example::EchoService>
@@ -12,7 +10,7 @@ class MyEchoClient : public simppl::dbus::Stub<simppl::example::EchoService>
 
 public:
     MyEchoClient(simppl::dbus::Dispatcher& disp)
-            : simppl::dbus::Stub<simppl::example::EchoService>(disp, "myEcho")
+     : simppl::dbus::Stub<simppl::example::EchoService>(disp, "myEcho")
     {
         connected >> [this](simppl::dbus::ConnectionState st){handle_connected(st);};
     }
@@ -22,8 +20,7 @@ private:
     {
         if (st == simppl::dbus::ConnectionState::Connected)
         {
-
-            this->echo.async("Hello World!") >> [this](const simppl::dbus::CallState st, const std::string& echo_string)
+            echo.async("Hello World!") >> [this](const simppl::dbus::CallState st, const std::string& echo_string)
             {
                 if (st)
                 {
@@ -32,7 +29,6 @@ private:
                 else
                     std::cout << "Got error: " << st.what() << std::endl;
             };
-
         }
     }
 };
@@ -41,7 +37,7 @@ class MyEcho : public simppl::dbus::Skeleton<simppl::example::EchoService>
 {
 public:
     MyEcho(simppl::dbus::Dispatcher& disp)
-            : simppl::dbus::Skeleton<simppl::example::EchoService>(disp, "myEcho")
+     : simppl::dbus::Skeleton<simppl::example::EchoService>(disp, "myEcho")
     {
         echo >> [this](const std::string& echo_string)
         {

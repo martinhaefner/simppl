@@ -71,13 +71,13 @@ struct Client : simppl::dbus::Stub<Properties>
 
             if (callback_count_ == 1)   // the property Get(...) from the attach
             {
-               EXPECT_EQ(2, props.size());
+               EXPECT_EQ(2u, props.size());
 
                EXPECT_TRUE(props.find(Four) == props.end());
             }
             else if (callback_count_ == 2)   // the response on the assignment within the set(...) request
             {
-               EXPECT_EQ(3, props.size());
+               EXPECT_EQ(3u, props.size());
 
                EXPECT_TRUE(props.find(Four) != props.end());
 
@@ -140,13 +140,13 @@ struct MultiClient : simppl::dbus::Stub<Properties>
 
                if (callback_count_ == 1)
                {
-                  EXPECT_EQ(2, props.size());
+                  EXPECT_EQ(2u, props.size());
                   
                   EXPECT_TRUE(props.find(Four) == props.end());
                }
                else if (callback_count_ == 2)
                {
-                  EXPECT_EQ(3, props.size());
+                  EXPECT_EQ(3u, props.size());
                   
                   EXPECT_TRUE(props.find(Four) != props.end());
 
