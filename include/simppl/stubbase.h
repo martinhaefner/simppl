@@ -29,7 +29,7 @@ namespace detail
 {
    struct Serializer;
    struct Deserializer;
-};
+}
 
 
 struct StubBase
