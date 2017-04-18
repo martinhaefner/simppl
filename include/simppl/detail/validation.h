@@ -177,7 +177,7 @@ struct isMap
 template<typename T>
 struct isString
 {
-   enum { value = std::is_same<T, std::string>::value };
+   enum { value = std::is_same<T, std::string>::value || std::is_same<T, std::wstring>::value };
 };
 
 

@@ -26,6 +26,9 @@ INTERFACE(Simple)
    Request<in<int>, in<double>, out<double>> add;
    Request<in<int>, in<double>, out<int>, out<double>> echo;
 
+   Request<in<std::wstring>, out<std::wstring>> echo_wstring;
+   Request<in<wchar_t*>, out<wchar_t*>>         echo_wchart;
+
    Property<int> data;
 
    Signal<int> sig;
@@ -37,6 +40,8 @@ INTERFACE(Simple)
     , INIT(oneway)
     , INIT(add)
     , INIT(echo)
+    , INIT(echo_wstring)
+    , INIT(echo_wchart)
     , INIT(data)
     , INIT(sig)
     , INIT(sig2)
@@ -240,6 +245,19 @@ struct Server : simppl::dbus::Skeleton<Simple>
       {
          this->respond_with(echo(i, d));
       };
+      
+      echo_wstring >> [this](const std::wstring& str)
+      {
+         this->respond_with(echo_wstring(str));
+      };
+      
+      echo_wchart >> [this](wchar_t* str)
+      {
+         this->respond_with(echo_wchart(str));
+         
+         // clean up pointer
+         simppl::dbus::detail::Deserializer::free(str);
+      };
    }
 
    int count_oneway_ = 0;
@@ -333,7 +351,15 @@ TEST(Simple, blocking)
    int dv = -1;
    dv = stub.data.get();
    EXPECT_EQ(4711, dv);
-
+   
+   std::wstring rslt_str = stub.echo_wstring(L"Hello world");
+   EXPECT_EQ(0, rslt_str.compare(L"Hello world"));
+   
+   wchar_t* rslt_p = stub.echo_wchart(L"Hello world");
+   EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+   
+   simppl::dbus::detail::Deserializer::free(rslt_p);
+   
    stub.oneway(7777);   // stop server
    t.join();
 }

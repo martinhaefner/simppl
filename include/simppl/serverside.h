@@ -200,16 +200,16 @@ private:
    inline
    detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
-      std::function<void(detail::Serializer&)> f(std::bind(&simppl::dbus::detail::serialize<const T&...>, std::placeholders::_1, t...));
-      return detail::ServerResponseHolder(f);
+      return detail::ServerResponseHolder([&](detail::Serializer& s){
+         simppl::dbus::detail::serialize(s, t...);
+      });
    }
 
    template<typename... T>
    inline
    detail::ServerResponseHolder __impl(std::false_type, const T&... t)
    {
-      std::function<void(detail::Serializer&)> f;
-      return detail::ServerResponseHolder(f);
+      return detail::ServerResponseHolder([](detail::Serializer& s){ /*NOOP*/ });
    }
 
    callback_type f_;

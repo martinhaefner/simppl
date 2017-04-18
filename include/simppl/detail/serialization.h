@@ -7,6 +7,7 @@
 #include "simppl/callstate.h"
 #include "simppl/variant.h"
 #include "simppl/objectpath.h"
+#include <cxxabi.h>
 
 #include <iostream>
 #include <map>
@@ -240,6 +241,7 @@ struct StructSerializationHelper
    static inline
    void write(SerializerT& s, const StructT& st)
    {
+      std::cout << "A" << std::endl;
       const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
       s.write(tuple);
    }
@@ -454,6 +456,28 @@ struct make_type_signature<std::string>
 };
 
 
+template<>
+struct make_type_signature<std::wstring>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return make_type_signature<uint32_t>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
+   }
+};
+
+
+template<>
+struct make_type_signature<wchar_t*>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return make_type_signature<uint32_t>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
+   }
+};
+
+
 template<typename KeyT, typename ValueT>
 struct make_type_signature<std::pair<KeyT, ValueT>>
 {
@@ -564,6 +588,20 @@ bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig);
 
 // ---------------------------------------------------------------------
 
+struct Pod {};
+struct Pointer {};
+struct Struct {};
+
+template<typename T>
+struct type_deducer
+{
+   typedef typename std::conditional<isPod<T>::value || std::is_enum<T>::value, Pod, 
+      typename std::conditional<std::is_pointer<T>::value, Pointer, Struct>::type>::type type;
+};
+
+
+// ---------------------------------------------------------------------
+
 
 struct Serializer // : noncopyable
 {
@@ -577,15 +615,22 @@ struct Serializer // : noncopyable
    inline
    Serializer& write(const T& t)
    {
-      return write(t, bool_constant<isPod<T>::value || std::is_pointer<T>::value || std::is_enum<T>::value>());
+      return write(t, typename type_deducer<T>::type());
    }
 
    template<typename T>
    inline
-   Serializer& write(T t, std::true_type)
+   Serializer& write(T t, Pod)
    {
       dbus_message_iter_append_basic(iter_, dbus_type_code<T>::value, &t);
       return *this;
+   }
+   
+   template<typename T>
+   inline
+   Serializer& write(T t, Pointer)
+   {
+      return write_ptr(t);
    }
 
    inline
@@ -598,7 +643,7 @@ struct Serializer // : noncopyable
 
    template<typename T>
    inline
-   Serializer& write(const T& t, std::false_type)
+   Serializer& write(const T& t, Struct)
    {
       StructSerializationHelper<
 #ifdef SIMPPL_HAVE_BOOST_FUSION
@@ -611,9 +656,12 @@ struct Serializer // : noncopyable
       return *this;
    }
 
-
    Serializer& write(const std::string& str);
-   Serializer& write(const char* str);
+   Serializer& write_ptr(const char* str);
+
+   Serializer& write(const std::wstring& str);
+   Serializer& write_ptr(const wchar_t* str);
+   
    Serializer& write(const ObjectPath& path);
 
    template<typename... T>
@@ -745,6 +793,9 @@ MAKE_SERIALIZER(double)
 MAKE_SERIALIZER(const char*)
 MAKE_SERIALIZER(const std::string&)
 
+MAKE_SERIALIZER(const wchar_t*)
+MAKE_SERIALIZER(const std::wstring&)
+
 
 template<typename T>
 inline
@@ -820,9 +871,9 @@ namespace detail
 struct Deserializer // : noncopyable
 {
    static inline
-   void free(char* ptr)
+   void free(void* ptr)
    {
-      delete[] ptr;
+      delete[] (char*)ptr;
    }
 
    explicit
@@ -872,6 +923,10 @@ struct Deserializer // : noncopyable
 
    Deserializer& read(char*& str);
    Deserializer& read(std::string& str);
+   
+   Deserializer& read(wchar_t*& str);
+   Deserializer& read(std::wstring& str);
+   
    Deserializer& read(ObjectPath& path);
 
    template<typename... T>
@@ -989,7 +1044,7 @@ struct Deserializer // : noncopyable
 private:
 
    static inline
-   char* allocate(size_t len)
+   void* allocate(size_t len)
    {
       return new char[len];
    }
@@ -1033,6 +1088,9 @@ MAKE_DESERIALIZER(double)
 
 MAKE_DESERIALIZER(char*)
 MAKE_DESERIALIZER(std::string)
+
+MAKE_DESERIALIZER(wchar_t*)
+MAKE_DESERIALIZER(std::wstring)
 
 
 template<typename T>
