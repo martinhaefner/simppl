@@ -14,10 +14,10 @@ Development libraries of libdbus-1 are also needed for a successful build.
 
 Compilers
 
-Well, I only developed on GCC >=4.9 and clang/LLVM 3.4. Due to the heavy
-usage of templating techniques and C++1y language features I cannot
-guarantee that any of the code fragments will work with other compilers
-(especially VS compiler).
+I only developed on GCC >=4.9. The code uses features of upto C++14 and 
+g++ specific demangling functions for class symbols. Therefore, I do not
+expect the code to work on any other compiler family without appropriate
+code adaptions.
 
 For structure serialization boost::fusion can be used. See benchmark example
 for more information how to serialize structures when sending remote messages.
