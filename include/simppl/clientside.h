@@ -291,7 +291,7 @@ struct ClientRequest
         is_oneway = detail::is_oneway_request<ArgsT...>::value
     };
 
-    typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
+    typedef typename detail::canonify<typename args_type_generator::const_type>::type    args_type;
     typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
 
     typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
@@ -313,7 +313,10 @@ struct ClientRequest
    template<typename... T>
    return_type operator()(const T&... t)
    {
-      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
+//      std::cout << abi::__cxa_demangle(typeid(typename detail::canonify<std::tuple<T...>>::type).name(), 0, 0, 0) << std::endl;
+//      std::cout << abi::__cxa_demangle(typeid(args_type).name(), 0, 0, 0) << std::endl;
+      
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<T...>>::type,
                     args_type>::value, "args mismatch");
 
       auto stub = dynamic_cast<StubBase*>(parent_);

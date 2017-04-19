@@ -312,6 +312,24 @@ struct AllOf<TypeList<NilType, NilType>, FuncT>
     enum { value = true };
 };
 
+// ------------------ transform to other type --------------------------
+
+template<typename ListT, typename FuncT>
+struct transform;
+
+template<typename HeadT, typename TailT, typename FuncT>
+struct transform<TypeList<HeadT, TailT>, FuncT>
+{
+   typedef TypeList<typename FuncT::template apply_<HeadT>::type, typename transform<TailT, FuncT>::type> type;
+};
+
+template<typename HeadT, typename FuncT>
+struct transform<TypeList<HeadT, NilType>, FuncT>
+{
+   typedef TypeList<typename FuncT::template apply_<HeadT>::type, NilType> type;
+};
+
+
 }   // namespace simppl
 
 

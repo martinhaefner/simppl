@@ -71,8 +71,18 @@ struct Client : simppl::dbus::Stub<Simple>
 
             this->oneway(42);
 
-            // shutdown
-            this->oneway(7777);
+            const wchar_t* wct = L"Hello world";
+            
+            this->echo_wchart.async(wct) >> [this](simppl::dbus::CallState state, wchar_t* p){
+               EXPECT_TRUE((bool)state);
+               EXPECT_EQ(0, wcscmp(p, L"Hello world"));
+              
+               // must delete pointer now, it's mine
+               simppl::dbus::detail::Deserializer::free(p);
+               
+               // shutdown
+               this->oneway(7777);
+            };
          };
       };
    }
@@ -300,23 +310,17 @@ TEST(Simple, attribute)
 }
 
 
-void blockrunner()
-{
-   simppl::dbus::Dispatcher d("bus:session");
-
-   Server s(d, "sb");
-
-   d.run();
-
-   EXPECT_EQ(4, s.count_oneway_);
-}
-
-
 TEST(Simple, blocking)
 {
    simppl::dbus::Dispatcher d("bus:session");
 
-   std::thread t(blockrunner);
+   std::thread t([](){
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "sb");
+      d.run();
+
+      EXPECT_EQ(4, s.count_oneway_);
+   });
 
    simppl::dbus::Stub<Simple> stub(d, "sb");
 
@@ -355,10 +359,40 @@ TEST(Simple, blocking)
    std::wstring rslt_str = stub.echo_wstring(L"Hello world");
    EXPECT_EQ(0, rslt_str.compare(L"Hello world"));
    
-   wchar_t* rslt_p = stub.echo_wchart(L"Hello world");
-   EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+   // different calling styles for pointers
+   {
+      const wchar_t* text = L"Hello world";
+      wchar_t* rslt_p = stub.echo_wchart(text);
+      EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+      
+      simppl::dbus::detail::Deserializer::free(rslt_p);
+   }
    
-   simppl::dbus::detail::Deserializer::free(rslt_p);
+   {
+      wchar_t* rslt_p = stub.echo_wchart(L"Hello world");
+      EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+      
+      simppl::dbus::detail::Deserializer::free(rslt_p);
+   }
+   
+   {
+      wchar_t text[16];
+      wcscpy(text, L"Hello world");
+      wchar_t* rslt_p = stub.echo_wchart(text);
+      EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+      
+      simppl::dbus::detail::Deserializer::free(rslt_p);
+   }
+   
+   {
+      wchar_t text[16];
+      wcscpy(text, L"Hello world");
+      wchar_t* tp = text;
+      wchar_t* rslt_p = stub.echo_wchart(tp);
+      EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
+      
+      simppl::dbus::detail::Deserializer::free(rslt_p);
+   }
    
    stub.oneway(7777);   // stop server
    t.join();
@@ -386,3 +420,4 @@ TEST(Simple, disconnect)
       serverthread.join();
    }
 }
+

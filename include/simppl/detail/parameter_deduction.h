@@ -153,6 +153,23 @@ struct canonify<std::tuple<>>
 
 // ---------------------------------------------------------------------
 
+struct add_const_for_pointer
+{
+   template<typename T>
+   struct apply_
+   {
+      typedef T type;
+   };
+   
+   template<typename T>
+   struct apply_<T*>
+   {
+      typedef T const* type;
+   };
+};
+
+// ---------------------------------------------------------------------
+
 template<template<typename> class FilterFunc, typename... T>
 struct filter;
 
@@ -189,7 +206,10 @@ template<typename... T>
 struct generate_argument_type
 {
    typedef typename filter<is_in, T...>::list_type list_type;
+   typedef typename transform<list_type, add_const_for_pointer>::type const_list_type;
+   
    typedef typename make_tuple_from_list<list_type, std::tuple<>>::type type;
+   typedef typename make_tuple_from_list<const_list_type, std::tuple<>>::type const_type;
 };
 
 template<typename... T>
