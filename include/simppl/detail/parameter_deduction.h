@@ -123,6 +123,47 @@ struct make_function_from_list<void, std::function<void(T...)>>
 
 // ---------------------------------------------------------------------
 
+template<typename...T>
+struct SerializerGenerator
+{
+   static inline
+   void eval(Serializer& s, const T&... t)
+   {
+      serialize(s, t...);
+   }
+};
+
+
+// flatten typelist into serialize function
+template<typename ListT, typename FunctT>
+struct make_serializer_from_list;
+
+template<typename HeadT, typename TailT, typename... T>
+struct make_serializer_from_list<TypeList<HeadT, TailT>, SerializerGenerator<T...>>
+{
+   typedef typename make_serializer_from_list<TailT, SerializerGenerator<T..., HeadT>>::type type;
+};
+
+template<typename HeadT, typename... T>
+struct make_serializer_from_list<TypeList<HeadT, NilType>, SerializerGenerator<T...>>
+{
+   typedef SerializerGenerator<T..., HeadT> type;
+};
+
+template<typename... T>
+struct make_serializer_from_list<TypeList<NilType, NilType>, SerializerGenerator<T...>>
+{
+   typedef SerializerGenerator<T...> type;
+};
+
+template<typename... T>
+struct make_serializer_from_list<void, SerializerGenerator<T...>>
+{
+   typedef SerializerGenerator<T...> type;
+};
+
+// ---------------------------------------------------------------------
+
 // remove tuple<> if just one type is contained
 template<typename... T>
 struct canonify;

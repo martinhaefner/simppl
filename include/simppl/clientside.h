@@ -292,11 +292,15 @@ struct ClientRequest
     };
 
     typedef typename detail::canonify<typename args_type_generator::const_type>::type    args_type;
-    typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
+    typedef typename detail::canonify<typename return_type_generator::type>::type        return_type;
 
-    typedef typename detail::generate_callback_function<ArgsT...>::type            callback_type;
-    typedef detail::CallbackHolder<callback_type, return_type>                             holder_type;
-
+    typedef typename detail::generate_callback_function<ArgsT...>::type                  callback_type;
+    typedef detail::CallbackHolder<callback_type, return_type>                           holder_type;
+     
+    // correct typesafe serializer
+    typedef typename detail::make_serializer_from_list<
+        typename args_type_generator::const_list_type, detail::SerializerGenerator<>>::type serializer_type;
+    
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
@@ -322,7 +326,7 @@ struct ClientRequest
       auto stub = dynamic_cast<StubBase*>(parent_);
 
       auto p = make_pending_call(stub->send_request(method_name_, [&](detail::Serializer& s){
-         simppl::dbus::detail::serialize(s, t...);
+         serializer_type::eval(s, t...);
       }, is_oneway));
 
       // TODO move this stuff into the stub baseclass, including blocking on pending call,
@@ -358,7 +362,7 @@ struct ClientRequest
       auto stub = dynamic_cast<StubBase*>(parent_);
 
       return detail::InterimCallbackHolder<holder_type>(stub->send_request(method_name_, [&](detail::Serializer& s){
-         simppl::dbus::detail::serialize(s, t...);
+         serializer_type::eval(s, t...);
       }, false));
    }
 

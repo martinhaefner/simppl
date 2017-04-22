@@ -13,6 +13,7 @@
 #include "simppl/serialization.h"
 #include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
+#include "simppl/for_each.h"
 
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/basicinterface.h"
@@ -47,7 +48,8 @@ struct ServerRequestBase
    friend struct detail::ServerRequestBaseSetter;
 
    virtual void eval(DBusMessage* msg) = 0;
-
+   virtual void get_signature(std::ostream& os) const = 0;
+   
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
 #endif
@@ -147,8 +149,12 @@ struct ServerRequest : ServerRequestBase
     typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
     typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
 
-    typedef typename detail::generate_server_callback_function<ArgsT...>::type callback_type;
+    typedef typename detail::generate_server_callback_function<ArgsT...>::type     callback_type;
 
+    // TODO cleanup this typedef
+    typedef typename detail::make_serializer_from_list<
+        typename return_type_generator::list_type, detail::SerializerGenerator<>>::type serializer_type;
+    
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
@@ -167,11 +173,16 @@ struct ServerRequest : ServerRequestBase
         f_ = func;
     }
 
-   void eval(DBusMessage* msg)
+   void eval(DBusMessage* msg) override
    {
        assert(f_);
        detail::Deserializer d(msg);
        detail::GetCaller<args_type>::type::template eval(d, f_);
+   }
+   
+   void get_signature(std::ostream& os) const override
+   {
+      ForEach<typename args_type_generator::list_type>::template eval<detail::make_type_signature>(os);
    }
 
    template<typename... T>
@@ -201,7 +212,7 @@ private:
    detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
       return detail::ServerResponseHolder([&](detail::Serializer& s){
-         simppl::dbus::detail::serialize(s, t...);
+         serializer_type::eval(s, t...);
       });
    }
 
