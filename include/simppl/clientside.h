@@ -42,7 +42,8 @@ struct ClientSignalBase
    
    
    virtual void eval(DBusMessage* msg) = 0;
-
+   //virtual const char* get_signature() const = 0;
+   
    inline
    ClientSignalBase(const char* name, detail::BasicInterface* iface)
     : iface_(iface)
@@ -298,8 +299,7 @@ struct ClientRequest
     typedef detail::CallbackHolder<callback_type, return_type>                           holder_type;
      
     // correct typesafe serializer
-    typedef typename detail::make_serializer_from_list<
-        typename args_type_generator::const_list_type, detail::SerializerGenerator<>>::type serializer_type;
+    typedef typename detail::generate_serializer<typename args_type_generator::const_list_type>::type serializer_type;
     
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
@@ -340,6 +340,8 @@ struct ClientRequest
 
          if (!cs)
             cs.throw_exception();
+            
+         // TODO check signature
 
          return detail::deserialize_and_return<return_type>::eval(msg.get());
       }

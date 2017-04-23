@@ -315,10 +315,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
       {
          if (!strcmp(method, pm->name_))
          {
-            std::ostringstream oss;
-            pm->get_signature(oss);
-            
-            if (strcmp(oss.str().c_str(), dbus_message_get_signature(msg)))
+            if (strcmp(pm->get_signature(), dbus_message_get_signature(msg)))
             {
                std::cerr << "Shit, wrong arguments" << std::endl;
                return DBUS_HANDLER_RESULT_HANDLED;

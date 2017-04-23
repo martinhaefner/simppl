@@ -61,6 +61,8 @@ struct CallbackHolder
        assert(that->f_);
 
        CallState cs(*msg);
+       
+       // TODO check signature
 
        Deserializer d(msg.get());
        GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);

@@ -20,7 +20,29 @@ ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* i
    this->next_ = methods;
    methods = this;
 }
- 
+
+
+ServerRequestBase::~ServerRequestBase()
+{
+   // NOOP
+}
+
+
+const char* ServerRequestBase::get_signature() const
+{
+   if (signature_.empty())
+   {
+      std::ostringstream oss;
+      oss << "sig:";
+      get_signature(oss);
+      
+      signature_ = oss.str();
+   }
+   
+   return signature_.c_str()+4;
+}
+   
+
  
 ServerPropertyBase::ServerPropertyBase(const char* name, detail::BasicInterface* iface)
  : name_(name)

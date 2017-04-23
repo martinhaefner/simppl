@@ -50,6 +50,8 @@ struct ServerRequestBase
    virtual void eval(DBusMessage* msg) = 0;
    virtual void get_signature(std::ostream& os) const = 0;
    
+   const char* get_signature() const;
+   
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
 #endif
@@ -61,11 +63,9 @@ protected:
 
    ServerRequestBase(const char* name, detail::BasicInterface* iface);
 
-   inline
-   ~ServerRequestBase()
-   {
-      // NOOP
-   }
+   ~ServerRequestBase();
+   
+   mutable std::string signature_;
 };
 
 
@@ -138,7 +138,7 @@ struct ServerRequest : ServerRequestBase
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
-
+    
     enum {
         valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
         valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
@@ -149,11 +149,8 @@ struct ServerRequest : ServerRequestBase
     typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
     typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
 
-    typedef typename detail::generate_server_callback_function<ArgsT...>::type     callback_type;
-
-    // TODO cleanup this typedef
-    typedef typename detail::make_serializer_from_list<
-        typename return_type_generator::list_type, detail::SerializerGenerator<>>::type serializer_type;
+    typedef typename detail::generate_server_callback_function<ArgsT...>::type                     callback_type;
+    typedef typename detail::generate_serializer<typename return_type_generator::list_type>::type serializer_type;
     
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 

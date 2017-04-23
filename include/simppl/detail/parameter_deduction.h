@@ -267,6 +267,12 @@ struct generate_server_callback_function
    typedef typename make_function_from_list<list_type, std::function<void()>>::type type;
 };
 
+template<typename ListT>
+struct generate_serializer
+{
+   typedef typename make_serializer_from_list<ListT, SerializerGenerator<>>::type type;
+};
+
 // ---------------------------------------------------------------------
 
 template<typename T>
