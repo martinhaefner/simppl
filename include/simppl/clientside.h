@@ -212,7 +212,7 @@ struct ClientProperty
             this->f_(CallState(42), *d.template get<data_type>());
       });
 
-      dbus_pending_call_set_notify(stub().get_property_async(name_),
+      dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
          &holder_type::pending_notify,
          new holder_type([this](CallState cs, const arg_type& val){
             if (f_)
@@ -325,17 +325,17 @@ struct ClientRequest
 
       auto stub = dynamic_cast<StubBase*>(parent_);
 
-      auto p = make_pending_call(stub->send_request(method_name_, [&](detail::Serializer& s){
+      auto p = stub->send_request(method_name_, [&](detail::Serializer& s){
          serializer_type::eval(s, t...);
-      }, is_oneway));
+      }, is_oneway);
 
       // TODO move this stuff into the stub baseclass, including blocking on pending call,
       // stealing reply, eval callstate, throw exception, ...
       if (!is_oneway)
       {
-         dbus_pending_call_block(p.get());
+         dbus_pending_call_block(p.pending());
 
-         message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.get()));
+         message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.pending()));
          CallState cs(*msg);
 
          if (!cs)
@@ -397,12 +397,12 @@ private:
 
 template<typename HolderT, typename FunctorT>
 inline
-simppl::dbus::pending_call_ptr_t operator>>(simppl::dbus::detail::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
+simppl::dbus::PendingCall operator>>(simppl::dbus::detail::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
 {
    // TODO static_assert FunctorT and HolderT::f_ convertible?
-   dbus_pending_call_set_notify(r.pc_.get(), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
+   dbus_pending_call_set_notify(dbus_pending_call_ref(r.pc_.pending()), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
 
-   return r.pc_;
+   return std::move(r.pc_);
 }
 
 

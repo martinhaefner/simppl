@@ -19,15 +19,6 @@ namespace simppl
 namespace dbus
 {
 
-/**
- * Cancel a pending request.
- */
-inline
-void cancel_pending(pending_call_ptr_t p)
-{
-    dbus_pending_call_cancel(p.get());
-}
-
 
 // forward decl
 void dispatcher_add_stub(Dispatcher&, StubBase&);
