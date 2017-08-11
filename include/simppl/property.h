@@ -2,9 +2,6 @@
 #define SIMPPL_PROPERTY_H
 
 
-#include "simppl/detail/is_vector.h"
-
-
 namespace simppl
 {
    
