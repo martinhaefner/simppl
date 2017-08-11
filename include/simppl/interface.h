@@ -4,7 +4,6 @@
 
 #include <cstdint>
 
-//#include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
 
 #include "simppl/serialization.h"

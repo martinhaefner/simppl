@@ -10,7 +10,6 @@
 
 #include "simppl/callstate.h"
 #include "simppl/detail/constants.h"
-#include "simppl/detail/parented.h"
 
 #include "simppl/connectionstate.h"
 

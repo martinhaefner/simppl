@@ -9,7 +9,6 @@
 #include "simppl/stubbase.h"
 #include "simppl/clientside.h"
 
-#include "simppl/detail/parented.h"
 #include "simppl/detail/constants.h"
 
 
