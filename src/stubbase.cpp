@@ -106,6 +106,49 @@ PendingCall StubBase::send_request(const char* method_name, std::function<void(d
 }
 
 
+message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
+{
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
+    DBusPendingCall* pending = nullptr;
+    message_ptr_t rc(nullptr, &dbus_message_unref);
+
+    detail::Serializer s(msg.get());
+    f(s);
+
+    if (!is_oneway)
+    {
+        int timeout = disp().request_timeout();
+
+        if (detail::request_specific_timeout.count() > 0)
+            timeout = detail::request_specific_timeout.count();
+
+        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, timeout);
+                
+        detail::request_specific_timeout = std::chrono::milliseconds(0);
+
+        dbus_pending_call_block(pending);
+
+        rc = make_message(dbus_pending_call_steal_reply(pending));
+        dbus_pending_call_unref(pending);
+        
+        CallState cs(*rc);
+
+        if (!cs)
+           cs.throw_exception();
+    }
+    else
+    {
+       // otherwise server would stop reading requests after a while
+       dbus_message_set_no_reply(msg.get(), TRUE);
+
+       dbus_connection_send(disp().conn_, msg.get(), nullptr);
+       dbus_connection_flush(disp().conn_);
+    }
+
+    return rc;
+}
+
+
 void StubBase::connection_state_changed(ConnectionState state)
 {
    if (conn_state_ != state)

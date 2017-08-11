@@ -97,6 +97,8 @@ protected:
 
    PendingCall send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
+   message_ptr_t send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
+
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 

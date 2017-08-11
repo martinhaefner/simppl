@@ -320,30 +320,12 @@ struct ClientRequest
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<T...>>::type,
                     args_type>::value, "args mismatch");
 
-      auto stub = dynamic_cast<StubBase*>(parent_);
-
-      auto p = stub->send_request(method_name_, [&](detail::Serializer& s){
+      auto msg = dynamic_cast<StubBase*>(parent_)->send_request_and_block(method_name_, [&](detail::Serializer& s){
          serializer_type::eval(s, t...);
       }, is_oneway);
 
-      // TODO move this stuff into the stub baseclass, including blocking on pending call,
-      // stealing reply, eval callstate, throw exception, ...
-      if (!is_oneway)
-      {
-         dbus_pending_call_block(p.pending());
-
-         message_ptr_t msg = make_message(dbus_pending_call_steal_reply(p.pending()));
-         CallState cs(*msg);
-
-         if (!cs)
-            cs.throw_exception();
-
-         // TODO check signature
-
-         return detail::deserialize_and_return<return_type>::eval(msg.get());
-      }
-      else
-         return return_type();
+      // TODO check signature
+      return detail::deserialize_and_return<return_type>::eval(msg.get());
    }
 
 
@@ -355,9 +337,7 @@ struct ClientRequest
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      auto stub = dynamic_cast<StubBase*>(parent_);
-
-      return detail::InterimCallbackHolder<holder_type>(stub->send_request(method_name_, [&](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(dynamic_cast<StubBase*>(parent_)->send_request(method_name_, [&](detail::Serializer& s){
          serializer_type::eval(s, t...);
       }, false));
    }
