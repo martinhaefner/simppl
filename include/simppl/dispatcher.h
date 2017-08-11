@@ -29,7 +29,6 @@ struct ClientSignalBase;
 struct CallState;
 
 
-// TODO use pimpl for this...
 struct Dispatcher
 {
    friend struct StubBase;

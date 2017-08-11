@@ -37,7 +37,7 @@ struct Size<TypeList<HeadT, NilType> >
     enum { value = 1 };
 };
 
-// ------------------------------ push/pop front -------------------------------------
+// ------------------------------ push front -------------------------------------
 
 template<typename ListT, typename InsertT>
 struct PushFront
@@ -52,62 +52,7 @@ struct PushFront<ListT, NilType>
    typedef ListT type;
 };
 
-template<typename ListT>
-struct PopFront;
-
-template<typename HeadT, typename TailT>
-struct PopFront<TypeList<HeadT, TailT> >
-{
-   typedef TailT type;
-};
-
-template<>
-struct PopFront<NilType>
-{
-   typedef NilType type;
-};
-
-// -------------------------------popfrontN ------------------------------------
-// TODO this should be a generic Erase algorihtm instead
-
-template<int N, typename ListT>
-struct PopFrontN;
-
-template<int N, typename HeadT, typename TailT>
-struct PopFrontN<N, TypeList<HeadT, TailT> >
-{
-   typedef typename PopFrontN<N-1, TailT>::type type;
-};
-
-template<typename HeadT, typename TailT>
-struct PopFrontN<0, TypeList<HeadT, TailT> >
-{
-   typedef TypeList<HeadT, TailT> type;
-};
-
-template<int N>
-struct PopFrontN<N, NilType>
-{
-   typedef NilType type;
-};
-
-// -------------------------------push/pop back ------------------------------------
-
-template<typename ListT, typename InsertT>
-struct PushBack;
-
-template<typename HeadT, typename TailT, typename InsertT>
-struct PushBack<TypeList<HeadT, TailT>, InsertT>
-{
-   typedef TypeList<HeadT, typename PushBack<TailT, InsertT>::type> type;
-};
-
-template<typename HeadT, typename InsertT>
-struct PushBack<TypeList<HeadT, NilType>, InsertT>
-{
-   typedef TypeList<HeadT, TypeList<InsertT, NilType> > type;
-};
-
+// ------------------------------- pop back ------------------------------------
 
 template<typename ListT>
 struct PopBack;
