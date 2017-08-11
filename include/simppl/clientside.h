@@ -62,10 +62,7 @@ struct ClientSignalBase
 protected:
 
    inline
-   ~ClientSignalBase()
-   {
-      // NOOP
-   }
+   ~ClientSignalBase() = default;
 
    detail::BasicInterface* iface_;
    const char* name_;

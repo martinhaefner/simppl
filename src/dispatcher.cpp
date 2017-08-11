@@ -341,8 +341,10 @@ struct Dispatcher::Private
                         if (t_iter != tm_handlers_.end())
                         {
                             int64_t data;
-                            (void)::read(pfd.fd, &data, sizeof(data));
-
+                            
+                            int rc = ::read(pfd.fd, &data, sizeof(data));
+                            (void)rc;
+                            
 //                            std::cout << "handle timeout" << std::endl;
                             dbus_timeout_handle(t_iter->second);
                         }

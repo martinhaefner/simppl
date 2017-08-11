@@ -74,10 +74,8 @@ struct ServerSignalBase
 
 protected:
 
-   inline ~ServerSignalBase()
-   {
-      // NOOP
-   }
+   inline 
+   ~ServerSignalBase() = default;
 
    const char* name_;
    detail::BasicInterface* parent_;
@@ -236,10 +234,7 @@ struct ServerPropertyBase
 protected:
 
    inline
-   ~ServerPropertyBase()
-   {
-      // NOOP
-   }
+   ~ServerPropertyBase() = default;
 };
 
 
