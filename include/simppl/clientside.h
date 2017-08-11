@@ -343,10 +343,7 @@ struct ClientRequest
          return detail::deserialize_and_return<return_type>::eval(msg.get());
       }
       else
-      {
-         dbus_connection_flush(stub->conn());
          return return_type();
-      }
    }
 
 
