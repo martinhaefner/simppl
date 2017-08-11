@@ -23,7 +23,7 @@ message_ptr_t make_message(DBusMessage* p)
 }
 
 
-typedef std::unique_ptr<DBusPendingCall, void(*)(DBusPendingCall*)> pending_call_ptr_t;
+typedef std::shared_ptr<DBusPendingCall> pending_call_ptr_t;
 
 inline
 pending_call_ptr_t make_pending_call(DBusPendingCall* p)

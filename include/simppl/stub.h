@@ -18,6 +18,7 @@ namespace simppl
 namespace dbus
 {
 
+
 // forward decl
 void dispatcher_add_stub(Dispatcher&, StubBase&);
 

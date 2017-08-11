@@ -74,7 +74,7 @@ Dispatcher& StubBase::disp()
 }
 
 
-DBusPendingCall* StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
+PendingCall StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
@@ -102,7 +102,7 @@ DBusPendingCall* StubBase::send_request(const char* method_name, std::function<v
 
     detail::request_specific_timeout = std::chrono::milliseconds(0);
 
-    return pending;
+    return PendingCall(dbus_message_get_serial(msg.get()), pending);
 }
 
 
@@ -186,7 +186,7 @@ void StubBase::cleanup()
 }
 
 
-DBusPendingCall* StubBase::get_property_async(const char* name)
+PendingCall StubBase::get_property_async(const char* name)
 {
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
@@ -196,7 +196,7 @@ DBusPendingCall* StubBase::get_property_async(const char* name)
 
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
-   return pending;
+   return PendingCall(dbus_message_get_serial(msg.get()), pending);
 }
 
 
@@ -247,7 +247,7 @@ void StubBase::set_property(const char* name, std::function<void(detail::Seriali
 }
 
 
-DBusPendingCall* StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)> f)
+PendingCall StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)> f)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
@@ -259,7 +259,7 @@ DBusPendingCall* StubBase::set_property_async(const char* name, std::function<vo
 
     dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
-    return pending;
+    return PendingCall(dbus_message_get_serial(msg.get()), pending);
 }
 
 

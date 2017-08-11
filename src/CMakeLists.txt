@@ -11,7 +11,8 @@ add_library(simppl SHARED
    #clientresponseholder.cpp
    timeout.cpp
    util.cpp
-   serverrequestdescriptor.cpp)
+   serverrequestdescriptor.cpp
+   pendingcall.cpp)
 
 
 install(TARGETS simppl DESTINATION lib)

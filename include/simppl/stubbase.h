@@ -9,6 +9,7 @@
 #include <dbus/dbus.h>
 
 #include "simppl/callstate.h"
+#include "simppl/pendingcall.h"
 #include "simppl/detail/constants.h"
 
 #include "simppl/connectionstate.h"
@@ -82,7 +83,7 @@ public:
    {
        return conn_state_ == ConnectionState::Connected;
    }
-   
+
    inline
    std::string busname() const
    {
@@ -94,27 +95,27 @@ protected:
 
    void cleanup();
 
-   DBusPendingCall* send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
+   PendingCall send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
    void attach_property(const char* name, std::function<void(detail::Deserializer&)> f);
    void detach_property(const char* name);
-   
+
    /**
     * Blocking call.
     */
    message_ptr_t get_property(const char* name);
 
-   DBusPendingCall* get_property_async(const char* name);
+   PendingCall get_property_async(const char* name);
 
    /**
     * Blocking call.
     */
    void set_property(const char* Name, std::function<void(detail::Serializer&)> f);
-   
-   DBusPendingCall* set_property_async(const char* Name, std::function<void(detail::Serializer&)> f);
+
+   PendingCall set_property_async(const char* Name, std::function<void(detail::Serializer&)> f);
 
    char* iface_;
    char* objectpath_;
@@ -122,10 +123,10 @@ protected:
    ConnectionState conn_state_;
 
    Dispatcher* disp_;
-   
+
    // FIXME use linked lists instead of map...
    std::map<std::string, ClientSignalBase*> signals_;
-   std::map<std::string, std::function<void(detail::Deserializer&)>> properties_; 
+   std::map<std::string, std::function<void(detail::Deserializer&)>> properties_;
 };
 
 }   // namespace dbus
