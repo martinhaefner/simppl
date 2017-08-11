@@ -6,7 +6,6 @@
 
 //#include "simppl/detail/parented.h"
 #include "simppl/detail/basicinterface.h"
-//#include "simppl/detail/serverrequestbasesetter.h"
 
 #include "simppl/serialization.h"
 #include "simppl/parameter_deduction.h"
@@ -33,7 +32,6 @@ template<typename, int> struct ServerProperty;
 struct ServerRequestBase;
 struct ServerPropertyBase;
 struct ServerSignalBase;
-struct ServerRequestBaseSetter;
 
 
 template<template<typename...> class RequestT>

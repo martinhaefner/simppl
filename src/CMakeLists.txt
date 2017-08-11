@@ -1,4 +1,4 @@
-add_library(simppl
+add_library(simppl SHARED
    basicinterface.cpp
    callstate.cpp
    dispatcher.cpp 

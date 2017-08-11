@@ -36,17 +36,8 @@ namespace simppl
 namespace dbus
 {
 
-// forward decl
-namespace detail
-{
-   struct ServerRequestBaseSetter;
-}
-
-
 struct ServerRequestBase
 {
-   friend struct detail::ServerRequestBaseSetter;
-
    virtual void eval(DBusMessage* msg) = 0;
    virtual void get_signature(std::ostream& os) const = 0;
    
