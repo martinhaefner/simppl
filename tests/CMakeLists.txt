@@ -20,7 +20,7 @@ add_executable(unittests
 )
 
 
-target_link_libraries(unittests gtest gtest_main simppl dbus-1)
+target_link_libraries(unittests gtest gtest_main simppl)
 
 # This is so you can do 'make test' to see all your tests run, instead of
 # manually running the executable runUnitTests to see those specific tests.
@@ -33,4 +33,4 @@ add_executable(introserver
 )
 
 
-target_link_libraries(introserver simppl dbus-1)
+target_link_libraries(introserver simppl)

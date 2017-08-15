@@ -1,7 +1,7 @@
 add_definitions(-DSIMPPL_HAVE_INTROSPECTION=1)
 
 
-add_library(simppl
+add_library(simppl SHARED
    callstate.cpp
    dispatcher.cpp
    error.cpp
@@ -15,5 +15,6 @@ add_library(simppl
    util.cpp
    serverrequestdescriptor.cpp)
 
+target_link_libraries(simppl dbus-1)
 
 install(TARGETS simppl DESTINATION lib)
