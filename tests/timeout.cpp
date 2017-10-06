@@ -200,6 +200,8 @@ void runServer()
 
 TEST(Timeout, method)
 {
+   simppl::dbus::enable_threads();
+   
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d;

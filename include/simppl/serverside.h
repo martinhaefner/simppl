@@ -38,10 +38,22 @@ namespace dbus
 
 struct ServerRequestBase
 {
-   virtual void eval(DBusMessage* msg) = 0;
-   virtual void get_signature(std::ostream& os) const = 0;
+   typedef void(*eval_type)(ServerRequestBase*, DBusMessage*);
+   typedef void(*sig_type)(std::ostream&);
+   
+   void eval(DBusMessage* msg)
+   {
+      eval_(this, msg);
+   }
+
+#if SIMPPL_SIGNATURE_CHECK   
+   void get_signature(std::ostream& os) const
+   {
+      sig_(os);
+   }
    
    const char* get_signature() const;
+#endif
    
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
@@ -56,7 +68,12 @@ protected:
 
    ~ServerRequestBase();
    
+   eval_type eval_;
+   
+#if SIMPPL_SIGNATURE_CHECK   
    mutable std::string signature_;
+   sig_type sig_;
+#endif
 };
 
 
@@ -148,7 +165,10 @@ struct ServerRequest : ServerRequestBase
     ServerRequest(const char* name, detail::BasicInterface* iface)
     : ServerRequestBase(name, iface)
     {
-        // NOOP
+        eval_ = __eval;
+#if SIMPPL_SIGNATURE_CHECK
+        sig_ = __sig;
+#endif
     }
 
     template<typename FunctorT>
@@ -159,17 +179,13 @@ struct ServerRequest : ServerRequestBase
         f_ = func;
     }
 
-   void eval(DBusMessage* msg) override
-   {
-       assert(f_);
-       detail::Deserializer d(msg);
-       detail::GetCaller<args_type>::type::template eval(d, f_);
-   }
-   
-   void get_signature(std::ostream& os) const override
+#if SIMPPL_SIGNATURE_CHECK
+   static 
+   void __sig(std::ostream& os)
    {
       ForEach<typename args_type_generator::list_type>::template eval<detail::make_type_signature>(os);
    }
+#endif
 
    template<typename... T>
    inline
@@ -192,6 +208,14 @@ struct ServerRequest : ServerRequestBase
 #endif
 
 private:
+
+   static
+   void __eval(ServerRequestBase* obj, DBusMessage* msg)
+   {
+       detail::Deserializer d(msg);
+       detail::GetCaller<args_type>::type::template eval(d, ((ServerRequest*)obj)->f_);
+   }
+   
 
    template<typename... T>
    inline
@@ -218,11 +242,21 @@ private:
 
 struct ServerPropertyBase
 {
+   typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
+   typedef void (*eval_set_type)(ServerPropertyBase*, detail::Deserializer&);
+   
    ServerPropertyBase(const char* name, detail::BasicInterface* iface);
 
-   virtual void eval(DBusMessage* msg) = 0;
-   virtual void evalSet(detail::Deserializer& ds) = 0;
-
+   void eval(DBusMessage* msg)
+   {
+      eval_(this, msg);
+   }
+   
+   void evalSet(detail::Deserializer& ds)
+   {
+      eval_set_(this, ds);
+   }
+   
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
 #endif
@@ -235,6 +269,9 @@ protected:
 
    inline
    ~ServerPropertyBase() = default;
+   
+   eval_type eval_;
+   eval_set_type eval_set_;
 };
 
 
@@ -245,7 +282,7 @@ struct BaseProperty : ServerPropertyBase
    BaseProperty(const char* name, detail::BasicInterface* iface)
     : ServerPropertyBase(name, iface)
    {
-      // NOOP
+      eval_ = __eval;
    }
 
    inline
@@ -254,11 +291,12 @@ struct BaseProperty : ServerPropertyBase
       return t_;
    }
 
-   void eval(DBusMessage* response)
+   static
+   void __eval(ServerPropertyBase* obj, DBusMessage* response)
    {
       detail::Serializer s(response);
 
-      Variant<DataT> v(t_);   // FIXME this copy is overhead, just somehow wrap it...
+      Variant<DataT> v(((BaseProperty*)obj)->t_);   // FIXME this copy is overhead, just somehow wrap it...
       serialize(s, v);
    }
 
@@ -277,7 +315,8 @@ struct ServerProperty : BaseProperty<DataT>
    ServerProperty(const char* name, detail::BasicInterface* iface)
     : BaseProperty<DataT>(name, iface)
    {
-      // NOOP
+      if (Flags & ReadWrite)
+         this->eval_set_ = __eval_set;
    }
 
    ServerProperty& operator=(const DataT& data)
@@ -300,15 +339,13 @@ struct ServerProperty : BaseProperty<DataT>
 
 protected:
 
-   void evalSet(detail::Deserializer& ds)
+   static 
+   void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
    {
-      if (Flags & ReadWrite)
-      { 
-         Variant<DataT> v;
-         ds >> v;
+      Variant<DataT> v;
+      ds >> v;
 
-         *this = *v.template get<DataT>();
-      }
+      *((ServerProperty*)obj) = *v.template get<DataT>();
    }
 
 #if SIMPPL_HAVE_INTROSPECTION

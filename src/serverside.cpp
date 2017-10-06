@@ -28,6 +28,7 @@ ServerRequestBase::~ServerRequestBase()
 }
 
 
+#if SIMPPL_SIGNATURE_CHECK
 const char* ServerRequestBase::get_signature() const
 {
    if (signature_.empty())
@@ -41,7 +42,7 @@ const char* ServerRequestBase::get_signature() const
    
    return signature_.c_str()+4;
 }
-   
+#endif
 
  
 ServerPropertyBase::ServerPropertyBase(const char* name, detail::BasicInterface* iface)

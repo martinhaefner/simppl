@@ -37,11 +37,17 @@ template<typename> struct InterfaceNamer;
 
 struct ClientSignalBase
 {
+   typedef void (*eval_type)(ClientSignalBase*, DBusMessage*);
+   
    template<typename, int>
    friend struct ClientProperty;
 
 
-   virtual void eval(DBusMessage* msg) = 0;
+   void eval(DBusMessage* msg)
+   {
+      eval_(this, msg);
+   }
+   
    //virtual const char* get_signature() const = 0;
 
    inline
@@ -66,6 +72,8 @@ protected:
 
    detail::BasicInterface* iface_;
    const char* name_;
+   
+   eval_type eval_;
 };
 
 
@@ -80,7 +88,7 @@ struct ClientSignal : ClientSignalBase
    ClientSignal(const char* name, detail::BasicInterface* iface)
     : ClientSignalBase(name, iface)
    {
-      // NOOP
+      eval_ = __eval;
    }
 
    template<typename FunctorT>
@@ -109,10 +117,13 @@ struct ClientSignal : ClientSignalBase
 
 private:
 
-   void eval(DBusMessage* msg)
+   static 
+   void __eval(ClientSignalBase* obj, DBusMessage* msg)
    {
+      ClientSignal* that = (ClientSignal*)(obj);
+      
       detail::Deserializer d(msg);
-      detail::GetCaller<std::tuple<T...>>::type::template eval(d, f_);
+      detail::GetCaller<std::tuple<T...>>::type::template eval(d, that->f_);
    }
 
    function_type f_;
@@ -198,28 +209,7 @@ struct ClientProperty
    }
 
    /// only call this after the server is connected.
-   ClientProperty& attach()
-   {
-      stub().attach_property(name_, [this](detail::Deserializer& s){
-
-         Variant<data_type> d;
-         s >> d;
-
-         if (this->f_)
-            this->f_(CallState(42), *d.template get<data_type>());
-      });
-
-      dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
-         &holder_type::pending_notify,
-         new holder_type([this](CallState cs, const arg_type& val){
-            if (f_)
-               f_(cs, val);
-         }),
-         &holder_type::_delete);
-
-      return *this;
-   }
-
+   ClientProperty& attach();
 
    // TODO implement GetAll
    DataT get()
@@ -272,6 +262,30 @@ private:
    function_type f_;
 };
 
+
+/// only call this after the server is connected.
+template<typename DataT, int Flags>
+ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
+   {
+      stub().attach_property(name_, [this](detail::Deserializer& s){
+
+         Variant<data_type> d;
+         s >> d;
+
+         if (this->f_)
+            this->f_(CallState(42), *d.template get<data_type>());
+      });
+
+      dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
+         &holder_type::pending_notify,
+         new holder_type([this](CallState cs, const arg_type& val){
+            if (f_)
+               f_(cs, val);
+         }),
+         &holder_type::_delete);
+
+      return *this;
+   }
 
 // --------------------------------------------------------------------------------
 
@@ -381,7 +395,6 @@ simppl::dbus::PendingCall operator>>(simppl::dbus::detail::InterimCallbackHolder
 
 
 template<typename DataT, int Flags, typename FuncT>
-inline
 void operator>>(simppl::dbus::ClientProperty<DataT, Flags>& attr, const FuncT& func)
 {
    attr.handled_by(func);
@@ -389,7 +402,6 @@ void operator>>(simppl::dbus::ClientProperty<DataT, Flags>& attr, const FuncT& f
 
 
 template<typename... T, typename FuncT>
-inline
 void operator>>(simppl::dbus::ClientSignal<T...>& sig, const FuncT& func)
 {
    sig.handled_by(func);

@@ -369,14 +369,22 @@ struct Dispatcher::Private
 DBusObjectPathVTable stub_v_table = { nullptr, &SkeletonBase::method_handler, nullptr, nullptr, nullptr, nullptr };
 
 
-Dispatcher::Dispatcher(const char* busname)
- : running_(false)
- , conn_(nullptr)
- , request_timeout_(DBUS_TIMEOUT_USE_DEFAULT)
- , d(nullptr)
+void enable_threads()
 {
-   // TODO make this part of the dispatcher interface...
    dbus_threads_init_default();
+}
+
+
+void Dispatcher::init(int have_introspection, const char* busname)
+{
+   // compile check if stubs or skeletons are compiled with the settings
+   // used for building the library
+   assert(SIMPPL_HAVE_INTROSPECTION == have_introspection);
+   
+   running_ = false;
+   conn_ = nullptr;
+   request_timeout_ = DBUS_TIMEOUT_USE_DEFAULT;
+   d = nullptr;
 
    DBusError err;
    dbus_error_init(&err);

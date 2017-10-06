@@ -2,9 +2,11 @@
 
 include_directories(. ../include)
 
+add_subdirectory(${GTEST_ROOT} gtest)
+
 enable_testing()
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
+
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 
 add_executable(unittests
@@ -16,12 +18,11 @@ add_executable(unittests
    variant.cpp
 )
 
-target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} Threads::Threads simppl rt dbus-1)
-
-
 # This is so you can do 'make test' to see all your tests run, instead of
 # manually running the executable runUnitTests to see those specific tests.
-add_test(name "simpple unit tests" command unittests)
+#add_test(name "simpple unit tests" command unittests)
+
+target_link_libraries(unittests gtest gtest_main Threads::Threads simppl rt dbus-1)
 
 
 # not a test, just an introspection example  

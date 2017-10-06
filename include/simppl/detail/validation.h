@@ -16,7 +16,7 @@ namespace dbus
 namespace detail
 {
 
-#ifdef SIMPPL_HAVE_VALIDATION
+#if SIMPPL_HAVE_VALIDATION
 
 // forward decl
 template<typename... T>

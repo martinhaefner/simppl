@@ -84,7 +84,7 @@ template<typename T>
 struct DeserializeAndCall : simppl::NonInstantiable
 {
    template<typename FunctorT>
-   static inline
+   static 
    void eval(Deserializer& d, FunctorT& f)
    {
       std::tuple<T> tuple;
@@ -94,7 +94,7 @@ struct DeserializeAndCall : simppl::NonInstantiable
    }
 
    template<typename FunctorT>
-   static inline
+   static
    void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       std::tuple<T> tuple;
@@ -121,7 +121,7 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
    }
 
    template<typename FunctorT>
-   static inline
+   static 
    void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       std::tuple<T...> tuple;

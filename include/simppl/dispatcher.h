@@ -29,6 +29,9 @@ struct ClientSignalBase;
 struct CallState;
 
 
+void enable_threads();
+
+
 struct Dispatcher
 {
    friend struct StubBase;
@@ -43,7 +46,11 @@ struct Dispatcher
    /**
     * @param busname the busname to use, e.g. "bus:session" or "bus:system. nullptr means session.
     */
-   Dispatcher(const char* busname = nullptr);
+   inline
+   Dispatcher(const char* busname = nullptr)
+   {
+      init(SIMPPL_HAVE_INTROSPECTION, busname);
+   }
 
    ~Dispatcher();
 
@@ -94,6 +101,8 @@ struct Dispatcher
    }
 
 private:
+
+   void init(int have_introspection, const char* busname);
 
    void register_signal_match(const std::string& match_string);
    void unregister_signal_match(const std::string& match_string);

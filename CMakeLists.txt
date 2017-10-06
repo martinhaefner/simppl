@@ -18,13 +18,22 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 
 
-# enable instrospection by default
+# enable introspection by default
 OPTION(HAVE_INTROSPECTION "Have introspection" ON) 
 
-IF(HAVE_INTROSPECTION)
-    ADD_DEFINITIONS(-DSIMPPL_HAVE_INTROSPECTION)
-ENDIF(HAVE_INTROSPECTION)
+if(HAVE_INTROSPECTION)
+   add_definitions(-DSIMPPL_HAVE_INTROSPECTION=1)
+else()
+   add_definitions(-DSIMPPL_HAVE_INTROSPECTION=0)
+endif()
 
+# check signature of request - this should be enabled to improve
+# client and server robustness
+add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
+
+# extended validation of request/response arguments, just in order
+# to improve compiler error messages  
+add_definitions(-DSIMPPL_HAVE_VALIDATION=0)
 
 include_directories(include)
 
@@ -63,10 +72,20 @@ add_subdirectory(src)
 add_subdirectory(examples)
 
 # gtest environment 
-find_package(GTest)
+if(NOT GTEST_ROOT)
+   message("Searching for gtest installation...")
+
+   find_path(GTEST_ROOT
+       include/gtest/gtest.h
+       PATHS $ENV{HOME}/*
+       PATHS /usr/share/*
+       ONLY_CMAKE_FIND_ROOT_PATH
+       NO_DEFAULT_PATH
+   )
+endif()
 
 # having tests?
-if(GTEST_FOUND)
+if(GTEST_ROOT)
     message("Building tests")
     add_subdirectory(tests)
 else()

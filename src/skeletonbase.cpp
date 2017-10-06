@@ -315,11 +315,13 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
       {
          if (!strcmp(method, pm->name_))
          {
+#if SIMPPL_SIGNATURE_CHECK
             if (strcmp(pm->get_signature(), dbus_message_get_signature(msg)))
             {
                std::cerr << "Shit, wrong arguments" << std::endl;
                return DBUS_HANDLER_RESULT_HANDLED;
             }
+#endif
             
             current_request_.set(pm, msg);
             pm->eval(msg);
