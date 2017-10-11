@@ -20,6 +20,7 @@ namespace test
 INTERFACE(Simple)
 {
    Request<> hello;
+   Request<> hello_wait_some_time;
 
    Request<in<int>, simppl::dbus::oneway> oneway;
 
@@ -37,6 +38,7 @@ INTERFACE(Simple)
    inline
    Simple()
     : INIT(hello)
+    , INIT(hello_wait_some_time)
     , INIT(oneway)
     , INIT(add)
     , INIT(echo)
@@ -89,6 +91,37 @@ struct Client : simppl::dbus::Stub<Simple>
 };
 
 
+struct CancelClient : simppl::dbus::Stub<Simple>
+{
+   CancelClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+         
+         sig.attach() >> [this](int i){
+            if (i == 42)
+            {
+               pc_.cancel();
+            }
+            else if (i == 43)
+            {
+               oneway(7777);
+               disp().stop();
+            }
+         };
+         
+         pc_ = this->hello_wait_some_time.async() >> [this](simppl::dbus::CallState){
+            // reply shall never arrive
+            EXPECT_TRUE(false);
+         };
+      };
+   }
+   
+   simppl::dbus::PendingCall pc_;
+};
+
+
 struct DisconnectClient : simppl::dbus::Stub<Simple>
 {
    DisconnectClient(simppl::dbus::Dispatcher& d)
@@ -100,7 +133,7 @@ struct DisconnectClient : simppl::dbus::Stub<Simple>
 
          if (s == simppl::dbus::ConnectionState::Connected)
          {
-            this->oneway(7777);
+            oneway(7777);
          }
          else
             this->disp().stop();
@@ -124,9 +157,9 @@ struct PropertyClient : simppl::dbus::Stub<Simple>
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
          // like for signals, attributes must be attached when the client is connected
-         this->data.attach() >> [this](simppl::dbus::CallState state, int new_value)
+         data.attach() >> [this](simppl::dbus::CallState state, int new_value)
          {
-            this->attributeChanged(state, new_value);
+            attributeChanged(state, new_value);
          };
       };
    }
@@ -223,6 +256,19 @@ struct Server : simppl::dbus::Skeleton<Simple>
          this->respond_with(hello());
       };
 
+
+      hello_wait_some_time >> [this]()
+      {
+         this->sig.notify(42);
+         
+         // flush possibly dangling signal 
+         dbus_connection_flush(&disp().connection());
+         
+         std::this_thread::sleep_for(500ms);
+         this->respond_with(hello_wait_some_time());
+         
+         this->sig.notify(43);
+      };
 
       oneway >> [this](int i)
       {
@@ -413,6 +459,27 @@ TEST(Simple, disconnect)
          serverd->run();
          delete s;
          delete serverd;
+      });
+
+      clientd.run();
+
+      serverthread.join();
+   }
+}
+
+
+TEST(Simple, cancel)
+{
+   simppl::dbus::Dispatcher clientd;
+
+   CancelClient c(clientd);
+
+   {
+      simppl::dbus::Dispatcher serverd("bus:session");
+      Server s(serverd, "s");
+
+      std::thread serverthread([&serverd, &s](){
+         serverd.run();
       });
 
       clientd.run();
