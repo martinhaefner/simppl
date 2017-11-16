@@ -108,6 +108,9 @@ namespace {
 
 TEST(Variant, basic)
 {
+   constructs = 0;
+   destructs = 0;
+   
    simppl::Variant<int, double, std::string, TestHelper> v;
 
    v = 42;
