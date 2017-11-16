@@ -148,7 +148,7 @@ detail::Deserializer& detail::Deserializer::read(wchar_t*& str)
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7
        dbus_message_iter_get_array_len(&iter) / sizeof(uint32_t);
 #else
-       dbus_message_iter_get_element_count(&iter);
+       dbus_message_iter_get_element_count(iter_);
 #endif
    if (count > 0)
    {
@@ -188,7 +188,7 @@ detail::Deserializer& detail::Deserializer::read(std::wstring& str)
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7
        dbus_message_iter_get_array_len(&iter) / sizeof(uint32_t);
 #else
-       dbus_message_iter_get_element_count(&iter);
+       dbus_message_iter_get_element_count(iter_);
 #endif
    if (count > 0)
       str.reserve(count);

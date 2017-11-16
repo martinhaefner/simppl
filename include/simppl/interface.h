@@ -4,8 +4,6 @@
 
 #include <cstdint>
 
-#include "simppl/detail/basicinterface.h"
-
 #include "simppl/serialization.h"
 #include "simppl/parameter_deduction.h"
 #include "simppl/variant.h"
