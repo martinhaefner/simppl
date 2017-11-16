@@ -362,7 +362,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 }
 
 
-void SkeletonBase::send_signal(const char* signame, std::function<void(detail::Serializer&)> f)
+void SkeletonBase::send_signal(const char* signame, std::function<void(detail::Serializer&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
 
@@ -373,7 +373,7 @@ void SkeletonBase::send_signal(const char* signame, std::function<void(detail::S
 }
 
 
-void SkeletonBase::send_property_change(const char* prop, std::function<void(detail::Serializer&)> f)
+void SkeletonBase::send_property_change(const char* prop, std::function<void(detail::Serializer&)>&& f)
 {
    static std::vector<std::string> invalid;
 

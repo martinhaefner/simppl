@@ -96,14 +96,14 @@ protected:
 
    void cleanup();
 
-   PendingCall send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
+   PendingCall send_request(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway);
 
-   message_ptr_t send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway);
+   message_ptr_t send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
-   void attach_property(const char* name, std::function<void(detail::Deserializer&)> f);
+   void attach_property(const char* name, std::function<void(detail::Deserializer&)>&& f);
    void detach_property(const char* name);
 
    /**
@@ -116,9 +116,9 @@ protected:
    /**
     * Blocking call.
     */
-   void set_property(const char* Name, std::function<void(detail::Serializer&)> f);
+   void set_property(const char* Name, std::function<void(detail::Serializer&)>&& f);
 
-   PendingCall set_property_async(const char* Name, std::function<void(detail::Serializer&)> f);
+   PendingCall set_property_async(const char* Name, std::function<void(detail::Serializer&)>&& f);
 
    char* iface_;
    char* objectpath_;

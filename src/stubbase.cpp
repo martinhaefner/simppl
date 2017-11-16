@@ -85,7 +85,7 @@ Dispatcher& StubBase::disp()
 }
 
 
-PendingCall StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
+PendingCall StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
@@ -117,7 +117,7 @@ PendingCall StubBase::send_request(const char* method_name, std::function<void(d
 }
 
 
-message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)> f, bool is_oneway)
+message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
@@ -198,7 +198,7 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 }
 
 
-void StubBase::attach_property(const char* name, std::function<void(detail::Deserializer&)> f)
+void StubBase::attach_property(const char* name, std::function<void(detail::Deserializer&)>&& f)
 {
    assert(disp_);
 
@@ -273,7 +273,7 @@ message_ptr_t StubBase::get_property(const char* name)
 }
 
 
-void StubBase::set_property(const char* name, std::function<void(detail::Serializer&)> f)
+void StubBase::set_property(const char* name, std::function<void(detail::Serializer&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
@@ -301,7 +301,7 @@ void StubBase::set_property(const char* name, std::function<void(detail::Seriali
 }
 
 
-PendingCall StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)> f)
+PendingCall StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 

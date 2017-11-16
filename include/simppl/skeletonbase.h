@@ -79,9 +79,9 @@ struct SkeletonBase
         return busname_;
     }
 
-    void send_property_change(const char* prop, std::function<void(detail::Serializer&)> f);
+    void send_property_change(const char* prop, std::function<void(detail::Serializer&)>&& f);
 
-    void send_signal(const char* signame, std::function<void(detail::Serializer&)> f);
+    void send_signal(const char* signame, std::function<void(detail::Serializer&)>&& f);
 
 protected:
 
