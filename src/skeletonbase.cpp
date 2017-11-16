@@ -65,13 +65,25 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 }
 
 
-SkeletonBase::SkeletonBase(const char* iface, const char* role)
- : iface_(detail::extract_interface(iface))
+SkeletonBase::SkeletonBase()
+ : iface_(nullptr)
  , busname_(nullptr)
  , objectpath_(nullptr)
  , disp_(nullptr)
+ , methods_(nullptr)
+ , properties_(nullptr)
+#if SIMPPL_HAVE_INTROSPECTION
+ , signals_(nullptr)
+#endif
 {
-   assert(role);
+   // NOOP
+}
+
+void SkeletonBase::init(const char* iface, const char* role)
+{
+	assert(role);
+	
+	iface_ = detail::extract_interface(iface);
 
    objectpath_ = detail::create_objectpath(iface_, role);
    busname_ = detail::create_busname(iface_, role);
@@ -204,21 +216,21 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
              "<node name=\""<< objectpath() << "\">\n"
              "  <interface name=\""<< iface() << "\">\n";
 
-         auto pm = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+         auto pm = this->methods_;
          while(pm)
          {
             pm->introspect(oss);
             pm = pm->next_;
          }
 
-         auto pa = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_;
+         auto pa = this->properties_;
          while(pa)
          {
             pa->introspect(oss);
             pa = pa->next_;
          }
             
-         auto ps = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->signals_;
+         auto ps = this->signals_;
          while(ps)
          {
             ps->introspect(oss);
@@ -234,7 +246,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
              "  </interface>\n";
 
          // attributes
-         if (dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_)
+         if (this->properties_)
          {
             oss <<
                "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
@@ -272,7 +284,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
    {
        if (!strcmp(method, "Get") || !strcmp(method, "Set"))
        {
-          auto p = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->properties_;
+          auto p = this->properties_;
 
           std::string interface;
           std::string attribute;
@@ -310,7 +322,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
    }
    else
    {
-      auto pm = dynamic_cast<InterfaceBase<ServerRequest>*>(this)->methods_;
+      auto pm = this->methods_;
       while(pm)
       {
          if (!strcmp(method, pm->name_))
@@ -344,6 +356,17 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+
+void SkeletonBase::send_signal(const char* signame, std::function<void(detail::Serializer&)> f)
+{
+	message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
+
+	detail::Serializer s(msg.get());
+	f(s);
+	
+	dbus_connection_send(disp_->conn_, msg.get(), nullptr);   
 }
 
 

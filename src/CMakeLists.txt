@@ -1,5 +1,5 @@
 add_library(simppl SHARED
-   basicinterface.cpp
+   #basicinterface.cpp
    callstate.cpp
    dispatcher.cpp 
    error.cpp 

@@ -478,9 +478,6 @@ void Dispatcher::add_server(SkeletonBase& serv)
       dbus_error_free(&err);
    }
 
-   // isn't this double the information?
-   dynamic_cast<detail::BasicInterface*>(&serv)->conn_ = conn_;
-
    // register same path as busname, just with / instead of .
    dbus_error_init(&err);
 
@@ -650,9 +647,6 @@ void Dispatcher::add_client(StubBase& clnt)
 {
    clnt.disp_ = this;
 
-   // isn't this double the information?
-   dynamic_cast<detail::BasicInterface*>(&clnt)->conn_ = conn_;
-
    //std::cout << "Adding stub: " << clnt.busname() << std::endl;
    stubs_.insert(std::make_pair(clnt.busname(), &clnt));
 
@@ -664,7 +658,7 @@ void Dispatcher::add_client(StubBase& clnt)
       objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
-
+	
       detail::Serializer s(msg);
       serialize(s, clnt.busname());
 

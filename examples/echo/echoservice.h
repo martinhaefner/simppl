@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <stdio.h>
 #include "simppl/interface.h"
 
 

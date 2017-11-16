@@ -47,16 +47,17 @@ struct StubBase
 protected:
 
    virtual ~StubBase();
+   
+   void init(const char* iface, const char* role);
+   void init(const char* iface, const char* busname, const char* objectpath);
+  
 
 public:
 
    std::function<void(ConnectionState)> connected;
 
-   StubBase(const char* iface, const char* role);
-
-   // FIXME use ObjectPath instead of const char*
-   StubBase(const char* iface, const char* busname, const char* objectpath);
-
+   StubBase();
+      
    inline
    const char* iface() const
    {

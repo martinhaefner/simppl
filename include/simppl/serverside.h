@@ -16,7 +16,6 @@
 #include "simppl/for_each.h"
 
 #include "simppl/detail/serverresponseholder.h"
-#include "simppl/detail/basicinterface.h"
 #include "simppl/detail/validation.h"
 #include "simppl/detail/callinterface.h"
 
@@ -64,7 +63,7 @@ struct ServerRequestBase
 
 protected:
 
-   ServerRequestBase(const char* name, detail::BasicInterface* iface);
+   ServerRequestBase(const char* name, SkeletonBase* iface);
 
    ~ServerRequestBase();
    
@@ -82,7 +81,7 @@ protected:
 
 struct ServerSignalBase
 {
-   ServerSignalBase(const char* name, detail::BasicInterface* iface);
+   ServerSignalBase(const char* name, SkeletonBase* iface);
 
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
@@ -95,7 +94,7 @@ protected:
    ~ServerSignalBase() = default;
 
    const char* name_;
-   detail::BasicInterface* parent_;
+   SkeletonBase* parent_;
 };
 
 
@@ -105,7 +104,7 @@ struct ServerSignal : ServerSignalBase
    static_assert(detail::isValidType<T...>::value, "invalid type in interface");
 
    inline
-   ServerSignal(const char* name, detail::BasicInterface* iface)
+   ServerSignal(const char* name, SkeletonBase* iface)
     : ServerSignalBase(name, iface)
    {
       // NOOP
@@ -113,16 +112,9 @@ struct ServerSignal : ServerSignalBase
 
    void notify(typename CallTraits<T>::param_type... args)
    {
-      if (parent_->conn_)
-      {
-         SkeletonBase* skel = dynamic_cast<SkeletonBase*>(parent_);
-         message_ptr_t msg = make_message(dbus_message_new_signal(skel->objectpath(), skel->iface(), name_));
-
-         detail::Serializer s(msg.get());
-         serialize(s, args...);
-
-         dbus_connection_send(parent_->conn_, msg.get(), nullptr);
-      }
+	   parent_->send_signal(this->name_, [&](detail::Serializer& s){
+            detail::serialize(s, args...);
+       });
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
@@ -162,7 +154,7 @@ struct ServerRequest : ServerRequestBase
 
 
     inline
-    ServerRequest(const char* name, detail::BasicInterface* iface)
+    ServerRequest(const char* name, SkeletonBase* iface)
     : ServerRequestBase(name, iface)
     {
         eval_ = __eval;
@@ -245,7 +237,7 @@ struct ServerPropertyBase
    typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
    typedef void (*eval_set_type)(ServerPropertyBase*, detail::Deserializer&);
    
-   ServerPropertyBase(const char* name, detail::BasicInterface* iface);
+   ServerPropertyBase(const char* name, SkeletonBase* iface);
 
    void eval(DBusMessage* msg)
    {
@@ -263,7 +255,7 @@ struct ServerPropertyBase
 
    ServerPropertyBase* next_;   ///< list hook
    const char* name_;
-   detail::BasicInterface* parent_;
+   SkeletonBase* parent_;
 
 protected:
 
@@ -279,7 +271,7 @@ template<typename DataT>
 struct BaseProperty : ServerPropertyBase
 {
    inline
-   BaseProperty(const char* name, detail::BasicInterface* iface)
+   BaseProperty(const char* name, SkeletonBase* iface)
     : ServerPropertyBase(name, iface)
    {
       eval_ = __eval;
@@ -312,7 +304,7 @@ struct ServerProperty : BaseProperty<DataT>
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
    inline
-   ServerProperty(const char* name, detail::BasicInterface* iface)
+   ServerProperty(const char* name, SkeletonBase* iface)
     : BaseProperty<DataT>(name, iface)
    {
       if (Flags & ReadWrite)
@@ -327,7 +319,7 @@ struct ServerProperty : BaseProperty<DataT>
 
          if (Flags & Notifying)
          {
-            dynamic_cast<SkeletonBase*>(this->parent_)->send_property_change(this->name_, [this](detail::Serializer& s){
+            this->parent_->send_property_change(this->name_, [this](detail::Serializer& s){
                detail::serialize_property(s, this->t_);
             });
          }

@@ -21,6 +21,9 @@ namespace dbus
 
 // forward decl
 struct Dispatcher;
+struct ServerRequestBase;    
+struct ServerPropertyBase;
+struct ServerSignalBase;   
 
 
 struct SkeletonBase
@@ -29,11 +32,15 @@ struct SkeletonBase
    SkeletonBase& operator=(const SkeletonBase&) = delete;
 
    friend struct Dispatcher;
+   friend struct ServerRequestBase;
+   friend struct ServerPropertyBase;
+   friend struct ServerSignalBase;
 
    static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
 
-   SkeletonBase(const char* iface, const char* role);
+   SkeletonBase();
 
+   // FIXME missing
    SkeletonBase(const char* iface, const char* busname, const char* objectpath);
 
    virtual ~SkeletonBase();
@@ -77,8 +84,11 @@ struct SkeletonBase
    
    void send_property_change(const char* prop, std::function<void(detail::Serializer&)> f);
 
+   void send_signal(const char* signame, std::function<void(detail::Serializer&)> f);
 
 protected:
+
+	void init(const char* iface, const char* role);
 
    DBusHandlerResult handle_request(DBusMessage* msg);
 
@@ -91,6 +101,14 @@ protected:
 
    Dispatcher* disp_;
    ServerRequestDescriptor current_request_;
+   
+   // linked list heads
+   ServerRequestBase* methods_;    
+   ServerPropertyBase* properties_;
+
+#if SIMPPL_HAVE_INTROSPECTION
+   ServerSignalBase* signals_;   
+#endif
 };
 
 }   // namespace dbus

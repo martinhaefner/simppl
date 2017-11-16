@@ -25,30 +25,31 @@ void dispatcher_add_stub(Dispatcher&, StubBase&);
 
 template<template<template<typename...> class,
                   template<typename...> class,
-                  template<typename,int> class>
-   class IfaceT>
-struct Stub : StubBase, IfaceT<ClientRequest, ClientSignal, ClientProperty>
+                  template<typename,int> class, typename> class IfaceT>
+struct Stub : IfaceT<ClientRequest, ClientSignal, ClientProperty, StubBase>
 {
    friend struct Dispatcher;
 
 private:
 
-   typedef IfaceT<ClientRequest, ClientSignal, ClientProperty> interface_type;
+   typedef IfaceT<ClientRequest, ClientSignal, ClientProperty, StubBase> interface_type;
 
 public:
 
    inline
-   Stub(Dispatcher& disp, const char* role)
-    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)
+   Stub(Dispatcher& disp, const char* role)	
+    : interface_type()
    {
+	   this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role);
        dispatcher_add_stub(disp, *this);
    }
 
 
    inline
    Stub(Dispatcher& disp, const char* busname, const char* objectpath)
-    : StubBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), busname, objectpath)
+    : interface_type()
    {
+	  this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), busname, objectpath);
       dispatcher_add_stub(disp, *this);
    }
 };

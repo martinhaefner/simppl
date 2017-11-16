@@ -51,7 +51,7 @@ struct ClientSignalBase
    //virtual const char* get_signature() const = 0;
 
    inline
-   ClientSignalBase(const char* name, detail::BasicInterface* iface)
+   ClientSignalBase(const char* name, StubBase* iface)
     : iface_(iface)
     , name_(name)
    {
@@ -70,7 +70,7 @@ protected:
    inline
    ~ClientSignalBase() = default;
 
-   detail::BasicInterface* iface_;
+   StubBase* iface_;
    const char* name_;
    
    eval_type eval_;
@@ -85,7 +85,7 @@ struct ClientSignal : ClientSignalBase
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
 
    inline
-   ClientSignal(const char* name, detail::BasicInterface* iface)
+   ClientSignal(const char* name, StubBase* iface)
     : ClientSignalBase(name, iface)
    {
       eval_ = __eval;
@@ -102,7 +102,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& attach()
    {
-      dynamic_cast<StubBase*>(iface_)->register_signal(*this);
+      iface_->register_signal(*this);
       return *this;
    }
 
@@ -110,7 +110,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& detach()
    {
-      dynamic_cast<StubBase*>(iface_)->unregister_signal(*this);
+      iface_->unregister_signal(*this);
       return *this;
    }
 
@@ -188,7 +188,7 @@ struct ClientProperty
 
 
    inline
-   ClientProperty(const char* name, detail::BasicInterface* iface)
+   ClientProperty(const char* name, StubBase* iface)
     : name_(name)
     , iface_(iface)
    {
@@ -205,7 +205,7 @@ struct ClientProperty
 
    StubBase& stub()
    {
-      return *dynamic_cast<StubBase*>(iface_);
+      return *iface_;
    }
 
    /// only call this after the server is connected.
@@ -257,7 +257,7 @@ struct ClientProperty
 private:
 
    const char* name_;
-   detail::BasicInterface* iface_;
+   StubBase* iface_;
 
    function_type f_;
 };
@@ -316,9 +316,9 @@ struct ClientRequest
 
 
     inline
-    ClientRequest(const char* method_name, detail::BasicInterface* parent)
+    ClientRequest(const char* method_name, StubBase* parent)
      : method_name_(method_name)
-     , parent_(parent)   // must take BasicInterface here and dynamic_cast later(!) since object hierarchy is not yet fully instantiated
+     , parent_(parent)   
     {
       // NOOP
     }
@@ -334,7 +334,7 @@ struct ClientRequest
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<T...>>::type,
                     args_type>::value, "args mismatch");
 
-      auto msg = dynamic_cast<StubBase*>(parent_)->send_request_and_block(method_name_, [&](detail::Serializer& s){
+      auto msg = parent_->send_request_and_block(method_name_, [&](detail::Serializer& s){
          serializer_type::eval(s, t...);
       }, is_oneway);
 
@@ -351,7 +351,7 @@ struct ClientRequest
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      return detail::InterimCallbackHolder<holder_type>(dynamic_cast<StubBase*>(parent_)->send_request(method_name_, [&](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(parent_->send_request(method_name_, [&](detail::Serializer& s){
          serializer_type::eval(s, t...);
       }, false));
    }
@@ -371,7 +371,7 @@ struct ClientRequest
 private:
 
    const char* method_name_;
-   detail::BasicInterface* parent_;
+   StubBase* parent_;
 };
 
 

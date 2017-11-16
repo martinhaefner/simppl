@@ -22,17 +22,18 @@ void dispatcher_add_skeleton(Dispatcher&, StubBase&);
 
 template<template<template<typename...> class,
                   template<typename...> class,
-                  template<typename,int> class> class IfaceT>
-struct Skeleton : SkeletonBase, IfaceT<ServerRequest, ServerSignal, ServerProperty>
+                  template<typename,int> class, typename> class IfaceT>
+struct Skeleton : IfaceT<ServerRequest, ServerSignal, ServerProperty, SkeletonBase>
 {
    friend struct Dispatcher;
 
-   typedef IfaceT<ServerRequest, ServerSignal, ServerProperty> interface_type;
+   typedef IfaceT<ServerRequest, ServerSignal, ServerProperty, SkeletonBase> interface_type;
 
    inline
    Skeleton(Dispatcher& disp, const char* role)
-    : SkeletonBase(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role)
+    : interface_type()
    {
+	   this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role);
       dispatcher_add_skeleton(disp, *this);
    }
 

@@ -20,6 +20,7 @@ namespace test
 INTERFACE(Simple)
 {
    Request<> hello;
+   Request<> hello_wait_for_some_time;
 
    Request<in<int>, simppl::dbus::oneway> oneway;
 
@@ -37,6 +38,7 @@ INTERFACE(Simple)
    inline
    Simple()
     : INIT(hello)
+    , INIT(hello_wait_for_some_time)
     , INIT(oneway)
     , INIT(add)
     , INIT(echo)
@@ -84,6 +86,30 @@ struct Client : simppl::dbus::Stub<Simple>
                this->oneway(7777);
             };
          };
+      };
+   }
+};
+
+
+struct CancelClient : simppl::dbus::Stub<Simple>
+{
+   CancelClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Simple>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+         
+         simppl::dbus::PendingCall p = this->hello_wait_for_some_time.async() >> [this](simppl::dbus::CallState state){
+            
+            if (!state)
+				std::cout << state.what() << std::endl;
+               
+            // shutdown
+            this->oneway(7777);
+         };
+         
+         std::this_thread::sleep_for(100ms);
+		 p.cancel();
       };
    }
 };
@@ -222,6 +248,13 @@ struct Server : simppl::dbus::Skeleton<Simple>
       {
          this->respond_with(hello());
       };
+
+
+      hello_wait_for_some_time >> [this]()
+      {
+		  std::this_thread::sleep_for(1000ms);
+		  this->respond_with(hello_wait_for_some_time());
+	  };
 
 
       oneway >> [this](int i)
@@ -421,3 +454,25 @@ TEST(Simple, disconnect)
    }
 }
 
+
+TEST(Simple, cancel)
+{
+   simppl::dbus::Dispatcher clientd;
+
+   CancelClient c(clientd);
+
+   {
+      simppl::dbus::Dispatcher* serverd = new simppl::dbus::Dispatcher("bus:session");
+      Server* s = new Server(*serverd, "s");
+
+      std::thread serverthread([serverd, s](){
+         serverd->run();
+         delete s;
+         delete serverd;
+      });
+
+      clientd.run();
+
+      serverthread.join();
+   }
+}

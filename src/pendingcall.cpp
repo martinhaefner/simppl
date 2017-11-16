@@ -40,6 +40,7 @@ PendingCall& PendingCall::operator=(PendingCall&& rhs)
     pending_ = rhs.pending_;
 
     rhs.reset();
+    return *this;
 }
 
 

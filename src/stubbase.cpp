@@ -19,35 +19,42 @@ namespace simppl
 namespace dbus
 {
 
-StubBase::StubBase(const char* iface, const char* role)
- : iface_(detail::extract_interface(iface))
+StubBase::StubBase()
+ : iface_(nullptr)
  , objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
 {
-   assert(role);
-   objectpath_ = detail::create_objectpath(iface_, role);
-
-   busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
-   busname_ = this->iface();
-   busname_ += ".";
-   busname_ += role;
+	// NOOP
 }
 
 
-StubBase::StubBase(const char* iface, const char* busname, const char* objectpath)
- : iface_(detail::extract_interface(iface))
- , objectpath_(nullptr)
- , conn_state_(ConnectionState::Disconnected)
- , disp_(nullptr)
+void StubBase::init(const char* iface, const char* busname, const char* objectpath)
 {
-   assert(busname);
+	assert(busname);
    assert(objectpath);
+
+	iface_ = detail::extract_interface(iface);
 
    objectpath_ = new char[strlen(objectpath)+1];
    strcpy(objectpath_, objectpath);
 
    busname_ = busname;
+}
+
+
+void StubBase::init(const char* iface, const char* role)
+{
+	assert(role);
+
+	iface_ = detail::extract_interface(iface);
+
+   objectpath_ = detail::create_objectpath(iface_, role);
+
+   busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
+   busname_ = this->iface();
+   busname_ += ".";
+   busname_ += role;	
 }
 
 

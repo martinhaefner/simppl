@@ -13,10 +13,10 @@ namespace dbus
 {
  
  
-ServerRequestBase::ServerRequestBase(const char* name, detail::BasicInterface* iface)
+ServerRequestBase::ServerRequestBase(const char* name, SkeletonBase* iface)
  : name_(name)
 {
-   auto& methods = dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->methods_;
+   auto& methods = iface->methods_;
    this->next_ = methods;
    methods = this;
 }
@@ -45,22 +45,22 @@ const char* ServerRequestBase::get_signature() const
 #endif
 
  
-ServerPropertyBase::ServerPropertyBase(const char* name, detail::BasicInterface* iface)
+ServerPropertyBase::ServerPropertyBase(const char* name, SkeletonBase* iface)
  : name_(name)
  , parent_(iface)
 {
-   auto& properties = dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->properties_;
+   auto& properties = iface->properties_;
    this->next_ = properties;
    properties = this;
 }
 
 
-ServerSignalBase::ServerSignalBase(const char* name, detail::BasicInterface* iface)
+ServerSignalBase::ServerSignalBase(const char* name, SkeletonBase* iface)
  : name_(name)
  , parent_(iface)
 {
 #if SIMPPL_HAVE_INTROSPECTION
-   auto& signals = dynamic_cast<InterfaceBase<ServerRequest>*>(iface)->signals_;
+   auto& signals = iface->signals_;
    this->next_ = signals;
    signals = this;
 #endif

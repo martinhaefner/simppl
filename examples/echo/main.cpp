@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "echoservice.h"
 
 #include "simppl/stub.h"
