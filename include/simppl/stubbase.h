@@ -47,17 +47,17 @@ struct StubBase
 protected:
 
    virtual ~StubBase();
-   
-   void init(const char* iface, const char* role);
-   void init(const char* iface, const char* busname, const char* objectpath);
-  
+
+   void init(char* iface, const char* role);
+   void init(char* iface, const char* busname, const char* objectpath);
+
 
 public:
 
    std::function<void(ConnectionState)> connected;
 
    StubBase();
-      
+
    inline
    const char* iface() const
    {

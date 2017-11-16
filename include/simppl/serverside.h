@@ -39,21 +39,21 @@ struct ServerRequestBase
 {
    typedef void(*eval_type)(ServerRequestBase*, DBusMessage*);
    typedef void(*sig_type)(std::ostream&);
-   
+
    void eval(DBusMessage* msg)
    {
       eval_(this, msg);
    }
 
-#if SIMPPL_SIGNATURE_CHECK   
+#if SIMPPL_SIGNATURE_CHECK
    void get_signature(std::ostream& os) const
    {
       sig_(os);
    }
-   
+
    const char* get_signature() const;
 #endif
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
 #endif
@@ -66,10 +66,10 @@ protected:
    ServerRequestBase(const char* name, SkeletonBase* iface);
 
    ~ServerRequestBase();
-   
+
    eval_type eval_;
-   
-#if SIMPPL_SIGNATURE_CHECK   
+
+#if SIMPPL_SIGNATURE_CHECK
    mutable std::string signature_;
    sig_type sig_;
 #endif
@@ -90,7 +90,7 @@ struct ServerSignalBase
 
 protected:
 
-   inline 
+   inline
    ~ServerSignalBase() = default;
 
    const char* name_;
@@ -112,7 +112,7 @@ struct ServerSignal : ServerSignalBase
 
    void notify(typename CallTraits<T>::param_type... args)
    {
-	   parent_->send_signal(this->name_, [&](detail::Serializer& s){
+       parent_->send_signal(this->name_, [&](detail::Serializer& s){
             detail::serialize(s, args...);
        });
    }
@@ -136,7 +136,7 @@ struct ServerRequest : ServerRequestBase
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
-    
+
     enum {
         valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
         valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
@@ -149,7 +149,7 @@ struct ServerRequest : ServerRequestBase
 
     typedef typename detail::generate_server_callback_function<ArgsT...>::type                     callback_type;
     typedef typename detail::generate_serializer<typename return_type_generator::list_type>::type serializer_type;
-    
+
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
@@ -172,7 +172,7 @@ struct ServerRequest : ServerRequestBase
     }
 
 #if SIMPPL_SIGNATURE_CHECK
-   static 
+   static
    void __sig(std::ostream& os)
    {
       ForEach<typename args_type_generator::list_type>::template eval<detail::make_type_signature>(os);
@@ -207,7 +207,7 @@ private:
        detail::Deserializer d(msg);
        detail::GetCaller<args_type>::type::template eval(d, ((ServerRequest*)obj)->f_);
    }
-   
+
 
    template<typename... T>
    inline
@@ -236,19 +236,19 @@ struct ServerPropertyBase
 {
    typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
    typedef void (*eval_set_type)(ServerPropertyBase*, detail::Deserializer&);
-   
+
    ServerPropertyBase(const char* name, SkeletonBase* iface);
 
    void eval(DBusMessage* msg)
    {
       eval_(this, msg);
    }
-   
+
    void evalSet(detail::Deserializer& ds)
    {
       eval_set_(this, ds);
    }
-   
+
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
 #endif
@@ -261,7 +261,7 @@ protected:
 
    inline
    ~ServerPropertyBase() = default;
-   
+
    eval_type eval_;
    eval_set_type eval_set_;
 };
@@ -273,6 +273,7 @@ struct BaseProperty : ServerPropertyBase
    inline
    BaseProperty(const char* name, SkeletonBase* iface)
     : ServerPropertyBase(name, iface)
+    , t_()
    {
       eval_ = __eval;
    }
@@ -324,14 +325,14 @@ struct ServerProperty : BaseProperty<DataT>
             });
          }
       }
-      
+
       return *this;
    }
 
 
 protected:
 
-   static 
+   static
    void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
    {
       Variant<DataT> v;

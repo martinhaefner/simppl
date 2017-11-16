@@ -20,7 +20,7 @@ namespace org
          INTERFACE(Introspectable)
          {
             Request<out<std::string>> Introspect;
-            
+
             Introspectable()
              : INIT(Introspect)
             {
@@ -34,9 +34,9 @@ namespace org
             Request<in<std::string>, in<std::string> out<Any>> Get;
             Request<in<std::string>, in<std::string>, in<Any>> Set;
             Request<in<std::string>, in<std::string>, out<std::map<std::string, Any>>> GetAll;
-            
+
             // TODO Signal<...> PropertiesChanged;
-            
+
             Properties()
              : INIT(Get)
              , INIT(Set)
@@ -79,39 +79,42 @@ SkeletonBase::SkeletonBase()
    // NOOP
 }
 
-void SkeletonBase::init(const char* iface, const char* role)
-{
-	assert(role);
-	
-	iface_ = detail::extract_interface(iface);
-
-   objectpath_ = detail::create_objectpath(iface_, role);
-   busname_ = detail::create_busname(iface_, role);
-}
-
-
-SkeletonBase::SkeletonBase(const char* iface, const char* busname, const char* objectpath)
- : iface_(detail::extract_interface(iface))
- , busname_(nullptr)
- , objectpath_(nullptr)
- , disp_(nullptr)
-{
-   assert(busname);
-   assert(objectpath);
-
-   busname_ = new char[strlen(busname) + 1];
-   strcpy(busname_, busname);
-
-   objectpath_ = new char[strlen(objectpath)+1];
-   strcpy(objectpath_, objectpath);
-}
-
 
 SkeletonBase::~SkeletonBase()
 {
    delete[] iface_;
    delete[] busname_;
    delete[] objectpath_;
+}
+
+
+void SkeletonBase::init(char* iface, const char* role)
+{
+    assert(role);
+
+    iface_ = detail::extract_interface(iface);
+
+    objectpath_ = detail::create_objectpath(iface_, role);
+    busname_ = detail::create_busname(iface_, role);
+
+    free(iface);
+}
+
+
+void SkeletonBase::init(char* iface, const char* busname, const char* objectpath)
+{
+    assert(busname);
+    assert(objectpath);
+
+    iface_ = detail::extract_interface(iface);
+
+    busname_ = new char[strlen(busname) + 1];
+    strcpy(busname_, busname);
+
+    objectpath_ = new char[strlen(objectpath)+1];
+    strcpy(objectpath_, objectpath);
+
+    free(iface);
 }
 
 
@@ -229,14 +232,14 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
             pa->introspect(oss);
             pa = pa->next_;
          }
-            
+
          auto ps = this->signals_;
          while(ps)
          {
             ps->introspect(oss);
             ps = ps->next_;
          }
-         
+
          // introspectable
          oss << "  </interface>\n"
              "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
@@ -268,7 +271,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                "  </interface>\n"
                "</node>\n";
          }
-         
+
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
          detail::Serializer s(reply);
@@ -310,13 +313,13 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                    message_ptr_t response = make_message(dbus_message_new_method_return(msg));
                    dbus_connection_send(disp_->conn_, response.get(), nullptr);
                 }
-                
+
                 return DBUS_HANDLER_RESULT_HANDLED;
              }
 
              p = p->next_;
           }
-          
+
           std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
        }
    }
@@ -334,7 +337,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                return DBUS_HANDLER_RESULT_HANDLED;
             }
 #endif
-            
+
             current_request_.set(pm, msg);
             pm->eval(msg);
 
@@ -348,10 +351,10 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 
             return DBUS_HANDLER_RESULT_HANDLED;
          }
-         
+
          pm = pm->next_;
       }
-      
+
       std::cerr << "method '" << method << "' unknown" << std::endl;
    }
 
@@ -361,31 +364,31 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 
 void SkeletonBase::send_signal(const char* signame, std::function<void(detail::Serializer&)> f)
 {
-	message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
+    message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
 
-	detail::Serializer s(msg.get());
-	f(s);
-	
-	dbus_connection_send(disp_->conn_, msg.get(), nullptr);   
+    detail::Serializer s(msg.get());
+    f(s);
+
+    dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }
 
 
 void SkeletonBase::send_property_change(const char* prop, std::function<void(detail::Serializer&)> f)
 {
    static std::vector<std::string> invalid;
-   
+
    message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), "org.freedesktop.DBus.Properties", "PropertiesChanged"));
 
    detail::Serializer s(msg.get());
    s << iface();
-   
+
    // TODO make once
    std::ostringstream buf;
    buf << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
        << DBUS_TYPE_STRING_AS_STRING
        << DBUS_TYPE_VARIANT_AS_STRING
        << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
-   
+
    DBusMessageIter iter;
    dbus_message_iter_open_container(s.iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
@@ -395,10 +398,10 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(det
    detail::Serializer des(&item_iterator);
    des.write(prop);
    f(des);
-   
+
    // the dict entry
    dbus_message_iter_close_container(&iter, &item_iterator);
-   
+
    // the map
    dbus_message_iter_close_container(s.iter_, &iter);
 

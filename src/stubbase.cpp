@@ -25,36 +25,7 @@ StubBase::StubBase()
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
 {
-	// NOOP
-}
-
-
-void StubBase::init(const char* iface, const char* busname, const char* objectpath)
-{
-	assert(busname);
-   assert(objectpath);
-
-	iface_ = detail::extract_interface(iface);
-
-   objectpath_ = new char[strlen(objectpath)+1];
-   strcpy(objectpath_, objectpath);
-
-   busname_ = busname;
-}
-
-
-void StubBase::init(const char* iface, const char* role)
-{
-	assert(role);
-
-	iface_ = detail::extract_interface(iface);
-
-   objectpath_ = detail::create_objectpath(iface_, role);
-
-   busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
-   busname_ = this->iface();
-   busname_ += ".";
-   busname_ += role;	
+    // NOOP
 }
 
 
@@ -65,6 +36,39 @@ StubBase::~StubBase()
 
    delete[] iface_;
    delete[] objectpath_;
+}
+
+
+void StubBase::init(char* iface, const char* busname, const char* objectpath)
+{
+    assert(busname);
+    assert(objectpath);
+
+    iface_ = detail::extract_interface(iface);
+
+    objectpath_ = new char[strlen(objectpath)+1];
+    strcpy(objectpath_, objectpath);
+
+    busname_ = busname;
+
+    free(iface);
+}
+
+
+void StubBase::init(char* iface, const char* role)
+{
+    assert(role);
+
+    iface_ = detail::extract_interface(iface);
+
+    objectpath_ = detail::create_objectpath(iface_, role);
+
+    busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
+    busname_ = this->iface();
+    busname_ += ".";
+    busname_ += role;
+
+    free(iface);
 }
 
 
@@ -130,14 +134,14 @@ message_ptr_t StubBase::send_request_and_block(const char* method_name, std::fun
             timeout = detail::request_specific_timeout.count();
 
         dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, timeout);
-                
+
         detail::request_specific_timeout = std::chrono::milliseconds(0);
 
         dbus_pending_call_block(pending);
 
         rc = make_message(dbus_pending_call_steal_reply(pending));
         dbus_pending_call_unref(pending);
-        
+
         CallState cs(*rc);
 
         if (!cs)

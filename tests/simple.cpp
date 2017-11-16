@@ -67,21 +67,21 @@ struct Client : simppl::dbus::Stub<Simple>
    {
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         
+
          this->hello.async() >> [this](simppl::dbus::CallState state){
             EXPECT_TRUE((bool)state);
 
             this->oneway(42);
 
             const wchar_t* wct = L"Hello world";
-            
+
             this->echo_wchart.async(wct) >> [this](simppl::dbus::CallState state, wchar_t* p){
                EXPECT_TRUE((bool)state);
                EXPECT_EQ(0, wcscmp(p, L"Hello world"));
-              
+
                // must delete pointer now, it's mine
                simppl::dbus::detail::Deserializer::free(p);
-               
+
                // shutdown
                this->oneway(7777);
             };
@@ -97,19 +97,25 @@ struct CancelClient : simppl::dbus::Stub<Simple>
     : simppl::dbus::Stub<Simple>(d, "s")
    {
       connected >> [this](simppl::dbus::ConnectionState s){
-         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         
-         simppl::dbus::PendingCall p = this->hello_wait_for_some_time.async() >> [this](simppl::dbus::CallState state){
-            
-            if (!state)
-				std::cout << state.what() << std::endl;
-               
-            // shutdown
-            this->oneway(7777);
-         };
-         
-         std::this_thread::sleep_for(100ms);
-		 p.cancel();
+
+         if (s == simppl::dbus::ConnectionState::Connected)   // FIXME add bool cast operator
+         {
+            simppl::dbus::PendingCall p = this->hello_wait_for_some_time.async() >> [this](simppl::dbus::CallState state){
+
+                // never called!!!
+                EXPECT_TRUE(false);
+                if (!state)
+                    std::cout << state.what() << std::endl;
+            };
+
+            std::this_thread::sleep_for(100ms);
+            p.cancel();
+
+            // must stop server
+            oneway(7777);
+         }
+         else
+            disp().stop();
       };
    }
 };
@@ -165,14 +171,14 @@ struct PropertyClient : simppl::dbus::Stub<Simple>
       {
          // first you get the current value
          EXPECT_EQ(4711, new_value);
-         
+
          // now we trigger update on server
          oneway(42);
       }
       else
       {
          EXPECT_EQ(42, new_value);
-         
+
          oneway(7777);   // stop signal
       }
 
@@ -197,7 +203,7 @@ struct SignalClient : simppl::dbus::Stub<Simple>
          {
             this->handleSignal(value);
          };
-         
+
          this->sig2.attach() >> [this](int value1, int value2)
          {
             this->handleSignal2(value1, value2);
@@ -221,11 +227,11 @@ struct SignalClient : simppl::dbus::Stub<Simple>
       // trigger again
       oneway(start_);
    }
-   
+
    void handleSignal2(int value1, int value2)
    {
       ++count2_;
-      
+
       EXPECT_EQ(value1, -value2);
    }
 
@@ -252,9 +258,9 @@ struct Server : simppl::dbus::Skeleton<Simple>
 
       hello_wait_for_some_time >> [this]()
       {
-		  std::this_thread::sleep_for(1000ms);
-		  this->respond_with(hello_wait_for_some_time());
-	  };
+          std::this_thread::sleep_for(200ms);
+          this->respond_with(hello_wait_for_some_time());
+      };
 
 
       oneway >> [this](int i)
@@ -288,16 +294,16 @@ struct Server : simppl::dbus::Skeleton<Simple>
       {
          this->respond_with(echo(i, d));
       };
-      
+
       echo_wstring >> [this](const std::wstring& str)
       {
          this->respond_with(echo_wstring(str));
       };
-      
+
       echo_wchart >> [this](wchar_t* str)
       {
          this->respond_with(echo_wchart(str));
-         
+
          // clean up pointer
          simppl::dbus::detail::Deserializer::free(str);
       };
@@ -388,45 +394,45 @@ TEST(Simple, blocking)
    int dv = -1;
    dv = stub.data.get();
    EXPECT_EQ(4711, dv);
-   
+
    std::wstring rslt_str = stub.echo_wstring(L"Hello world");
    EXPECT_EQ(0, rslt_str.compare(L"Hello world"));
-   
+
    // different calling styles for pointers
    {
       const wchar_t* text = L"Hello world";
       wchar_t* rslt_p = stub.echo_wchart(text);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
-      
+
       simppl::dbus::detail::Deserializer::free(rslt_p);
    }
-   
+
    {
       wchar_t* rslt_p = stub.echo_wchart(L"Hello world");
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
-      
+
       simppl::dbus::detail::Deserializer::free(rslt_p);
    }
-   
+
    {
       wchar_t text[16];
       wcscpy(text, L"Hello world");
       wchar_t* rslt_p = stub.echo_wchart(text);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
-      
+
       simppl::dbus::detail::Deserializer::free(rslt_p);
    }
-   
+
    {
       wchar_t text[16];
       wcscpy(text, L"Hello world");
       wchar_t* tp = text;
       wchar_t* rslt_p = stub.echo_wchart(tp);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
-      
+
       simppl::dbus::detail::Deserializer::free(rslt_p);
    }
-   
+
    stub.oneway(7777);   // stop server
    t.join();
 }
@@ -467,6 +473,7 @@ TEST(Simple, cancel)
 
       std::thread serverthread([serverd, s](){
          serverd->run();
+
          delete s;
          delete serverd;
       });

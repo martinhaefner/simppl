@@ -22,7 +22,7 @@ add_executable(unittests
 # manually running the executable runUnitTests to see those specific tests.
 #add_test(name "simpple unit tests" command unittests)
 
-target_link_libraries(unittests gtest gtest_main Threads::Threads simppl rt dbus-1)
+target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
 
 
 # not a test, just an introspection example  
