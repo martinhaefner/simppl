@@ -430,7 +430,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
    std::vector<std::string> busnames;
 
    detail::Deserializer ds(reply);
-   ds >> busnames;
+   ds.read(busnames);
 
    for(auto& busname : busnames)
    {
@@ -571,7 +571,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            std::string busname;
 
            detail::Deserializer ds(msg);
-           ds >> busname;
+           ds.read(busname);
 
            if (busnames_.find(busname) != busnames_.end())
             notify_clients(busname, ConnectionState::Connected);
@@ -585,7 +585,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            std::string new_name;
 
            detail::Deserializer ds(msg);
-           ds >> bus_name >> old_name >> new_name;
+           ds.read(bus_name).read(old_name).read(new_name);
 
            if (bus_name[0] != ':')
            {

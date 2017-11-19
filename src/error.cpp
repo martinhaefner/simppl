@@ -26,7 +26,7 @@ std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
 {
     detail::Deserializer d(&msg);
     std::string text;
-    d >> text;
+    d.read(text);
 
     return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
 }

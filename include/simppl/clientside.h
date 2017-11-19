@@ -218,7 +218,7 @@ struct ClientProperty
       detail::Deserializer ds(msg.get());
 
       Variant<DataT> v;
-      ds >> v;
+      ds.read(v);
 
       return *v.template get<DataT>();
    }
@@ -269,7 +269,7 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
       stub().attach_property(name_, [this](detail::Deserializer& s){
 
          Variant<data_type> d;
-         s >> d;
+         s.read(d);
 
          if (this->f_)
             this->f_(CallState(42), *d.template get<data_type>());

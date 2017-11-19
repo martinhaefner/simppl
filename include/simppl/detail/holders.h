@@ -108,7 +108,7 @@ struct PropertyCallbackHolder
           Deserializer ds(msg.get());
 
           simppl::Variant<DataT> v;
-          ds >> v;
+          ds.read(v);
 
           that->f_(cs, *v.template get<DataT>());
        }

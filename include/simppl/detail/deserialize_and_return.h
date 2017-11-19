@@ -23,7 +23,7 @@ struct deserialize_and_return
       ReturnT rc;
       
       Deserializer d(msg);
-      d >> rc;
+      d.read(rc);
       
       return std::move(rc); 
    }

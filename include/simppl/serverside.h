@@ -336,7 +336,7 @@ protected:
    void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
    {
       Variant<DataT> v;
-      ds >> v;
+      ds.read(v);
 
       *((ServerProperty*)obj) = *v.template get<DataT>();
    }

@@ -241,7 +241,6 @@ struct StructSerializationHelper
    static inline
    void write(SerializerT& s, const StructT& st)
    {
-      std::cout << "A" << std::endl;
       const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
       s.write(tuple);
    }
@@ -549,7 +548,7 @@ struct VariantDeserializer<T1, T...>
       if (!strcmp(buf.str().c_str(), sig))
       {
          v = T1();
-         s >> *v.template get<T1>();
+         s.read(*v.template get<T1>());
 
          return true;
       }
@@ -571,7 +570,7 @@ struct VariantDeserializer<T>
       if (!strcmp(buf.str().c_str(), sig))
       {
          v = T();
-         s >> *v.template get<T>();
+         s.read(*v.template get<T>());
 
          return true;
       }
@@ -767,74 +766,12 @@ public:
 }   // namespace simppl
 
 
-#define MAKE_SERIALIZER(type) \
-inline \
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, type t) \
-{ \
-   return s.write(t); \
-}
-
-MAKE_SERIALIZER(bool)
-
-MAKE_SERIALIZER(unsigned short)
-MAKE_SERIALIZER(short)
-
-MAKE_SERIALIZER(unsigned int)
-MAKE_SERIALIZER(int)
-
-MAKE_SERIALIZER(unsigned long)
-MAKE_SERIALIZER(long)
-
-MAKE_SERIALIZER(unsigned long long)
-MAKE_SERIALIZER(long long)
-
-MAKE_SERIALIZER(double)
-
-MAKE_SERIALIZER(const char*)
-MAKE_SERIALIZER(const std::string&)
-
-MAKE_SERIALIZER(const wchar_t*)
-MAKE_SERIALIZER(const std::wstring&)
-
-
-template<typename T>
-inline
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::vector<T>& v)
-{
-   return s.write(v);
-}
-
-
-template<typename KeyT, typename ValueT>
-inline
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::map<KeyT, ValueT>& m)
-{
-   return s.write(m);
-}
-
-
-template<typename StructT>
-inline
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const StructT& st)
-{
-   return s.write(st);
-}
-
-
-template<typename... T>
-inline
-simppl::dbus::detail::Serializer& operator<<(simppl::dbus::detail::Serializer& s, const std::tuple<T...>& t)
-{
-   return s.write(t);
-}
-
-
 template<typename SerializerT>
 template<typename T>
 inline
 void simppl::dbus::detail::TupleSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
-    s_ << t;
+    s_.write(t);
 }
 
 
@@ -1063,71 +1000,12 @@ public:   // FIXME friend?
 }   // namespace simppl
 
 
-#define MAKE_DESERIALIZER(type) \
-inline \
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, type& t) \
-{ \
-   return s.read(t); \
-}
-
-MAKE_DESERIALIZER(bool)
-
-MAKE_DESERIALIZER(unsigned short)
-MAKE_DESERIALIZER(short)
-
-MAKE_DESERIALIZER(unsigned int)
-MAKE_DESERIALIZER(int)
-
-MAKE_DESERIALIZER(unsigned long)
-MAKE_DESERIALIZER(long)
-
-MAKE_DESERIALIZER(unsigned long long)
-MAKE_DESERIALIZER(long long)
-
-MAKE_DESERIALIZER(double)
-
-MAKE_DESERIALIZER(char*)
-MAKE_DESERIALIZER(std::string)
-
-MAKE_DESERIALIZER(wchar_t*)
-MAKE_DESERIALIZER(std::wstring)
-
-
-template<typename T>
-inline
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::vector<T>& v)
-{
-   return s.read(v);
-}
-
-template<typename KeyT, typename ValueT>
-inline
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::map<KeyT, ValueT>& m)
-{
-   return s.read(m);
-}
-
-template<typename StructT>
-inline
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, StructT& st)
-{
-   return s.read(st);
-}
-
-template<typename... T>
-inline
-simppl::dbus::detail::Deserializer& operator>>(simppl::dbus::detail::Deserializer& s, std::tuple<T...>& t)
-{
-   return s.read(t);
-}
-
-
 template<typename DeserializerT>
 template<typename T>
 inline
 void simppl::dbus::detail::TupleDeserializer<DeserializerT>::operator()(T& t)
 {
-   s_ >> t;
+   s_.read(t);
 }
 
 
@@ -1160,7 +1038,7 @@ template<typename T1, typename... T>
 inline
 Serializer& serialize(Serializer& s, const T1& t1, const T&... t)
 {
-   s << t1;
+   s.write(t1);
    return serialize(s, t...);
 }
 
