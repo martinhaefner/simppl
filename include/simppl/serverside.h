@@ -13,7 +13,6 @@
 #include "simppl/serialization.h"
 #include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
-#include "simppl/for_each.h"
 
 #include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/validation.h"
