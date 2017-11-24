@@ -19,13 +19,21 @@ struct InterimCallbackHolder
 {
    typedef HolderT holder_type;
 
+   InterimCallbackHolder(const InterimCallbackHolder& rhs)
+   : pc_(std::move(rhs.pc_))
+   {
+	   // NOOP
+   }
+   
+   InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
+
    explicit inline
-   InterimCallbackHolder(PendingCall&& pc)
+   InterimCallbackHolder(const PendingCall& pc)
     : pc_(std::move(pc))
    {
       // NOOP
    }
-
+   
    PendingCall pc_;
 };
 
@@ -39,11 +47,11 @@ struct CallbackHolder
 
    explicit inline
    CallbackHolder(const FuncT& f)
-    : f_(f)
+    : f_(std::move(f))
    {
       // NOOP
    }
-
+   
    static inline
    void _delete(void* p)
    {
@@ -54,7 +62,6 @@ struct CallbackHolder
    static
    void pending_notify(DBusPendingCall* pc, void* data)
    {
-       auto upc = simppl::dbus::make_pending_call(pc);
        auto msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pc));
 
        auto that = (CallbackHolder*)data;
@@ -96,8 +103,7 @@ struct PropertyCallbackHolder
    static
    void pending_notify(DBusPendingCall* pc, void* data)
    {
-       auto upc = simppl::dbus::make_pending_call(pc);
-       auto msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pc));
+	   auto msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pc));
 
        auto that = (PropertyCallbackHolder*)data;
        assert(that->f_);

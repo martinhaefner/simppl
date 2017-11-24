@@ -16,14 +16,12 @@ struct PendingCall
     PendingCall(uint32_t serial, DBusPendingCall* p);
     PendingCall();
 
-    // only move
     PendingCall(PendingCall&& rhs);
     PendingCall& operator=(PendingCall&& rhs);
 
-    // no copy
-    PendingCall(const PendingCall&) = delete;
-    PendingCall& operator=(const PendingCall&) = delete;
-
+    PendingCall(const PendingCall& rhs);
+    PendingCall& operator=(const PendingCall& rhs);
+	
     /** request serial */
     uint32_t serial() const;
 

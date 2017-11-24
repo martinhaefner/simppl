@@ -30,6 +30,8 @@ private:
                 }
                 else
                     std::cout << "Got error: " << st.what() << std::endl;
+                    
+                disp().stop();
             };
         }
     }

@@ -1,8 +1,6 @@
 #ifndef SIMPPL_SERVERSIDE_H
 #define SIMPPL_SERVERSIDE_H
 
-#include <set>
-#include <iostream>
 
 #include <dbus/dbus.h>
 

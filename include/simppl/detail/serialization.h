@@ -9,7 +9,6 @@
 #include "simppl/objectpath.h"
 #include <cxxabi.h>
 
-#include <iostream>
 #include <map>
 #include <vector>
 #include <tuple>
@@ -875,10 +874,7 @@ struct Deserializer // : noncopyable
        Deserializer s(&iter);
 
        if (!try_deserialize(s, v, dbus_message_iter_get_signature(&iter)))
-       {
-          std::cerr << "Invalid variant type detected" << std::endl;
           assert(false);
-       }
 
        dbus_message_iter_next(iter_);
        return *this;

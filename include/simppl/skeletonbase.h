@@ -5,8 +5,6 @@
 
 #include <dbus/dbus.h>
 
-#include <iostream>  // FIXME remove this
-
 #include "simppl/error.h"
 #include "simppl/serverrequestdescriptor.h"
 

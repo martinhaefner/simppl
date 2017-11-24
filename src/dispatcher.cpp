@@ -5,6 +5,7 @@
 
 #include <unistd.h>
 
+#include <iostream>
 #include <map>
 #include <set>
 #include <atomic>
@@ -488,6 +489,7 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
    if (dbus_error_is_set(&err))
    {
+	   // FIXME make exception classes
       std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
       dbus_error_free(&err);
    }

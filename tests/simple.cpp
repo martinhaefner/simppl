@@ -109,8 +109,9 @@ struct CancelClient : simppl::dbus::Stub<Simple>
             };
 
             std::this_thread::sleep_for(100ms);
+            
             p.cancel();
-
+            
             // must stop server
             oneway(7777);
          }

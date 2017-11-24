@@ -2,7 +2,6 @@
 #define SIMPPL_CLIENTSIDE_H
 
 
-#include <iostream>
 #include <functional>
 
 #include <dbus/dbus.h>
@@ -275,7 +274,7 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 		this->f_(CallState(42), *d.template get<data_type>());
   });
 
-  dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
+  dbus_pending_call_set_notify(stub().get_property_async(name_).pending(),
 	 &holder_type::pending_notify,
 	 new holder_type([this](CallState cs, const arg_type& val){
 		if (f_)
@@ -388,7 +387,7 @@ inline
 simppl::dbus::PendingCall operator>>(simppl::dbus::detail::InterimCallbackHolder<HolderT>&& r, const FunctorT& f)
 {
    // TODO static_assert FunctorT and HolderT::f_ convertible?
-   dbus_pending_call_set_notify(dbus_pending_call_ref(r.pc_.pending()), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
+   dbus_pending_call_set_notify(r.pc_.pending(), &HolderT::pending_notify, new HolderT(f), &HolderT::_delete);
 
    return std::move(r.pc_);
 }

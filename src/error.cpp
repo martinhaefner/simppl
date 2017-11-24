@@ -1,6 +1,5 @@
 #include "simppl/error.h"
 
-#include <iostream>
 #include <cassert>
 #include <cstring>
 
