@@ -220,7 +220,7 @@ struct ClientProperty
       Variant<DataT> v;
       ds.read(v);
 
-      return *v.template get<DataT>();
+      return std::move(*v.template get<DataT>());
    }
 
 
@@ -265,26 +265,27 @@ private:
 /// only call this after the server is connected.
 template<typename DataT, int Flags>
 ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
-   {
-      stub().attach_property(name_, [this](detail::Deserializer& s){
+{
+  stub().attach_property(name_, [this](detail::Deserializer& s){
 
-         Variant<data_type> d;
-         s.read(d);
+	 Variant<data_type> d;
+	 s.read(d);
 
-         if (this->f_)
-            this->f_(CallState(42), *d.template get<data_type>());
-      });
+	 if (this->f_)
+		this->f_(CallState(42), *d.template get<data_type>());
+  });
 
-      dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
-         &holder_type::pending_notify,
-         new holder_type([this](CallState cs, const arg_type& val){
-            if (f_)
-               f_(cs, val);
-         }),
-         &holder_type::_delete);
+  dbus_pending_call_set_notify(dbus_pending_call_ref(stub().get_property_async(name_).pending()),
+	 &holder_type::pending_notify,
+	 new holder_type([this](CallState cs, const arg_type& val){
+		if (f_)
+		   f_(cs, val);
+	 }),
+	 &holder_type::_delete);
 
-      return *this;
-   }
+  return *this;
+}
+
 
 // --------------------------------------------------------------------------------
 

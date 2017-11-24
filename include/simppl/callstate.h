@@ -2,8 +2,7 @@
 #define SIMPPL_CALLSTATE_H
 
 
-#include <memory>
-#include <cassert>
+#include <cstdint>
 
 #include "simppl/error.h"
 

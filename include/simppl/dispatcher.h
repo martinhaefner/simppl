@@ -2,13 +2,8 @@
 #define SIMPPL_DISPATCHER_H
 
 
-#include <map>
-#include <set>
-#include <iostream>
-#include <memory>
 #include <chrono>
-#include <atomic>
-#include <queue>
+#include <string>
 
 #include <dbus/dbus.h>
 
@@ -61,7 +56,10 @@ struct Dispatcher
       request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
 
-   int run();
+	/**
+	 * Start self-hosted eventloop.
+	 */
+	int run();
 
    /**
     * Do some IO and dispatch the retrieved messages.
@@ -76,8 +74,14 @@ struct Dispatcher
    /// same as run()
    void loop();
 
+   /**
+    * Stop self-hosted eventloop.
+    */
    void stop();
 
+   /**
+    * Self hosted eventloop is running.
+    */
    bool is_running() const;
 
    DBusHandlerResult try_handle_signal(DBusMessage* msg);
@@ -121,15 +125,8 @@ private:
 
    void notify_clients(const std::string& boundname, ConnectionState state);
 
-   std::atomic_bool running_;
    DBusConnection* conn_;
    int request_timeout_;    ///< default request timeout in milliseconds
-
-   std::multimap<std::string, StubBase*> stubs_;
-   std::map<std::string, int> signal_matches_;
-
-   /// service registration's list
-   std::set<std::string> busnames_;
 
    struct Private;
    Private* d;

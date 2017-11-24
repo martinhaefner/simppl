@@ -3,6 +3,7 @@
 #include <dbus/dbus.h>
 
 #include <cstring>
+#include <cassert>
 
 
 namespace simppl

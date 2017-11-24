@@ -5,6 +5,10 @@
 
 #include <unistd.h>
 
+#include <map>
+#include <set>
+#include <atomic>
+
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
 #include "simppl/skeletonbase.h"
@@ -15,7 +19,7 @@
 #include "simppl/clientside.h"
 #undef SIMPPL_DISPATCHER_CPP
 
-#define USE_POLL
+#define SIMPPL_USE_POLL
 
 using namespace std::placeholders;
 using namespace std::literals::chrono_literals;
@@ -171,12 +175,10 @@ struct Dispatcher::Private
     }
 
 
-    Private(DBusConnection* conn)
+    Private()
+     : running_(false)
     {
-#ifdef USE_POLL
-        dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
-        dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
-#endif
+		// NOOP
     }
 
 
@@ -357,12 +359,26 @@ struct Dispatcher::Private
 
         return 0;
     }
+    
+    
+    void init(DBusConnection* conn)
+    {
+		dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
+		dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
+	}
 
 
+	std::atomic_bool running_;
     std::vector<pollfd> fds_;
 
     std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
+    
+    std::multimap<std::string, StubBase*> stubs_;
+    std::map<std::string, int> signal_matches_;
+
+    /// service registration's list
+    std::set<std::string> busnames_;
 };
 
 
@@ -380,12 +396,12 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // compile check if stubs or skeletons are compiled with the settings
    // used for building the library
    assert(SIMPPL_HAVE_INTROSPECTION == have_introspection);
+ 
+   d = new Dispatcher::Private;  
    
-   running_ = false;
    conn_ = nullptr;
    request_timeout_ = DBUS_TIMEOUT_USE_DEFAULT;
-   d = nullptr;
-
+   
    DBusError err;
    dbus_error_init(&err);
 
@@ -435,13 +451,11 @@ void Dispatcher::init(int have_introspection, const char* busname)
    for(auto& busname : busnames)
    {
       if (busname[0] != ':')
-         this->busnames_.insert(busname);
+         d->busnames_.insert(busname);
    }
 
    dbus_message_unref(msg);
    dbus_message_unref(reply);
-
-   d = new Dispatcher::Private(conn_);
 }
 
 
@@ -457,7 +471,7 @@ Dispatcher::~Dispatcher()
 
 void Dispatcher::notify_clients(const std::string& busname, ConnectionState state)
 {
-   auto range = stubs_.equal_range(busname);
+   auto range = d->stubs_.equal_range(busname);
 
    std::for_each(range.first, range.second, [state](auto& entry){
       entry.second->connection_state_changed(state);
@@ -520,9 +534,9 @@ void Dispatcher::unregister_properties(StubBase& stub)
 
 void Dispatcher::register_signal_match(const std::string& match_string)
 {
-   auto iter = signal_matches_.find(match_string);
+   auto iter = d->signal_matches_.find(match_string);
 
-   if (iter == signal_matches_.end())
+   if (iter == d->signal_matches_.end())
    {
       DBusError err;
       dbus_error_init(&err);
@@ -532,7 +546,7 @@ void Dispatcher::register_signal_match(const std::string& match_string)
          
       dbus_error_free(&err);
 
-      signal_matches_[match_string] = 1;
+      d->signal_matches_[match_string] = 1;
    }
    else
       ++iter->second;
@@ -541,9 +555,9 @@ void Dispatcher::register_signal_match(const std::string& match_string)
 
 void Dispatcher::unregister_signal_match(const std::string& match_string)
 {
-   auto iter = signal_matches_.find(match_string);
+   auto iter = d->signal_matches_.find(match_string);
 
-   if (iter != signal_matches_.end())
+   if (iter != d->signal_matches_.end())
    {
       if (--iter->second == 0)
       {
@@ -573,8 +587,8 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            detail::Deserializer ds(msg);
            ds.read(busname);
 
-           if (busnames_.find(busname) != busnames_.end())
-            notify_clients(busname, ConnectionState::Connected);
+           if (d->busnames_.find(busname) != d->busnames_.end())
+				notify_clients(busname, ConnectionState::Connected);
         }
         else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
         {
@@ -591,12 +605,12 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            {
                if (old_name.empty())
                {
-                   busnames_.insert(bus_name);
+                   d->busnames_.insert(bus_name);
                    notify_clients(bus_name, ConnectionState::Connected);
                }
                else if (new_name.empty())
                {
-                   busnames_.erase(bus_name);
+                   d->busnames_.erase(bus_name);
                    notify_clients(bus_name, ConnectionState::Disconnected);
                }
            }
@@ -618,7 +632,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
               *p = '.';
         }
 
-        auto range = stubs_.equal_range(originator);
+        auto range = d->stubs_.equal_range(originator);
 
         std::for_each(range.first, range.second, [msg](auto& entry){
             entry.second->try_handle_signal(msg);
@@ -633,13 +647,13 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
 void Dispatcher::stop()
 {
-   running_.store(false);
+   d->running_.store(false);
 }
 
 
 bool Dispatcher::is_running() const
 {
-   return running_.load();
+   return d->running_.load();
 }
 
 
@@ -648,11 +662,11 @@ void Dispatcher::add_client(StubBase& clnt)
    clnt.disp_ = this;
 
    //std::cout << "Adding stub: " << clnt.busname() << std::endl;
-   stubs_.insert(std::make_pair(clnt.busname(), &clnt));
+   d->stubs_.insert(std::make_pair(clnt.busname(), &clnt));
 
    // send connected request from event loop
-   auto iter = busnames_.find(clnt.busname());
-   if (iter != busnames_.end())
+   auto iter = d->busnames_.find(clnt.busname());
+   if (iter != d->busnames_.end())
    {
       std::ostringstream objpath;
       objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
@@ -670,13 +684,13 @@ void Dispatcher::add_client(StubBase& clnt)
 
 void Dispatcher::remove_client(StubBase& clnt)
 {
-   for(auto iter = stubs_.begin(); iter != stubs_.end(); ++iter)
+   for(auto iter = d->stubs_.begin(); iter != d->stubs_.end(); ++iter)
    {
       if (&clnt == iter->second)
       {
          clnt.cleanup();
 
-         stubs_.erase(iter);
+         d->stubs_.erase(iter);
          break;
       }
    }
@@ -691,7 +705,7 @@ void Dispatcher::loop()
 
 int Dispatcher::step_ms(int timeout_ms)
 {
-#ifdef USE_POLL
+#ifdef SIMPPL_USE_POLL
     d->poll(timeout_ms);
 
     int rc;
@@ -710,9 +724,13 @@ int Dispatcher::step_ms(int timeout_ms)
 
 int Dispatcher::run()
 {
-   running_.store(true);
+#ifdef SIMPPL_USE_POLL
+   d->init(conn_);
+#endif
 
-   while(running_.load())
+   d->running_.store(true);
+
+   while(d->running_.load())
    {
        step_ms(100);
    }
