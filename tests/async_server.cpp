@@ -17,10 +17,10 @@ namespace test {
 INTERFACE(AsyncServer)
 {
    // FIXME validate all parameters to be either in or out or oneway
-   Request<in<int>, simppl::dbus::oneway> oneway;
+   Method<in<int>, simppl::dbus::oneway> oneway;
 
-   Request<in<int>, in<double>, out<double>> add;
-   Request<in<int>, in<double>, out<int>, out<double>> echo;
+   Method<in<int>, in<double>, out<double>> add;
+   Method<in<int>, in<double>, out<int>, out<double>> echo;
 
 
    inline

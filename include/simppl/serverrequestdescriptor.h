@@ -16,7 +16,7 @@ namespace dbus
 {
    
 // forward decl
-struct ServerRequestBase;
+struct ServerMethodBase;
 
 
 struct ServerRequestDescriptor
@@ -30,13 +30,13 @@ struct ServerRequestDescriptor
    ServerRequestDescriptor(ServerRequestDescriptor&& rhs);
    ServerRequestDescriptor& operator=(ServerRequestDescriptor&& rhs);
    
-   ServerRequestDescriptor& set(ServerRequestBase* requestor, DBusMessage* msg);
+   ServerRequestDescriptor& set(ServerMethodBase* requestor, DBusMessage* msg);
    
    void clear();
    
    operator const void*() const;
    
-   ServerRequestBase* requestor_;
+   ServerMethodBase* requestor_;
    DBusMessage* msg_;
 };
 

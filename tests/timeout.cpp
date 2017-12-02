@@ -18,8 +18,8 @@ namespace test
 
 INTERFACE(Timeout)
 {
-   Request<in<int>, out<double>> eval;
-   Request<in<int>, simppl::dbus::oneway> oneway;
+   Method<in<int>, out<double>> eval;
+   Method<in<int>, simppl::dbus::oneway> oneway;
 
    inline
    Timeout()

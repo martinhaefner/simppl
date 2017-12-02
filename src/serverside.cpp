@@ -13,7 +13,7 @@ namespace dbus
 {
  
  
-ServerRequestBase::ServerRequestBase(const char* name, SkeletonBase* iface)
+ServerMethodBase::ServerMethodBase(const char* name, SkeletonBase* iface)
  : name_(name)
 {
    auto& methods = iface->methods_;
@@ -22,14 +22,14 @@ ServerRequestBase::ServerRequestBase(const char* name, SkeletonBase* iface)
 }
 
 
-ServerRequestBase::~ServerRequestBase()
+ServerMethodBase::~ServerMethodBase()
 {
    // NOOP
 }
 
 
 #if SIMPPL_SIGNATURE_CHECK
-const char* ServerRequestBase::get_signature() const
+const char* ServerMethodBase::get_signature() const
 {
    if (signature_.empty())
    {

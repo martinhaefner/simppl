@@ -17,7 +17,7 @@ namespace example
 
     INTERFACE(EchoService)
     {
-        Request<in<std::string>, out<std::string>> echo;
+        Method<in<std::string>, out<std::string>> echo;
 
         // constructor
         EchoService()

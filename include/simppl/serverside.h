@@ -32,9 +32,9 @@ namespace simppl
 namespace dbus
 {
 
-struct ServerRequestBase
+struct ServerMethodBase
 {
-   typedef void(*eval_type)(ServerRequestBase*, DBusMessage*);
+   typedef void(*eval_type)(ServerMethodBase*, DBusMessage*);
    typedef void(*sig_type)(std::ostream&);
 
    void eval(DBusMessage* msg)
@@ -55,14 +55,14 @@ struct ServerRequestBase
    virtual void introspect(std::ostream& os) const = 0;
 #endif
 
-   ServerRequestBase* next_;
+   ServerMethodBase* next_;
    const char* name_;
 
 protected:
 
-   ServerRequestBase(const char* name, SkeletonBase* iface);
+   ServerMethodBase(const char* name, SkeletonBase* iface);
 
-   ~ServerRequestBase();
+   ~ServerMethodBase();
 
    eval_type eval_;
 
@@ -129,7 +129,7 @@ struct ServerSignal : ServerSignalBase
 
 
 template<typename... ArgsT>
-struct ServerRequest : ServerRequestBase
+struct ServerMethod : ServerMethodBase
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
@@ -151,8 +151,8 @@ struct ServerRequest : ServerRequestBase
 
 
     inline
-    ServerRequest(const char* name, SkeletonBase* iface)
-    : ServerRequestBase(name, iface)
+    ServerMethod(const char* name, SkeletonBase* iface)
+    : ServerMethodBase(name, iface)
     {
         eval_ = __eval;
 #if SIMPPL_SIGNATURE_CHECK
@@ -199,10 +199,10 @@ struct ServerRequest : ServerRequestBase
 private:
 
    static
-   void __eval(ServerRequestBase* obj, DBusMessage* msg)
+   void __eval(ServerMethodBase* obj, DBusMessage* msg)
    {
        detail::Deserializer d(msg);
-       detail::GetCaller<args_type>::type::template eval(d, ((ServerRequest*)obj)->f_);
+       detail::GetCaller<args_type>::type::template eval(d, ((ServerMethod*)obj)->f_);
    }
 
 
@@ -356,7 +356,7 @@ protected:
 
 template<typename FunctorT, typename... T>
 inline
-void operator>>(simppl::dbus::ServerRequest<T...>& r, const FunctorT& f)
+void operator>>(simppl::dbus::ServerMethod<T...>& r, const FunctorT& f)
 {
    r.handled_by(f);
 }

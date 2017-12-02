@@ -290,7 +290,7 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 
 
 template<typename... ArgsT>
-struct ClientRequest
+struct ClientMethod
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
@@ -315,7 +315,7 @@ struct ClientRequest
 
 
     inline
-    ClientRequest(const char* method_name, StubBase* parent)
+    ClientMethod(const char* method_name, StubBase* parent)
      : method_name_(method_name)
      , parent_(parent)   
     {
@@ -356,7 +356,7 @@ struct ClientRequest
    }
 
 
-   ClientRequest& operator[](int flags)
+   ClientMethod& operator[](int flags)
    {
       static_assert(is_oneway == false, "it's a oneway function");
 

@@ -34,8 +34,8 @@ struct gaga
 
 INTERFACE(Properties)
 {
-   Request<in<int>, in<std::string>> set;
-   Request<simppl::dbus::oneway> shutdown;
+   Method<in<int>, in<std::string>> set;
+   Method<simppl::dbus::oneway> shutdown;
 
    Property<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Property<std::map<ident_t, std::string>> props;

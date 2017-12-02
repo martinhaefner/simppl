@@ -25,7 +25,7 @@ namespace test
 
       INTERFACE(VServer)
       {
-         Request<out<std::map<std::string, simppl::Variant<int,double,std::string>>>> getData;
+         Method<out<std::map<std::string, simppl::Variant<int,double,std::string>>>> getData;
 
          VServer()
           : INIT(getData)

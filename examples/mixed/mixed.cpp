@@ -36,7 +36,7 @@ namespace test
    
    INTERFACE(long_op)
    {
-      Request<in<std::string>, out<std::string>> do_it;
+      Method<in<std::string>, out<std::string>> do_it;
       
       long_op()
        : INIT(do_it)

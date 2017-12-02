@@ -80,11 +80,11 @@ struct Menu
 
 INTERFACE(Properties)
 {
-   Request<in<int>, in<std::string>> set;
-   Request<> shutdown;
-   Request<> trigger_data;
+   Method<in<int>, in<std::string>> set;
+   Method<> shutdown;
+   Method<> trigger_data;
 
-   Request<out<Menu>> get_all;
+   Method<out<Menu>> get_all;
 
    Property<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Property<std::map<ident_t, std::string>> props;

@@ -35,7 +35,7 @@ namespace detail
 struct StubBase
 {
    template<typename... T> friend struct ClientSignal;
-   template<typename... T> friend struct ClientRequest;
+   template<typename... T> friend struct ClientMethod;
    template<typename, int> friend struct ClientProperty;
    template<typename, typename> friend struct ClientPropertyWritableMixin;
 

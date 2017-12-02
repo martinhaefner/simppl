@@ -19,7 +19,7 @@ namespace dbus
 
 // forward decl
 struct Dispatcher;
-struct ServerRequestBase;
+struct ServerMethodBase;
 struct ServerPropertyBase;
 struct ServerSignalBase;
 
@@ -30,7 +30,7 @@ struct SkeletonBase
     SkeletonBase& operator=(const SkeletonBase&) = delete;
 
     friend struct Dispatcher;
-    friend struct ServerRequestBase;
+    friend struct ServerMethodBase;
     friend struct ServerPropertyBase;
     friend struct ServerSignalBase;
 
@@ -99,7 +99,7 @@ protected:
     ServerRequestDescriptor current_request_;
 
     // linked list heads
-    ServerRequestBase* methods_;
+    ServerMethodBase* methods_;
     ServerPropertyBase* properties_;
 
 #if SIMPPL_HAVE_INTROSPECTION

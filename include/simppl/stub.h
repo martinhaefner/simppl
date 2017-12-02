@@ -26,13 +26,13 @@ void dispatcher_add_stub(Dispatcher&, StubBase&);
 template<template<template<typename...> class,
                   template<typename...> class,
                   template<typename,int> class, typename> class IfaceT>
-struct Stub : IfaceT<ClientRequest, ClientSignal, ClientProperty, StubBase>
+struct Stub : IfaceT<ClientMethod, ClientSignal, ClientProperty, StubBase>
 {
    friend struct Dispatcher;
 
 private:
 
-   typedef IfaceT<ClientRequest, ClientSignal, ClientProperty, StubBase> interface_type;
+   typedef IfaceT<ClientMethod, ClientSignal, ClientProperty, StubBase> interface_type;
 
 public:
 

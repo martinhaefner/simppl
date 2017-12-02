@@ -23,11 +23,11 @@ void dispatcher_add_skeleton(Dispatcher&, StubBase&);
 template<template<template<typename...> class,
                   template<typename...> class,
                   template<typename,int> class, typename> class IfaceT>
-struct Skeleton : IfaceT<ServerRequest, ServerSignal, ServerProperty, SkeletonBase>
+struct Skeleton : IfaceT<ServerMethod, ServerSignal, ServerProperty, SkeletonBase>
 {
     friend struct Dispatcher;
 
-    typedef IfaceT<ServerRequest, ServerSignal, ServerProperty, SkeletonBase> interface_type;
+    typedef IfaceT<ServerMethod, ServerSignal, ServerProperty, SkeletonBase> interface_type;
 
     inline
     Skeleton(Dispatcher& disp, const char* role)

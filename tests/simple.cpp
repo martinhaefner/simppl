@@ -19,16 +19,16 @@ namespace test
 
 INTERFACE(Simple)
 {
-   Request<> hello;
-   Request<> hello_wait_for_some_time;
+   Method<> hello;
+   Method<> hello_wait_for_some_time;
 
-   Request<in<int>, simppl::dbus::oneway> oneway;
+   Method<in<int>, simppl::dbus::oneway> oneway;
 
-   Request<in<int>, in<double>, out<double>> add;
-   Request<in<int>, in<double>, out<int>, out<double>> echo;
+   Method<in<int>, in<double>, out<double>> add;
+   Method<in<int>, in<double>, out<int>, out<double>> echo;
 
-   Request<in<std::wstring>, out<std::wstring>> echo_wstring;
-   Request<in<wchar_t*>, out<wchar_t*>>         echo_wchart;
+   Method<in<std::wstring>, out<std::wstring>> echo_wstring;
+   Method<in<wchar_t*>, out<wchar_t*>>         echo_wchart;
 
    Property<int> data;
 

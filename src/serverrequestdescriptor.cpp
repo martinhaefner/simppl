@@ -50,7 +50,7 @@ ServerRequestDescriptor& ServerRequestDescriptor::operator=(ServerRequestDescrip
 }
 
 
-ServerRequestDescriptor& ServerRequestDescriptor::set(ServerRequestBase* requestor, DBusMessage* msg)
+ServerRequestDescriptor& ServerRequestDescriptor::set(ServerMethodBase* requestor, DBusMessage* msg)
 {
    clear();
    

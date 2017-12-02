@@ -18,10 +18,10 @@ namespace test
 
 INTERFACE(Errors)
 {
-   Request<simppl::dbus::oneway> stop;
+   Method<simppl::dbus::oneway> stop;
 
-   Request<> hello;
-   Request<in<int>, out<int>> hello1;
+   Method<> hello;
+   Method<in<int>, out<int>> hello1;
 
    inline
    Errors()
