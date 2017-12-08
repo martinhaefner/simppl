@@ -160,14 +160,6 @@ struct ServerMethod : ServerMethodBase
 #endif
     }
 
-    template<typename FunctorT>
-    inline
-    void handled_by(FunctorT func)
-    {
-        assert(!f_);
-        f_ = func;
-    }
-
 #if SIMPPL_SIGNATURE_CHECK
    static
    void __sig(std::ostream& os)
@@ -196,6 +188,9 @@ struct ServerMethod : ServerMethodBase
    }
 #endif
 
+
+   callback_type f_;
+   
 private:
 
    static
@@ -221,8 +216,6 @@ private:
    {
       return detail::ServerResponseHolder([](detail::Serializer& s){ /*NOOP*/ });
    }
-
-   callback_type f_;
 };
 
 
@@ -296,8 +289,38 @@ protected:
 };
 
 
+template<typename DataT>
+struct ServerNoopMixin
+{
+    bool __set(typename CallTraits<DataT>::param_type)
+    {
+        return true;
+    }
+};
+
+
+template<typename DataT>
+struct ServerWritableMixin
+{
+    typedef std::function<void(typename CallTraits<DataT>::param_type)> function_type;
+    
+    bool __set(typename CallTraits<DataT>::param_type d)
+    {
+        if (f_)
+        {
+            f_(d);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function_type f_;
+};
+
+
 template<typename DataT, int Flags>
-struct ServerProperty : BaseProperty<DataT>
+struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite, ServerWritableMixin<DataT>, ServerNoopMixin<DataT>>::type
 {
    static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
 
@@ -329,14 +352,18 @@ struct ServerProperty : BaseProperty<DataT>
 
 protected:
 
-   static
-   void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
-   {
-      Variant<DataT> v;
-      ds.read(v);
-
-      *((ServerProperty*)obj) = *v.template get<DataT>();
-   }
+    static
+    void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
+    {
+        ServerProperty* that = (ServerProperty*)obj;
+        
+        Variant<DataT> v;
+        ds.read(v);
+        
+        if (that->__set(*v.template get<DataT>()))
+            *that = *v.template get<DataT>();
+    }
+   
 
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os) const override
@@ -358,7 +385,15 @@ template<typename FunctorT, typename... T>
 inline
 void operator>>(simppl::dbus::ServerMethod<T...>& r, const FunctorT& f)
 {
-   r.handled_by(f);
+    r.f_ = f;
+}
+
+
+template<typename FunctorT, typename DataT, int Flags>
+inline
+void operator>>(simppl::dbus::ServerProperty<DataT, Flags>& p, const FunctorT& f)
+{
+    p.f_ = f;
 }
 
 

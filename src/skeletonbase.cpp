@@ -12,46 +12,6 @@
 #include <iostream>
 
 
-#if 0
-namespace org
-{
-   namespace freedesktop
-   {
-      namespace DBus
-      {
-         INTERFACE(Introspectable)
-         {
-            Request<out<std::string>> Introspect;
-
-            Introspectable()
-             : INIT(Introspect)
-            {
-               // NOOP
-            }
-         };
-
-
-         INTERFACE(Properties)
-         {
-            Request<in<std::string>, in<std::string> out<Any>> Get;
-            Request<in<std::string>, in<std::string>, in<Any>> Set;
-            Request<in<std::string>, in<std::string>, out<std::map<std::string, Any>>> GetAll;
-
-            // TODO Signal<...> PropertiesChanged;
-
-            Properties()
-             : INIT(Get)
-             , INIT(Set)
-            {
-               // NOOP
-            }
-         };
-      }
-   }
-}
-#endif
-
-
 namespace simppl
 {
 
@@ -310,9 +270,24 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                 }
                 else
                 {
-                   p->evalSet(ds);
-
-                   message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                   message_ptr_t response = make_message(nullptr);
+                   
+                   try
+                   {
+                      p->evalSet(ds);
+                     
+                      response = make_message(dbus_message_new_method_return(msg));
+                   }
+                   catch(simppl::dbus::Error& err)
+                   {
+                      response = err.make_reply_for(*msg);
+                   }
+                   catch(...)
+                   {
+                      simppl::dbus::Error e("simppl.dbus.UnhandledException");
+                      response = e.make_reply_for(*msg);
+                   }
+                   
                    dbus_connection_send(disp_->conn_, response.get(), nullptr);
                 }
 

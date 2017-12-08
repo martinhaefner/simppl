@@ -195,10 +195,47 @@ struct SetterClient : simppl::dbus::Stub<Properties>
 
              disp().stop();
          };
-
       };
    }
+   
+   int callback_count_ = 0;
+};
 
+
+struct InvalidSetterClient : simppl::dbus::Stub<Properties>
+{
+   InvalidSetterClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Properties>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+         
+         data.attach() >> [this](simppl::dbus::CallState, int) {
+             ++callback_count_;
+         };
+         
+         // never use operator= here, it's blocking!
+         data.set_async(-1) >> [this](simppl::dbus::CallState cs){
+             EXPECT_FALSE((bool)cs);
+             EXPECT_STREQ(cs.exception().what(), "simppl.dbus.UnhandledException");
+         };
+         
+         data.set_async(1) >> [this](simppl::dbus::CallState cs){
+             EXPECT_FALSE((bool)cs);
+             EXPECT_STREQ(cs.exception().what(), "Invalid.Argument");
+         };
+
+         data.set_async(2) >> [this](simppl::dbus::CallState cs){
+             EXPECT_TRUE((bool)cs);
+             EXPECT_EQ(2, callback_count_);   // one from attach, one from data change
+             
+             // finished, stop event loops
+             shutdown();
+             disp().stop();
+         };
+      };
+   }
+   
    int callback_count_ = 0;
 };
 
@@ -222,13 +259,39 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          mayShutdown.notify(42);
       };
-
+      
       // initialize attribute
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
    }
 
    int calls_ = 0;
+};
+
+
+struct InvalidSetterServer : simppl::dbus::Skeleton<Properties>
+{
+   InvalidSetterServer(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Properties>(d, rolename)
+   {
+      shutdown >> [this](){
+         disp().stop();
+      };
+      
+      data >> [this](int newval){
+          
+          if (newval < 0)
+             throw std::runtime_error("out of bounds");  // will be mapped to simppl.dbus.UnhandledException
+             
+          if (newval == 1)
+             throw simppl::dbus::Error("Invalid.Argument");
+             
+          data = newval;
+      };
+      
+      // initialize attribute
+      data = 4711;
+   }
 };
 
 
@@ -332,6 +395,17 @@ TEST(Properties, get_async)
 
    Server s(d, "s");
    GetterClient c(d);
+
+   d.run();
+}
+
+
+TEST(Properties, invalid_set)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   InvalidSetterServer s(d, "s");
+   InvalidSetterClient c(d);
 
    d.run();
 }

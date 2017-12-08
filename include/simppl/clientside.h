@@ -89,13 +89,6 @@ struct ClientSignal : ClientSignalBase
       eval_ = __eval;
    }
 
-   template<typename FunctorT>
-   inline
-   void handled_by(FunctorT func)
-   {
-      f_ = func;
-   }
-
    /// send registration to the server - only attach after the interface is connected.
    inline
    ClientSignal& attach()
@@ -111,6 +104,10 @@ struct ClientSignal : ClientSignalBase
       iface_->unregister_signal(*this);
       return *this;
    }
+   
+   
+   // TODO make >> a friend
+   function_type f_;
 
 
 private:
@@ -123,8 +120,6 @@ private:
       detail::Deserializer d(msg);
       detail::GetCaller<std::tuple<T...>>::type::template eval(d, that->f_);
    }
-
-   function_type f_;
 };
 
 
@@ -193,14 +188,6 @@ struct ClientProperty
       // NOOP
    }
 
-
-   template<typename FunctorT>
-   inline
-   void handled_by(FunctorT func)
-   {
-      f_ = func;
-   }
-
    StubBase& stub()
    {
       return *iface_;
@@ -252,12 +239,13 @@ struct ClientProperty
       return name_;
    }
 
+   
+   function_type f_;
+
 private:
 
    const char* name_;
    StubBase* iface_;
-
-   function_type f_;
 };
 
 
@@ -267,20 +255,20 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
   stub().attach_property(name_, [this](detail::Deserializer& s){
 
-	 Variant<data_type> d;
-	 s.read(d);
+     Variant<data_type> d;
+     s.read(d);
 
-	 if (this->f_)
-		this->f_(CallState(42), *d.template get<data_type>());
+     if (this->f_)
+        this->f_(CallState(42), *d.template get<data_type>());
   });
 
   dbus_pending_call_set_notify(stub().get_property_async(name_).pending(),
-	 &holder_type::pending_notify,
-	 new holder_type([this](CallState cs, const arg_type& val){
-		if (f_)
-		   f_(cs, val);
-	 }),
-	 &holder_type::_delete);
+     &holder_type::pending_notify,
+     new holder_type([this](CallState cs, const arg_type& val){
+        if (f_)
+           f_(cs, val);
+     }),
+     &holder_type::_delete);
 
   return *this;
 }
@@ -394,16 +382,18 @@ simppl::dbus::PendingCall operator>>(simppl::dbus::detail::InterimCallbackHolder
 
 
 template<typename DataT, int Flags, typename FuncT>
+inline
 void operator>>(simppl::dbus::ClientProperty<DataT, Flags>& attr, const FuncT& func)
 {
-   attr.handled_by(func);
+   attr.f_ = func;
 }
 
 
 template<typename... T, typename FuncT>
+inline
 void operator>>(simppl::dbus::ClientSignal<T...>& sig, const FuncT& func)
 {
-   sig.handled_by(func);
+   sig.f_ = func;
 }
 
 
