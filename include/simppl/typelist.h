@@ -37,6 +37,30 @@ struct Size<TypeList<HeadT, NilType> >
     enum { value = 1 };
 };
 
+// -------------------------------popfrontN ------------------------------------
+// TODO this should be a generic Erase algorihtm instead
+
+template<int N, typename ListT>
+struct PopFrontN;
+
+template<int N, typename HeadT, typename TailT>
+struct PopFrontN<N, TypeList<HeadT, TailT> >
+{
+   typedef typename PopFrontN<N-1, TailT>::type type;
+};
+
+template<typename HeadT, typename TailT>
+struct PopFrontN<0, TypeList<HeadT, TailT> >
+{
+   typedef TypeList<HeadT, TailT> type;
+};
+
+template<int N>
+struct PopFrontN<N, NilType>
+{
+   typedef NilType type;
+};
+
 // ------------------------------ push front -------------------------------------
 
 template<typename ListT, typename InsertT>

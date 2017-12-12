@@ -32,13 +32,13 @@ namespace
 std::string generate_matchstring(simppl::dbus::StubBase& stub, const char* signame)
 {
    std::ostringstream match_string;
-   
-   match_string 
+
+   match_string
       << "type='signal'"
       << ", sender='" << stub.busname() << "'"
       << ", interface='" << stub.iface() << "'"
       << ", member='" << signame << "'";
-      
+
    return match_string.str();
 }
 
@@ -46,14 +46,14 @@ std::string generate_matchstring(simppl::dbus::StubBase& stub, const char* signa
 std::string generate_property_matchstring(simppl::dbus::StubBase& stub)
 {
    std::ostringstream match_string;
-   
-   match_string 
+
+   match_string
       << "type='signal'"
       << ",sender='" << stub.busname() << "'"
       << ",interface='org.freedesktop.DBus.Properties'"
       << ",member='PropertiesChanged'"
       << ",path='" << stub.objectpath() << "'";
-      
+
    return match_string.str();
 }
 
@@ -179,7 +179,7 @@ struct Dispatcher::Private
     Private()
      : running_(false)
     {
-		// NOOP
+        // NOOP
     }
 
 
@@ -344,10 +344,10 @@ struct Dispatcher::Private
                         if (t_iter != tm_handlers_.end())
                         {
                             int64_t data;
-                            
+
                             int rc = ::read(pfd.fd, &data, sizeof(data));
                             (void)rc;
-                            
+
 //                            std::cout << "handle timeout" << std::endl;
                             dbus_timeout_handle(t_iter->second);
                         }
@@ -360,21 +360,21 @@ struct Dispatcher::Private
 
         return 0;
     }
-    
-    
+
+
     void init(DBusConnection* conn)
     {
-		dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
-		dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
-	}
+        dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
+        dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
+    }
 
 
-	std::atomic_bool running_;
+    std::atomic_bool running_;
     std::vector<pollfd> fds_;
 
     std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
-    
+
     std::multimap<std::string, StubBase*> stubs_;
     std::map<std::string, int> signal_matches_;
 
@@ -397,12 +397,12 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // compile check if stubs or skeletons are compiled with the settings
    // used for building the library
    assert(SIMPPL_HAVE_INTROSPECTION == have_introspection);
- 
-   d = new Dispatcher::Private;  
-   
+
+   d = new Dispatcher::Private;
+
    conn_ = nullptr;
    request_timeout_ = DBUS_TIMEOUT_USE_DEFAULT;
-   
+
    DBusError err;
    dbus_error_init(&err);
 
@@ -413,7 +413,22 @@ void Dispatcher::init(int have_introspection, const char* busname)
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
    else
-      conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+   {
+       if (!strcmp(busname, "bus:system"))
+       {
+          conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+       }
+       else
+       {
+          conn_ = dbus_connection_open_private(busname, &err);
+
+          if (conn_)
+          {
+             dbus_error_init(&err);
+             dbus_bus_register(conn_, &err);
+          }
+       }
+   }
 
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
@@ -489,7 +504,7 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
    if (dbus_error_is_set(&err))
    {
-	   // FIXME make exception classes
+       // FIXME make exception classes
       std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
       dbus_error_free(&err);
    }
@@ -545,7 +560,7 @@ void Dispatcher::register_signal_match(const std::string& match_string)
 
       dbus_bus_add_match(conn_, match_string.c_str(), &err);
       assert(!dbus_error_is_set(&err));
-         
+
       dbus_error_free(&err);
 
       d->signal_matches_[match_string] = 1;
@@ -590,7 +605,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            ds.read(busname);
 
            if (d->busnames_.find(busname) != d->busnames_.end())
-				notify_clients(busname, ConnectionState::Connected);
+                notify_clients(busname, ConnectionState::Connected);
         }
         else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
         {
@@ -674,7 +689,7 @@ void Dispatcher::add_client(StubBase& clnt)
       objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
-	
+
       detail::Serializer s(msg);
       serialize(s, clnt.busname());
 
@@ -702,6 +717,18 @@ void Dispatcher::remove_client(StubBase& clnt)
 void Dispatcher::loop()
 {
    run();
+}
+
+
+void Dispatcher::dispatch()
+{
+    int rc;
+
+    do
+    {
+       rc = dbus_connection_dispatch(conn_);
+    }
+    while(rc != DBUS_DISPATCH_COMPLETE);
 }
 
 
@@ -736,7 +763,7 @@ int Dispatcher::run()
    {
        step_ms(100);
    }
-   
+
    return 0;
 }
 

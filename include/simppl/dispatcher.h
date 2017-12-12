@@ -56,10 +56,10 @@ struct Dispatcher
       request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
 
-	/**
-	 * Start self-hosted eventloop.
-	 */
-	int run();
+    /**
+     * Start self-hosted eventloop.
+     */
+    int run();
 
    /**
     * Do some IO and dispatch the retrieved messages.
@@ -70,6 +70,9 @@ struct Dispatcher
    {
        return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
    }
+
+   /// Dispatch incoming messages
+   void dispatch();
 
    /// same as run()
    void loop();

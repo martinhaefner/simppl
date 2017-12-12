@@ -1,9 +1,9 @@
 add_library(simppl SHARED
    callstate.cpp
-   dispatcher.cpp 
-   error.cpp 
-   serverresponseholder.cpp 
-   skeletonbase.cpp 
+   dispatcher.cpp
+   error.cpp
+   serverresponseholder.cpp
+   skeletonbase.cpp
    serverside.cpp
    stubbase.cpp
    serialization.cpp
@@ -11,6 +11,8 @@ add_library(simppl SHARED
    util.cpp
    serverrequestdescriptor.cpp
    pendingcall.cpp)
+
+target_link_libraries(simppl dbus-1)
 
 
 install(TARGETS simppl DESTINATION lib)

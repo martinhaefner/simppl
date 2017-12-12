@@ -25,7 +25,7 @@ add_executable(unittests
 target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
 
 
-# not a test, just an introspection example  
+# not a test, just an introspection example
 add_executable(introserver
    introserver.cpp
 )

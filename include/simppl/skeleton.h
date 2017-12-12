@@ -37,6 +37,14 @@ struct Skeleton : IfaceT<ServerMethod, ServerSignal, ServerProperty, SkeletonBas
         dispatcher_add_skeleton(disp, *this);
     }
 
+    inline
+    Skeleton(Dispatcher& disp, const char* busname, const char* objectpath)
+     : interface_type()
+    {
+        this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), busname, objectpath);
+        dispatcher_add_skeleton(disp, *this);
+    }
+
 
 protected:
 
