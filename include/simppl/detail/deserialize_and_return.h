@@ -25,7 +25,7 @@ struct deserialize_and_return
       Deserializer d(msg);
       d.read(rc);
       
-      return std::move(rc); 
+      return rc; 
    }
 };
 
@@ -55,7 +55,7 @@ struct deserialize_and_return<std::tuple<T...>>
       Deserializer d(msg);
       d.read_flattened(rc);
       
-      return std::move(rc); 
+      return rc; 
    }
 };
    

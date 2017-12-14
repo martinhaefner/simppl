@@ -12,5 +12,6 @@ add_library(simppl SHARED
    serverrequestdescriptor.cpp
    pendingcall.cpp)
 
+target_link_libraries(simppl dbus-1)
 
 install(TARGETS simppl DESTINATION lib)
