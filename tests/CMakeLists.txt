@@ -16,6 +16,7 @@ add_executable(unittests
    async_server.cpp
    properties.cpp
    variant.cpp
+   buffer.cpp
 )
 
 # This is so you can do 'make test' to see all your tests run, instead of
