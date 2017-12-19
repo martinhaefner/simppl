@@ -14,5 +14,4 @@ add_library(simppl SHARED
 
 target_link_libraries(simppl dbus-1)
 
-
 install(TARGETS simppl DESTINATION lib)

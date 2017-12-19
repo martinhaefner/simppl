@@ -17,6 +17,41 @@ using simppl::dbus::out;
 namespace test
 {
 
+   
+struct Complex
+{
+   typedef typename simppl::dbus::make_serializer<std::string, std::string>::type serializer_type;
+   
+   std::string str1;
+   std::string str2;
+   
+   Complex() = default;
+   
+   Complex(const Complex& c)
+   {
+      str1 = c.str1;
+      str2 = c.str2;
+      
+      ++rvo_count;
+   }
+   
+   Complex& operator=(const Complex& c)
+   {
+      str1 = c.str1;
+      str2 = c.str2;
+      
+      ++rvo_count;
+      return *this;
+   }
+   
+   // not serialized
+   static int rvo_count;
+};
+
+
+/*static*/ int Complex::rvo_count;
+
+
 INTERFACE(Simple)
 {
    Method<> hello;
@@ -29,6 +64,8 @@ INTERFACE(Simple)
 
    Method<in<std::wstring>, out<std::wstring>> echo_wstring;
    Method<in<wchar_t*>, out<wchar_t*>>         echo_wchart;
+
+   Method<out<Complex>>                        test_rvo;
 
    Property<int> data;
 
@@ -44,6 +81,7 @@ INTERFACE(Simple)
     , INIT(echo)
     , INIT(echo_wstring)
     , INIT(echo_wchart)
+    , INIT(test_rvo)
     , INIT(data)
     , INIT(sig)
     , INIT(sig2)
@@ -308,6 +346,16 @@ struct Server : simppl::dbus::Skeleton<Simple>
          // clean up pointer
          simppl::dbus::detail::Deserializer::free(str);
       };
+      
+      test_rvo >> [this]()
+      {
+         Complex c;
+         c.str1 = "Hello World";
+         c.str2 = "Super";
+         
+         respond_with(test_rvo(c));
+      };
+
    }
 
    int count_oneway_ = 0;
@@ -483,4 +531,32 @@ TEST(Simple, cancel)
 
       serverthread.join();
    }
+}
+
+
+TEST(Simple, return_value_optimization)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+   
+   std::thread t([](){
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "rvo");
+      d.run();
+   });
+
+   simppl::dbus::Stub<Simple> stub(d, "rvo");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   // make sure the return value does not create copy operations
+   auto rc = stub.test_rvo();
+   
+   EXPECT_EQ(rc.str1, "Hello World");
+   
+   // no copy operation took place
+   EXPECT_EQ(0, test::Complex::rvo_count);
+   
+   stub.oneway(7777);   // stop server
+   t.join();
 }

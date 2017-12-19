@@ -16,13 +16,14 @@ add_executable(unittests
    async_server.cpp
    properties.cpp
    variant.cpp
+   buffer.cpp
 )
 
 # This is so you can do 'make test' to see all your tests run, instead of
 # manually running the executable runUnitTests to see those specific tests.
 #add_test(name "simpple unit tests" command unittests)
 
-target_link_libraries(unittests gtest gtest_main simppl rt dbus-1)
+target_link_libraries(unittests gtest gtest_main simppl rt)
 
 
 # not a test, just an introspection example
@@ -31,4 +32,4 @@ add_executable(introserver
 )
 
 
-target_link_libraries(introserver simppl rt dbus-1)
+target_link_libraries(introserver simppl rt)

@@ -7,6 +7,8 @@
 #include "simppl/callstate.h"
 #include "simppl/variant.h"
 #include "simppl/objectpath.h"
+#include "simppl/buffer.h"
+
 #include <cxxabi.h>
 
 #include <map>
@@ -454,6 +456,17 @@ struct make_type_signature<std::string>
 };
 
 
+template<size_t len>
+struct make_type_signature<FixedSizeBuffer<len>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_ARRAY_AS_STRING;
+   }
+};
+
+
 template<>
 struct make_type_signature<std::wstring>
 {
@@ -629,6 +642,18 @@ struct Serializer // : noncopyable
    Serializer& write(T t, Pointer)
    {
       return write_ptr(t);
+   }
+   
+   template<size_t len>
+   Serializer& write(const FixedSizeBuffer<len>& b)
+   {
+      DBusMessageIter iter;
+
+      dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &iter);
+      dbus_message_iter_append_fixed_array(&iter, DBUS_TYPE_BYTE, &b.buf, len);      
+      dbus_message_iter_close_container(iter_, &iter);
+
+      return *this;
    }
 
    inline
@@ -834,6 +859,25 @@ struct Deserializer // : noncopyable
       return *this;
    }
 
+   // FIXME move this to .cpp file
+   template<size_t len>
+   Deserializer& read(FixedSizeBuffer<len>& b)
+   {  
+      DBusMessageIter iter;
+      dbus_message_iter_recurse(iter_, &iter);
+      
+      unsigned char* buf; 
+      int _len = len;
+      dbus_message_iter_get_fixed_array(&iter, &buf, &_len);
+      
+      b.assign(buf);
+      
+      // advance to next element
+      dbus_message_iter_next(iter_);
+
+      return *this;
+   }
+   
    Deserializer& read(bool& t)
    {
       dbus_bool_t b;
