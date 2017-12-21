@@ -8,6 +8,7 @@
 #include "simppl/variant.h"
 #include "simppl/objectpath.h"
 #include "simppl/buffer.h"
+#include "simppl/filedescriptor.h"
 
 #include <cxxabi.h>
 
@@ -84,7 +85,8 @@ template<> struct dbus_type_code<long>               { enum { value = DBUS_TYPE_
 template<> struct dbus_type_code<long long>          { enum { value = DBUS_TYPE_INT64   }; };
 template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
 
-template<> struct dbus_type_code<simppl::dbus::ObjectPath> { enum { value = DBUS_TYPE_OBJECT_PATH }; };
+template<> struct dbus_type_code<simppl::dbus::ObjectPath>     { enum { value = DBUS_TYPE_OBJECT_PATH }; };
+template<> struct dbus_type_code<simppl::dbus::FileDescriptor> { enum { value = DBUS_TYPE_UNIX_FD     }; };
 
 template<typename... T>
 struct dbus_type_code<std::tuple<T...>>              { enum { value = DBUS_TYPE_STRUCT }; };
@@ -525,6 +527,17 @@ struct make_type_signature<ObjectPath>
 };
 
 
+template<>
+struct make_type_signature<FileDescriptor>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_UNIX_FD_AS_STRING;
+   }
+};
+
+
 // --- variant stuff ---------------------------------------------------
 
 
@@ -656,13 +669,7 @@ struct Serializer // : noncopyable
       return *this;
    }
 
-   inline
-   Serializer& write(bool b)
-   {
-      dbus_bool_t _b = b;
-      dbus_message_iter_append_basic(iter_, dbus_type_code<bool>::value, &_b);
-      return *this;
-   }
+   Serializer& write(bool b);
 
    template<typename T>
    inline
@@ -686,7 +693,8 @@ struct Serializer // : noncopyable
    Serializer& write_ptr(const wchar_t* str);
    
    Serializer& write(const ObjectPath& path);
-
+   Serializer& write(const FileDescriptor& fd);
+   
    template<typename... T>
    inline
    Serializer& write(const Variant<T...>& v)
@@ -878,15 +886,7 @@ struct Deserializer // : noncopyable
       return *this;
    }
    
-   Deserializer& read(bool& t)
-   {
-      dbus_bool_t b;
-      dbus_message_iter_get_basic(iter_, &b);
-      dbus_message_iter_next(iter_);
-
-      t = b;
-      return *this;
-   }
+   Deserializer& read(bool& t);
 
    template<typename T>
    Deserializer& read(T& t, std::false_type)
@@ -908,6 +908,7 @@ struct Deserializer // : noncopyable
    Deserializer& read(std::wstring& str);
    
    Deserializer& read(ObjectPath& path);
+   Deserializer& read(FileDescriptor& fd);
 
    template<typename... T>
    inline

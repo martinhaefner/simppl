@@ -10,7 +10,9 @@ add_library(simppl SHARED
    timeout.cpp
    util.cpp
    serverrequestdescriptor.cpp
-   pendingcall.cpp)
+   pendingcall.cpp
+   filedescriptor.cpp
+)
 
 target_link_libraries(simppl dbus-1)
 

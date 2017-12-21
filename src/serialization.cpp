@@ -83,6 +83,22 @@ detail::Serializer& detail::Serializer::write(const ObjectPath& p)
 }
 
 
+detail::Serializer& detail::Serializer::write(const FileDescriptor& fd)
+{
+   int _fd = fd.native_handle();
+   dbus_message_iter_append_basic(iter_, DBUS_TYPE_UNIX_FD, &_fd);
+   return *this;
+}
+
+
+detail::Serializer& detail::Serializer::write(bool b)
+{
+   dbus_bool_t _b = b;
+   dbus_message_iter_append_basic(iter_, dbus_type_code<bool>::value, &_b);
+   return *this;
+}
+
+
 // ----------------------------------------------------------------------------
 
 
@@ -224,6 +240,29 @@ detail::Deserializer& detail::Deserializer::read(ObjectPath& p)
 
    return *this;
 }
+
+
+detail::Deserializer& detail::Deserializer::read(FileDescriptor& fd)
+{
+   int _fd;
+   dbus_message_iter_get_basic(iter_, &_fd);
+   fd = FileDescriptor(_fd);
+   
+   return *this;
+}
+
+
+
+detail::Deserializer& detail::Deserializer::read(bool& t)
+{
+   dbus_bool_t b;
+   dbus_message_iter_get_basic(iter_, &b);
+   dbus_message_iter_next(iter_);
+
+   t = b;
+   return *this;
+}
+
 
 }   // namespace dbus
 
