@@ -48,13 +48,11 @@ struct ObjectPath
 
 struct ObjectPathCodec
 {
-   enum { dbus_type_code = DBUS_TYPE_OBJECT_PATH };
-
    static 
-   void encode(DBusMessageIter& s, const ObjectPath& p);
+   void encode(DBusMessageIter& iter, const ObjectPath& p);
    
    static 
-   void decode(DBusMessageIter& s, ObjectPath& p);
+   void decode(DBusMessageIter& iter, ObjectPath& p);
    
    static 
    std::ostream& make_type_signature(std::ostream& os);

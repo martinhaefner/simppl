@@ -7,6 +7,10 @@
 #include "simppl/struct.h"
 #include "simppl/string.h"
 #include "simppl/wstring.h"
+#include "simppl/filedescriptor.h"
+
+#include <sys/stat.h>
+#include <sys/fcntl.h>
 
 #include <thread>
 
@@ -69,7 +73,7 @@ INTERFACE(Simple)
    Method<in<wchar_t*>, out<wchar_t*>>         echo_wchart;
 
    Method<out<Complex>>                        test_rvo;
-
+   Method<in<simppl::dbus::FileDescriptor>, out<int>>    test_fd;
    Property<int> data;
 
    Signal<int> sig;
@@ -85,6 +89,7 @@ INTERFACE(Simple)
     , INIT(echo_wstring)
     , INIT(echo_wchart)
     , INIT(test_rvo)
+    , INIT(test_fd)
     , INIT(data)
     , INIT(sig)
     , INIT(sig2)
@@ -359,7 +364,14 @@ struct Server : simppl::dbus::Skeleton<Simple>
          
          respond_with(test_rvo(c));
       };
-
+      
+      test_fd >> [this](const simppl::dbus::FileDescriptor& fd)
+      {
+         struct stat st;
+         fstat(fd.native_handle(), &st);
+         
+         respond_with(test_fd((int)st.st_size));
+      };
    }
 
    int count_oneway_ = 0;
@@ -535,6 +547,52 @@ TEST(Simple, cancel)
 
       serverthread.join();
    }
+}
+
+
+TEST(Simple, fd)
+{
+   // FIXME must fork server
+   pid_t pid = fork();
+   if (pid == 0)
+   {
+      // child
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "fd");
+      d.run();
+      
+      exit(0);
+   }
+   
+   // parent
+   simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<Simple> stub(d, "fd");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   struct stat st;
+
+   int fd = open("/etc/fstab", O_RDONLY);
+   EXPECT_GT(fd, -1);
+   
+   {
+      simppl::dbus::FileDescriptor _fd(fd);
+      auto rc = stub.test_fd(_fd);
+   
+      EXPECT_EQ(0, fstat(fd, &st));
+      
+      EXPECT_GT(rc, 0);
+      EXPECT_EQ(rc, (int)st.st_size);
+   }
+   
+   // file is closed due to constructor
+   EXPECT_EQ(-1, fstat(fd, &st));
+   
+   stub.oneway(7777);   // stop server
+   
+   int status;
+   EXPECT_EQ(pid, waitpid(pid, &status, 0));
 }
 
 
