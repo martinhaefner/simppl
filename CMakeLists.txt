@@ -20,7 +20,7 @@ set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -Wall -pedantic -std=c++
 
 
 # enable introspection by default
-OPTION(HAVE_INTROSPECTION "Have introspection" ON) 
+OPTION(HAVE_INTROSPECTION "Have introspection" ON)
 
 if(HAVE_INTROSPECTION)
    add_definitions(-DSIMPPL_HAVE_INTROSPECTION=1)
@@ -33,7 +33,7 @@ endif()
 add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
 
 # extended validation of request/response arguments, just in order
-# to improve compiler error messages  
+# to improve compiler error messages
 add_definitions(-DSIMPPL_HAVE_VALIDATION=0)
 
 include_directories(include)
@@ -55,6 +55,13 @@ find_path(DBUS_ARCHDEPS_INCLUDE_DIR
     NO_DEFAULT_PATH
 )
 
+find_path(DBUS_LIBDIR
+    libdbus-1.so
+    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
+    ONLY_CMAKE_FIND_ROOT_PATH
+    NO_DEFAULT_PATH
+)
+
 if(DBUS_INCLUDE_DIR)
     message("Found DBus include dir under '${DBUS_INCLUDE_DIR}'")
     include_directories(${DBUS_INCLUDE_DIR})
@@ -69,10 +76,17 @@ else()
     message(FATAL_ERROR "Didn't find dbus arch-deps directory")
 endif()
 
+if(DBUS_LIBDIR)
+    message("Found DBus library in '${DBUS_LIBDIR}'")
+    link_directories(${DBUS_LIBDIR})
+else()
+    message(FATAL_ERROR "Didn't find dbus-1 shared library")
+endif()
+
 add_subdirectory(src)
 add_subdirectory(examples)
 
-# gtest environment 
+# gtest environment
 if(NOT GTEST_ROOT)
    message("Searching for gtest installation...")
 

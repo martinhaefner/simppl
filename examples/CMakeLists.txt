@@ -9,8 +9,8 @@ add_executable(echo
 target_link_libraries(echo simppl)
 
 
-add_executable(mixed 
-	mixed/mixed.cpp
+add_executable(mixed
+    mixed/mixed.cpp
 )
 
-target_link_libraries(mixed simppl rt)
+target_link_libraries(mixed simppl)

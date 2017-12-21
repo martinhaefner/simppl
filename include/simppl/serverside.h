@@ -173,7 +173,7 @@ struct ServerMethod : ServerMethodBase
    detail::ServerResponseHolder operator()(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     return_type>::value, "args mismatch");
 
       return __impl(bool_constant<(sizeof...(t) > 0)>(), t...);
@@ -190,7 +190,7 @@ struct ServerMethod : ServerMethodBase
 
 
    callback_type f_;
-   
+
 private:
 
    static
@@ -303,7 +303,7 @@ template<typename DataT>
 struct ServerWritableMixin
 {
     typedef std::function<void(typename CallTraits<DataT>::param_type)> function_type;
-    
+
     bool __set(typename CallTraits<DataT>::param_type d)
     {
         if (f_)
@@ -311,10 +311,10 @@ struct ServerWritableMixin
             f_(d);
             return false;
         }
-        
+
         return true;
     }
-    
+
     function_type f_;
 };
 
@@ -334,7 +334,7 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (this->t_ != data)
+      if (PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
       {
          this->t_ = data;
 
@@ -356,14 +356,14 @@ protected:
     void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
     {
         ServerProperty* that = (ServerProperty*)obj;
-        
+
         Variant<DataT> v;
         ds.read(v);
-        
+
         if (that->__set(*v.template get<DataT>()))
             *that = *v.template get<DataT>();
     }
-   
+
 
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os) const override

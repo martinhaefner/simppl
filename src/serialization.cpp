@@ -41,9 +41,9 @@ detail::Serializer& detail::Serializer::write_ptr(const char* str)
 detail::Serializer& detail::Serializer::write(const std::wstring& str)
 {
    static_assert(sizeof(uint32_t) == sizeof(wchar_t), "data types mapping does not match");
-   
+
    DBusMessageIter iter;
-   
+
    dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &iter);
 
    Serializer s(&iter);
@@ -60,11 +60,11 @@ detail::Serializer& detail::Serializer::write(const std::wstring& str)
 detail::Serializer& detail::Serializer::write_ptr(const wchar_t* str)
 {
    DBusMessageIter iter;
-   
+
    dbus_message_iter_open_container(iter_, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &iter);
 
    Serializer s(&iter);
-   
+
    while(str && *str) {
       s.write((uint32_t)*str++);
    }
@@ -154,14 +154,14 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
 detail::Deserializer& detail::Deserializer::read(wchar_t*& str)
 {
    wchar_t* c_str = nullptr;
-   
+
    //assert(str == nullptr);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
 
    DBusMessageIter iter;
    dbus_message_iter_recurse(iter_, &iter);
-   
-   int count = 
-#if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7
+
+   int count =
+#if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 9
        dbus_message_iter_get_array_len(&iter) / sizeof(uint32_t);
 #else
        dbus_message_iter_get_element_count(iter_);
@@ -170,7 +170,7 @@ detail::Deserializer& detail::Deserializer::read(wchar_t*& str)
    {
       c_str = (wchar_t*)allocate((count+1) * sizeof(wchar_t));
       c_str[count] = 0;
-   
+
       Deserializer s(&iter);
 
       int i = 0;
@@ -180,12 +180,12 @@ detail::Deserializer& detail::Deserializer::read(wchar_t*& str)
          s.read(t);
          c_str[i++] = (wchar_t)t;
       }
-      
+
       str = c_str;
    }
    else
       str = nullptr;
-   
+
    // advance to next element
    dbus_message_iter_next(iter_);
 
@@ -199,16 +199,16 @@ detail::Deserializer& detail::Deserializer::read(std::wstring& str)
 
    DBusMessageIter iter;
    dbus_message_iter_recurse(iter_, &iter);
-   
-   int count = 
-#if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7
+
+   int count =
+#if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 9
        dbus_message_iter_get_array_len(&iter) / sizeof(uint32_t);
 #else
        dbus_message_iter_get_element_count(iter_);
 #endif
    if (count > 0)
       str.reserve(count);
-   
+
    Deserializer s(&iter);
 
    while(dbus_message_iter_get_arg_type(&iter) != 0)
