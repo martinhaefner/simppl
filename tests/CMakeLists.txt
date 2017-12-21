@@ -10,12 +10,12 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 
 add_executable(unittests
-   timeout.cpp
-   simple.cpp
-   errors.cpp
-   async_server.cpp
-   properties.cpp
-   variant.cpp
+   #timeout.cpp
+   #simple.cpp
+   #errors.cpp
+   #async_server.cpp
+   #properties.cpp
+   #variant.cpp
    buffer.cpp
 )
 

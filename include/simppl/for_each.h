@@ -50,6 +50,41 @@ struct ForEach<TypeList<NilType, NilType>>
    }
 };
 
+
+template<size_t N>
+struct StdTupleForEach
+{
+   template<typename TupleT, typename FunctorT>
+   static inline
+   void eval(TupleT& t, FunctorT func)
+   {
+     enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - N };
+      func(std::get<__M>(t));
+      StdTupleForEach<N-1>::template eval(t, func);
+   }
+};
+
+template<>
+struct StdTupleForEach<1>
+{
+   template<typename TupleT, typename FunctorT>
+   static inline
+   void eval(TupleT& t, FunctorT func)
+   {
+     enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - 1 };
+      func(std::get<__M>(t));
+   }
+};
+
+
+template<typename TupleT, typename FunctorT>
+inline
+void std_tuple_for_each(TupleT& t, FunctorT functor)
+{
+   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value>::template eval(t, functor);
+}
+
+
 }   // namespace simppl
 
 

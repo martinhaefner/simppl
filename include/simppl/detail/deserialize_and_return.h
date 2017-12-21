@@ -23,7 +23,7 @@ struct deserialize_and_return
       ReturnT rc;
       
       Deserializer d(msg);
-      d.read(rc);
+      Codec<ReturnT>::decode(d, rc);
       
       return rc; 
    }
@@ -53,7 +53,7 @@ struct deserialize_and_return<std::tuple<T...>>
       return_type rc;
       
       Deserializer d(msg);
-      d.read_flattened(rc);
+      Codec<return_type>::decode(d, rc);
       
       return rc; 
    }

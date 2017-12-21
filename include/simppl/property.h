@@ -2,6 +2,9 @@
 #define SIMPPL_PROPERTY_H
 
 
+#include "simppl/variant.h"
+
+
 namespace simppl
 {
    
@@ -14,6 +17,20 @@ enum PropertyFlags
    ReadWrite    = (1<<0),
    Notifying    = (1<<1)
 };
+
+
+namespace detail
+{
+   
+template<typename T>
+inline
+void serialize_property(Serializer& s, const T& t)
+{
+   VariantSerializer<Serializer> vs(s);
+   vs(t);
+}
+
+}   // detail
 
 }   // namespace dbus
 

@@ -82,6 +82,55 @@ struct FixedSizeBuffer
 };
 
 
+namespace detail
+{
+   
+
+template<size_t len>
+struct Codec<FixedSizeBuffer<len>>
+{
+   static 
+   void encode(Serializer& s, const FixedSizeBuffer<len>& b)
+   {
+      DBusMessageIter iter;
+
+      dbus_message_iter_open_container(s.iter_, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &iter);
+      dbus_message_iter_append_fixed_array(&iter, DBUS_TYPE_BYTE, &b.buf, len);      
+      dbus_message_iter_close_container(s.iter_, &iter);
+   }
+   
+   
+   static 
+   void decode(Deserializer& s, FixedSizeBuffer<len>& b)
+   {
+      DBusMessageIter iter;
+      dbus_message_iter_recurse(s.iter_, &iter);
+      
+      unsigned char* buf; 
+      int _len = len;
+      dbus_message_iter_get_fixed_array(&iter, &buf, &_len);
+      
+      b.assign(buf);
+      
+      // advance to next element
+      dbus_message_iter_next(s.iter_);
+   }
+};
+
+
+template<size_t len>
+struct make_type_signature<FixedSizeBuffer<len>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_ARRAY_AS_STRING;
+   }
+};
+
+
+}   // namespace detail
+
 }   // namespace dbus
 
 }   // namespace simppl

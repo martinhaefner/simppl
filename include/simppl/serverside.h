@@ -358,7 +358,7 @@ protected:
         ServerProperty* that = (ServerProperty*)obj;
         
         Variant<DataT> v;
-        ds.read(v);
+        detail::Codec<decltype(v)>::decode(ds, v);
         
         if (that->__set(*v.template get<DataT>()))
             *that = *v.template get<DataT>();

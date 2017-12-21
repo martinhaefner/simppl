@@ -325,7 +325,7 @@ void StubBase::try_handle_signal(DBusMessage* msg)
       detail::Deserializer d(msg);
 
       std::string iface;
-      d.read(iface);
+      detail::Codec<std::string>::decode(d, iface);
       // ignore interface name for now
 
       DBusMessageIter iter;
@@ -339,7 +339,7 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          detail::Deserializer s(&item_iterator);
 
          std::string property_name;
-         s.read(property_name);
+         detail::Codec<std::string>::decode(s, property_name);
 
          auto found = properties_.find(property_name);
          if (found != properties_.end())

@@ -237,7 +237,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
          detail::Serializer s(reply);
-         s.write(oss.str());
+         detail::Codec<std::string>::encode(s, oss.str());
 
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
@@ -255,7 +255,8 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           std::string attribute;
 
           detail::Deserializer ds(msg);
-          ds.read(interface).read(attribute);
+          detail::Codec<std::string>::decode(ds, interface);
+          detail::Codec<std::string>::decode(ds, attribute);
 
           while(p)
           {
@@ -381,8 +382,7 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(det
 
    // the map
    dbus_message_iter_close_container(s.iter_, &iter);
-
-   s.write(invalid);
+   detail::Codec<std::vector<std::string>>::encode(s, invalid);
 
    dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }

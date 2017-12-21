@@ -366,6 +366,160 @@ Variant<T...>& Variant<T...>::operator=(const Variant<T...>& rhs)
    return *this;
 }
 
+namespace dbus
+{
+
+namespace detail
+{
+
+
+template<typename SerializerT>
+struct VariantSerializer : StaticVisitor<>
+{
+   inline
+   VariantSerializer(SerializerT& s)
+    : orig_(s)
+   {
+       // NOOP
+   }
+
+   template<typename T>
+   void operator()(const T& t);
+
+   SerializerT& orig_;
+};
+
+
+// FIXME remove forward decls
+template<typename T>
+struct make_type_signature;
+
+template<typename T>
+struct Codec;
+
+
+template<typename... T>
+struct VariantDeserializer;
+
+template<typename T1, typename... T>
+struct VariantDeserializer<T1, T...>
+{
+   template<typename DeserializerT, typename VariantT>
+   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   {
+      std::ostringstream buf;
+      make_type_signature<T1>::eval(buf);
+
+      if (!strcmp(buf.str().c_str(), sig))
+      {
+         v = T1();
+         s.read(*v.template get<T1>());
+
+         return true;
+      }
+      else
+         return VariantDeserializer<T...>::eval(s, v, sig);
+   }
+};
+
+
+template<typename T>
+struct VariantDeserializer<T>
+{
+   template<typename DeserializerT, typename VariantT>
+   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   {
+      std::ostringstream buf;
+      make_type_signature<T>::eval(buf);
+
+      if (!strcmp(buf.str().c_str(), sig))
+      {
+         v = T();
+         s.read(*v.template get<T>());
+
+         return true;
+      }
+
+      // stop recursion
+      return false;
+   }
+};
+
+
+template<typename DeserializerT, typename... T>
+bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig);
+
+
+template<typename... T>
+struct Codec<Variant<T...>>
+{
+   static 
+   void encode(Serializer& s, const Variant<T...>& v)
+   {
+      VariantSerializer<Serializer> vs(s);
+      staticVisit(vs, const_cast<Variant<T...>&>(v));   // FIXME need const visitor
+   }
+   
+   
+   static 
+   void decode(Deserializer& s, Variant<T...>& v)
+   {
+      DBusMessageIter iter;
+      dbus_message_iter_recurse(s.iter_, &iter);
+      Deserializer s1(&iter);
+
+      if (!try_deserialize(s1, v, dbus_message_iter_get_signature(&iter)))
+         assert(false);
+
+      dbus_message_iter_next(s.iter_);
+   }
+};
+
+
+template<typename DeserializerT, typename... T>
+bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig)
+{
+   return VariantDeserializer<T...>::eval(d, v, sig);
+}
+
+
+template<typename SerializerT>
+template<typename T>
+inline
+void VariantSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
+{
+    std::ostringstream buf;
+    make_type_signature<T>::eval(buf);
+
+    DBusMessageIter iter;
+    dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
+
+    SerializerT s(&iter);
+    Codec<T>::encode(s, t);
+
+    dbus_message_iter_close_container(orig_.iter_, &iter);
+}
+
+
+template<typename... T>
+struct make_type_signature<simppl::Variant<T...>>
+{
+   static inline
+   std::ostream& eval(std::ostream& os)
+   {
+      return os << DBUS_TYPE_VARIANT_AS_STRING;
+   }
+};
+
+
+template<typename... T>
+struct dbus_type_code<Variant<T...>>                 { enum { value = DBUS_TYPE_VARIANT }; };
+
+
+}
+
+}
+
 }   // namespace simppl
 
 

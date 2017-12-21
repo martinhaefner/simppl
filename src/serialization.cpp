@@ -20,13 +20,14 @@ detail::Serializer::Serializer(DBusMessageIter* iter)
     // NOOP
 }
 
-
+#if 0
 detail::Serializer& detail::Serializer::write(const std::string& str)
 {
    char* c_str = const_cast<char*>(str.c_str());
    dbus_message_iter_append_basic(iter_, DBUS_TYPE_STRING, &c_str);
    return *this;
 }
+#endif
 
 
 // FIXME maybe we don't need it at all. Write a test to verify...
@@ -117,7 +118,7 @@ detail::Deserializer& detail::Deserializer::read(char*& str)
    return *this;
 }
 
-
+#if 0
 detail::Deserializer& detail::Deserializer::read(std::string& str)
 {
    char* c_str = nullptr;
@@ -133,7 +134,7 @@ detail::Deserializer& detail::Deserializer::read(std::string& str)
 
    return *this;
 }
-
+#endif
 
 detail::Deserializer& detail::Deserializer::read(wchar_t*& str)
 {

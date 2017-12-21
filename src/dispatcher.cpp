@@ -179,7 +179,7 @@ struct Dispatcher::Private
     Private()
      : running_(false)
     {
-		// NOOP
+      // NOOP
     }
 
 
@@ -364,12 +364,12 @@ struct Dispatcher::Private
     
     void init(DBusConnection* conn)
     {
-		dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
-		dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
-	}
+      dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
+      dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
+   }
 
 
-	std::atomic_bool running_;
+   std::atomic_bool running_;
     std::vector<pollfd> fds_;
 
     std::multimap<int, DBusWatch*> watch_handlers_;
@@ -447,7 +447,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
    std::vector<std::string> busnames;
 
    detail::Deserializer ds(reply);
-   ds.read(busnames);
+   detail::Codec<std::vector<std::string>>::decode(ds, busnames);
 
    for(auto& busname : busnames)
    {
@@ -489,7 +489,7 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
    if (dbus_error_is_set(&err))
    {
-	   // FIXME make exception classes
+      // FIXME make exception classes
       std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
       dbus_error_free(&err);
    }
@@ -587,10 +587,10 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            std::string busname;
 
            detail::Deserializer ds(msg);
-           ds.read(busname);
+           detail::Codec<std::string>::decode(ds, busname);
 
            if (d->busnames_.find(busname) != d->busnames_.end())
-				notify_clients(busname, ConnectionState::Connected);
+            notify_clients(busname, ConnectionState::Connected);
         }
         else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
         {
@@ -601,7 +601,9 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            std::string new_name;
 
            detail::Deserializer ds(msg);
-           ds.read(bus_name).read(old_name).read(new_name);
+           detail::Codec<std::string>::decode(ds, bus_name);
+           detail::Codec<std::string>::decode(ds, old_name);
+           detail::Codec<std::string>::decode(ds, new_name);
 
            if (bus_name[0] != ':')
            {
@@ -674,7 +676,7 @@ void Dispatcher::add_client(StubBase& clnt)
       objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
-	
+   
       detail::Serializer s(msg);
       serialize(s, clnt.busname());
 

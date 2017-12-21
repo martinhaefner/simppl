@@ -23,9 +23,10 @@ std::unique_ptr<Error> Error::from_error(const DBusError& err)
 /*static*/
 std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
 {
-    detail::Deserializer d(&msg);
     std::string text;
-    d.read(text);
+    detail::Deserializer d(&msg);
+    detail::Codec<std::string>::decode(d, text);
+    
 
     return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
 }
