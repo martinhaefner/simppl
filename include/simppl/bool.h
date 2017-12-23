@@ -28,7 +28,6 @@ struct Codec<bool>
    }
 
 
-   // FIXME move to impl file
    static inline 
    void decode(DBusMessageIter& iter, bool& t)
    {
