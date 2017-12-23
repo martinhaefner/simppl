@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <cstring>
 
+#include "simppl/serialization.h"
+
 
 namespace simppl
 {
@@ -47,6 +49,7 @@ struct FixedSizeBuffer
    /**
     * No copy of data.
     */
+   explicit
    FixedSizeBuffer(void* buf)
     : buf((unsigned char*)buf)
     , self(false)
@@ -80,56 +83,46 @@ struct FixedSizeBuffer
    unsigned char* buf;
    bool self;
 };
-
-
-namespace detail
-{
    
 
 template<size_t len>
 struct Codec<FixedSizeBuffer<len>>
 {
    static 
-   void encode(Serializer& s, const FixedSizeBuffer<len>& b)
+   void encode(DBusMessageIter& iter, const FixedSizeBuffer<len>& b)
    {
-      DBusMessageIter iter;
+      DBusMessageIter _iter;
 
-      dbus_message_iter_open_container(s.iter_, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &iter);
-      dbus_message_iter_append_fixed_array(&iter, DBUS_TYPE_BYTE, &b.buf, len);      
-      dbus_message_iter_close_container(s.iter_, &iter);
+      dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &_iter);
+      dbus_message_iter_append_fixed_array(&_iter, DBUS_TYPE_BYTE, &b.buf, len);      
+      dbus_message_iter_close_container(&iter, &_iter);
    }
    
    
    static 
-   void decode(Deserializer& s, FixedSizeBuffer<len>& b)
+   void decode(DBusMessageIter& iter, FixedSizeBuffer<len>& b)
    {
-      DBusMessageIter iter;
-      dbus_message_iter_recurse(s.iter_, &iter);
+      DBusMessageIter _iter;
+      dbus_message_iter_recurse(&iter, &_iter);
       
       unsigned char* buf; 
       int _len = len;
-      dbus_message_iter_get_fixed_array(&iter, &buf, &_len);
+      dbus_message_iter_get_fixed_array(&_iter, &buf, &_len);
       
       b.assign(buf);
       
       // advance to next element
-      dbus_message_iter_next(s.iter_);
+      dbus_message_iter_next(&iter);
    }
-};
-
-
-template<size_t len>
-struct make_type_signature<FixedSizeBuffer<len>>
-{
+   
+   
    static inline
-   std::ostream& eval(std::ostream& os)
+   std::ostream& make_type_signature(std::ostream& os)
    {
       return os << DBUS_TYPE_ARRAY_AS_STRING;
    }
 };
 
-
-}   // namespace detail
 
 }   // namespace dbus
 

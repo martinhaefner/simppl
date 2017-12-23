@@ -6,11 +6,15 @@ add_library(simppl SHARED
    skeletonbase.cpp 
    serverside.cpp
    stubbase.cpp
-   serialization.cpp
+   #serialization.cpp
    timeout.cpp
    util.cpp
    serverrequestdescriptor.cpp
-   pendingcall.cpp)
+   pendingcall.cpp
+   string.cpp
+   wstring.cpp
+   objectpath.cpp
+)
 
 target_link_libraries(simppl dbus-1)
 

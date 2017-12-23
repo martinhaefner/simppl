@@ -109,8 +109,8 @@ struct ServerSignal : ServerSignalBase
 
    void notify(typename CallTraits<T>::param_type... args)
    {
-       parent_->send_signal(this->name_, [&](detail::Serializer& s){
-            detail::serialize(s, args...);
+       parent_->send_signal(this->name_, [&](DBusMessageIter& iter){
+            detail::serialize(iter, args...);
        });
    }
 
@@ -196,8 +196,10 @@ private:
    static
    void __eval(ServerMethodBase* obj, DBusMessage* msg)
    {
-       detail::Deserializer d(msg);
-       detail::GetCaller<args_type>::type::template eval(d, ((ServerMethod*)obj)->f_);
+       DBusMessageIter iter;
+       dbus_message_iter_init(msg, &iter);
+       
+       detail::GetCaller<args_type>::type::template eval(iter, ((ServerMethod*)obj)->f_);
    }
 
 
@@ -205,7 +207,7 @@ private:
    inline
    detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
-      return detail::ServerResponseHolder([&](detail::Serializer& s){
+      return detail::ServerResponseHolder([&](DBusMessageIter& s){
          serializer_type::eval(s, t...);
       });
    }
@@ -214,7 +216,7 @@ private:
    inline
    detail::ServerResponseHolder __impl(std::false_type, const T&... t)
    {
-      return detail::ServerResponseHolder([](detail::Serializer& s){ /*NOOP*/ });
+      return detail::ServerResponseHolder([](DBusMessageIter&){ /*NOOP*/ });
    }
 };
 
@@ -225,7 +227,7 @@ private:
 struct ServerPropertyBase
 {
    typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
-   typedef void (*eval_set_type)(ServerPropertyBase*, detail::Deserializer&);
+   typedef void (*eval_set_type)(ServerPropertyBase*, DBusMessageIter&);
 
    ServerPropertyBase(const char* name, SkeletonBase* iface);
 
@@ -234,9 +236,9 @@ struct ServerPropertyBase
       eval_(this, msg);
    }
 
-   void evalSet(detail::Deserializer& ds)
+   void evalSet(DBusMessageIter& iter)
    {
-      eval_set_(this, ds);
+      eval_set_(this, iter);
    }
 
 #if SIMPPL_HAVE_INTROSPECTION
@@ -277,10 +279,11 @@ struct BaseProperty : ServerPropertyBase
    static
    void __eval(ServerPropertyBase* obj, DBusMessage* response)
    {
-      detail::Serializer s(response);
+      DBusMessageIter iter;
+      dbus_message_iter_init_append(response, &iter);
 
       Variant<DataT> v(((BaseProperty*)obj)->t_);   // FIXME this copy is overhead, just somehow wrap it...
-      serialize(s, v);
+      detail::serialize(iter, v);
    }
 
 protected:
@@ -340,8 +343,8 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
          if (Flags & Notifying)
          {
-            this->parent_->send_property_change(this->name_, [this](detail::Serializer& s){
-               detail::serialize_property(s, this->t_);
+            this->parent_->send_property_change(this->name_, [this](DBusMessageIter& iter){
+               detail::serialize_property(iter, this->t_);
             });
          }
       }
@@ -353,12 +356,12 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 protected:
 
     static
-    void __eval_set(ServerPropertyBase* obj, detail::Deserializer& ds)
+    void __eval_set(ServerPropertyBase* obj, DBusMessageIter& iter)
     {
         ServerProperty* that = (ServerProperty*)obj;
         
         Variant<DataT> v;
-        detail::Codec<decltype(v)>::decode(ds, v);
+        Codec<decltype(v)>::decode(iter, v);
         
         if (that->__set(*v.template get<DataT>()))
             *that = *v.template get<DataT>();
@@ -369,7 +372,7 @@ protected:
    void introspect(std::ostream& os) const override
    {
       os << "    <property name=\"" << this->name_ << "\" type=\"";
-      detail::make_type_signature<DataT>::eval(os);
+      Codec<DataT>::make_type_signature(os);
       os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }
 #endif

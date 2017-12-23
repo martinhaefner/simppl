@@ -6,6 +6,10 @@
 #   include <boost/fusion/support/is_sequence.hpp>
 #endif
 
+#include "simppl/struct.h"
+#include "simppl/objectpath.h"
+#include "simppl/buffer.h"   // FIXME buffer is a valid type
+
 
 namespace simppl
 {

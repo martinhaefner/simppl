@@ -5,6 +5,7 @@
 #include "simppl/noninstantiable.h"
 #include "simppl/typelist.h"
 #include "simppl/callstate.h"
+#include "simppl/tuple.h"
 
 
 namespace simppl
@@ -85,22 +86,22 @@ struct DeserializeAndCall : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static 
-   void eval(Deserializer& d, FunctorT& f)
+   void eval(DBusMessageIter& iter, FunctorT& f)
    {
       std::tuple<T> tuple;
-      d.read_flattened(tuple);
+      Codec<std::tuple<T>>::decode_flattened(iter, tuple);
 
       FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
    }
 
    template<typename FunctorT>
    static
-   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
+   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       std::tuple<T> tuple;
 
       if (cs)
-         d.read_flattened(tuple);
+         Codec<std::tuple<T>>::decode_flattened(iter, tuple);
 
       FunctionCaller<0, std::tuple<T>>::template eval_cs(f, cs, tuple);
    }
@@ -112,22 +113,22 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
-   void eval(Deserializer& d, FunctorT& f)
+   void eval(DBusMessageIter& iter, FunctorT& f)
    {
       std::tuple<T...> tuple;
-      d.read_flattened(tuple);
+      Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
 
       FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
 
    template<typename FunctorT>
    static 
-   void evalResponse(Deserializer& d, FunctorT& f, const simppl::dbus::CallState& cs)
+   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       std::tuple<T...> tuple;
 
       if (cs)
-         d.read_flattened(tuple);
+         Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
 
       FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
    }
@@ -138,14 +139,14 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
-   void eval(Deserializer& /*d*/, FunctorT& f)
+   void eval(DBusMessageIter& /*iter*/, FunctorT& f)
    {
       f();
    }
 
    template<typename FunctorT>
    static inline
-   void evalResponse(Deserializer& /*d*/, FunctorT& f, const simppl::dbus::CallState& cs)
+   void evalResponse(DBusMessageIter& /*iter*/, FunctorT& f, const simppl::dbus::CallState& cs)
    {
       f(cs);
    }

@@ -4,82 +4,42 @@
 
 #include <string>
 
+#include "simppl/serialization.h"
+
 
 namespace simppl
 {
 
 namespace dbus
 {
-
-namespace detail
-{
  
-   
-template<>
-struct Codec<std::string>
+ 
+struct StringCodec
 {
    static 
-   void encode(Serializer& s, const std::string& str)
-   {
-      // FIXME
-   }
-   
+   void encode(DBusMessageIter& s, const std::string& str);
    
    static 
-   void decode(Deserializer& s, std::string& str)
-   {
-      // FIXME
-   }
-};
-
-
- Serializer& write_ptr(const char* str);
-
-   Serializer& write(const std::wstring& str);
-   Serializer& write_ptr(const wchar_t* str);
-  
-  
-  Deserializer& read(char*& str);
-   Deserializer& read(wchar_t*& str);
-   Deserializer& read(std::wstring& str);
+   void decode(DBusMessageIter& s, std::string& str);
    
-
-template<>
-struct make_type_signature<std::string>
-{
-   static inline
-   std::ostream& eval(std::ostream& os)
-   {
-      return os << DBUS_TYPE_STRING_AS_STRING;
-   }
+   static 
+   void encode(DBusMessageIter& s, const char* str);
+   
+   static 
+   void decode(DBusMessageIter& s, char*& str);
+   
+   static
+   std::ostream& make_type_signature(std::ostream& os);
 };
-
-
-template<>
-struct make_type_signature<std::wstring>
-{
-   static inline
-   std::ostream& eval(std::ostream& os)
-   {
-      return make_type_signature<uint32_t>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
-   }
-};
-
-
-template<>
-struct make_type_signature<wchar_t*>
-{
-   static inline
-   std::ostream& eval(std::ostream& os)
-   {
-      return make_type_signature<uint32_t>::eval(os << DBUS_TYPE_ARRAY_AS_STRING);
-   }
-};
-
 
    
-}   // namespace detail
+template<>
+struct Codec<std::string> : public StringCodec {};
 
+template<>
+struct Codec<char*> : public StringCodec {};
+
+   
 }   // namespace dbus
 
 }   // namespace simppl

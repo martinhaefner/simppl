@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "simppl/serialization.h"
+#include "simppl/string.h"
 
 
 namespace simppl
@@ -23,11 +23,12 @@ std::unique_ptr<Error> Error::from_error(const DBusError& err)
 /*static*/
 std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
 {
+    DBusMessageIter iter;
+    dbus_message_iter_init(&msg, &iter);
+ 
     std::string text;
-    detail::Deserializer d(&msg);
-    detail::Codec<std::string>::decode(d, text);
+    Codec<std::string>::decode(iter, text);
     
-
     return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
 }
 

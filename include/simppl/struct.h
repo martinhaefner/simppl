@@ -1,27 +1,39 @@
+#ifndef __SIMPPL_DBUS_STRUCT_H__
+#define __SIMPPL_DBUS_STRUCT_H__
+
+
+#include "simppl/serialization.h"
+
+
+namespace simppl
+{
+   
+namespace dbus
+{
 
 
 template<typename T1, typename T2>
 struct SerializerTuple : T1
 {
-   template<typename SerializerT>
-   void write(SerializerT& s) const
+   void write(DBusMessageIter& iter) const
    {
-      T1::write(s);
-      s.write(data_);
+      T1::encode(iter);
+      Codec<T2>::encode(iter, data_);
    }
 
-   template<typename DeserializerT>
-   void read(DeserializerT& s)
+
+   void read(DBusMessageIter& iter)
    {
-      T1::read(s);
-      s.read(data_);
+      T1::decode(iter);
+      Codec<T2>::decode(iter, data_);
    }
+
 
    static
-   void write_signature(std::ostream& os)
+   void make_type_signature(std::ostream& os)
    {
-      T1::write_signature(os);
-      make_type_signature<T2>::eval(os);
+      T1::make_type_signature(os);
+      Codec<T2>::make_type_signature(os);
    }
 
    T2 data_;
@@ -31,167 +43,120 @@ struct SerializerTuple : T1
 template<typename T>
 struct SerializerTuple<T, NilType>
 {
-   template<typename SerializerT>
-   void write(SerializerT& s) const
+   void encode(DBusMessageIter& iter) const
    {
-      s.write(data_);
+      Codec<T>::encode(iter, data_);
    }
 
-   template<typename DeserializerT>
-   void read(DeserializerT& s)
+   void decode(DBusMessageIter& iter)
    {
-      s.read(data_);
+      Codec<T>::decode(iter, data_);
    }
 
+   
    static
-   void write_signature(std::ostream& os)
+   void make_type_signature(std::ostream& os)
    {
-      make_type_signature<T>::eval(os);
+      Codec<T>::make_type_signature(os);
    }
 
    T data_;
 };
 
 
-template<typename T>
-struct StructSerializationHelper
+template<typename T1, typename T2>
+struct Codec<SerializerTuple<T1, T2>>
 {
-   template<typename SerializerT, typename StructT>
-   static inline
-   void write(SerializerT& s, const StructT& st)
+   static 
+   void encode(DBusMessageIter& iter, const SerializerTuple<T1, T2>& tuple)
    {
-      const typename StructT::serializer_type& tuple = *(const typename StructT::serializer_type*)&st;
-      s.write(tuple);
+      DBusMessageIter _iter;
+      dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+
+      tuple.encode(_iter);
+
+      dbus_message_iter_close_container(&iter, &_iter);
    }
 
-   template<typename DeserializerT, typename StructT>
-   static inline
-   void read(DeserializerT& s, StructT& st)
+
+   // FIXME move this out in order to avoid inlining
+   static 
+   void decode(DBusMessageIter& iter, SerializerTuple<T1, T2>& tuple)
    {
-      typename StructT::serializer_type& tuple = *(typename StructT::serializer_type*)&st;
-      s.read(tuple);
+      DBusMessageIter _iter;
+      dbus_message_iter_recurse(&iter, &_iter);
+
+      tuple.decode(_iter);
+
+      dbus_message_iter_next(&iter);
    }
 };
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
-template<typename SerializerT>
-struct FusionWriter
+template<typename T>
+struct CodecImpl<T, Struct>
 {
-   explicit inline
-   FusionWriter(SerializerT& s)
-    : s_(s)
+   // unused!
+   enum { dbus_type_code = 'X' };
+   
+   typedef typename T::serializer_type s_type;
+   
+   static 
+   void encode(DBusMessageIter& iter, const T& st)
    {
-      // NOOP
+      const s_type& tuple = *(s_type*)&st;
+      Codec<s_type>::encode(iter, tuple);
    }
+
+
+   static 
+   void decode(DBusMessageIter& iter, T& st)
+   {
+      s_type& tuple = *(s_type*)&st;
+      Codec<s_type>::decode(iter, tuple);
+   }
+
+   
+   static inline
+   std::ostream& make_type_signature(std::ostream& os)
+   {
+      T::serializer_type::make_type_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
+      return os << DBUS_STRUCT_END_CHAR_AS_STRING;
+   }
+};
+
+
+namespace detail
+{
+   template<typename ListT>
+   struct make_serializer_imp;
+
+   template<typename T1, typename ListT>
+   struct make_serializer_imp<TypeList<T1, ListT> >
+   {
+      typedef SerializerTuple<typename make_serializer_imp<TypeList<T1, typename PopBack<ListT>::type> >::type, typename Back<ListT>::type> type;
+   };
 
    template<typename T>
-   inline
-   void operator()(const T& t) const
+   struct make_serializer_imp<TypeList<T, NilType> >
    {
-      s_.write(t);
-   }
+      typedef SerializerTuple<T, NilType> type;
+   };
+   
+}   // namespace detail
 
-   SerializerT& s_;
-};
 
-
-template<typename DeserializerT>
-struct FusionReader
+template<typename... T>
+struct make_serializer
 {
-   explicit inline
-   FusionReader(DeserializerT& s)
-    : s_(s)
-   {
-      // NOOP
-   }
-
-   template<typename T>
-   inline
-   void operator()(T& t) const
-   {
-      s_.read(t);
-   }
-
-   DeserializerT& s_;
+   typedef typename make_typelist<T...>::type type__;
+   typedef typename detail::make_serializer_imp<type__>::type type;
 };
 
 
-template<>
-struct StructSerializationHelper<boost::mpl::true_>
-{
-   template<typename SerializerT, typename StructT>
-   static inline
-   void write(SerializerT& s, const StructT& st)
-   {
-      boost::fusion::for_each(st, FusionWriter<SerializerT>(s));
-   }
+}   // namespace dbus
 
-   template<typename DeserializerT, typename StructT>
-   static inline
-   void read(DeserializerT& s, StructT& st)
-   {
-      boost::fusion::for_each(st, FusionReader<DeserializerT>(s));
-   }
-};
-#endif
+}   // namespace simppl
 
 
-template<typename T>
-   inline
-   Serializer& write(const T& t, Struct)
-   {
-      StructSerializationHelper<
-#ifdef SIMPPL_HAVE_BOOST_FUSION
-         typename boost::fusion::traits::is_sequence<T>::type
-#else
-         int
-#endif
-         >::template write(*this, t);
-
-      return *this;
-   }
-
-
- template<typename T1, typename T2>
-   Serializer& write(const SerializerTuple<T1, T2>& tuple)
-   {
-      DBusMessageIter iter;
-      dbus_message_iter_open_container(iter_, DBUS_TYPE_STRUCT, nullptr, &iter);
-
-      Serializer sub(&iter);
-      tuple.write(sub);
-
-      dbus_message_iter_close_container(iter_, &iter);
-
-      return *this;
-   }
-
-
-template<typename T>
-   Deserializer& read(T& t, std::false_type)
-   {
-      StructSerializationHelper<
-#ifdef SIMPPL_HAVE_BOOST_FUSION
-         typename boost::fusion::traits::is_sequence<T>::type
-#else
-         int
-#endif
-         >::template read(*this, t);
-      return *this;
-   }
-
-
- template<typename T1, typename T2>
-   Deserializer& read(SerializerTuple<T1, T2>& tuple)
-   {
-      DBusMessageIter iter;
-      dbus_message_iter_recurse(iter_, &iter);
-
-      Deserializer sub(&iter);
-      tuple.read(sub);
-
-      dbus_message_iter_next(iter_);
-
-      return *this;
-   }
+#endif   // __SIMPPL_DBUS_STRUCT_H__

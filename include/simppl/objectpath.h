@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include "simppl/serialization.h"
+
 
 namespace simppl
 {
@@ -44,43 +46,26 @@ struct ObjectPath
 };
 
 
-namespace detail
+struct ObjectPathCodec
 {
+   enum { dbus_type_code = DBUS_TYPE_OBJECT_PATH };
 
-
-template<>
-struct Codec<ObjectPath>
-{
    static 
-   void encode(Serializer& s, const ObjectPath& p)
-   {
-      // FIXME
-   }
-   
+   void encode(DBusMessageIter& s, const ObjectPath& p);
    
    static 
-   void decode(Deserializer& s, ObjectPath& p)
-   {
-      // FIXME
-   }
+   void decode(DBusMessageIter& s, ObjectPath& p);
+   
+   static 
+   std::ostream& make_type_signature(std::ostream& os);
 };
 
 
 template<>
-struct make_type_signature<ObjectPath>
-{
-   static inline
-   std::ostream& eval(std::ostream& os)
-   {
-      return os << DBUS_TYPE_OBJECT_PATH_AS_STRING;
-   }
-};
+struct Codec<ObjectPath> : public ObjectPathCodec {};
 
 
-template<> struct dbus_type_code<simppl::dbus::ObjectPath> { enum { value = DBUS_TYPE_OBJECT_PATH }; };
-
-
-}
+}   // dbus
 
 }   // simppl
 

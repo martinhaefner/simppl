@@ -25,12 +25,6 @@ namespace dbus
 struct Dispatcher;
 struct ClientSignalBase;
 
-namespace detail
-{
-   struct Serializer;
-   struct Deserializer;
-}
-
 
 struct StubBase
 {
@@ -96,14 +90,14 @@ protected:
 
    void cleanup();
 
-   PendingCall send_request(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway);
+   PendingCall send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
-   message_ptr_t send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway);
+   message_ptr_t send_request_and_block(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
-   void attach_property(const char* name, std::function<void(detail::Deserializer&)>&& f);
+   void attach_property(const char* name, std::function<void(DBusMessageIter&)>&& f);
    void detach_property(const char* name);
 
    /**
@@ -116,9 +110,9 @@ protected:
    /**
     * Blocking call.
     */
-   void set_property(const char* Name, std::function<void(detail::Serializer&)>&& f);
+   void set_property(const char* Name, std::function<void(DBusMessageIter&)>&& f);
 
-   PendingCall set_property_async(const char* Name, std::function<void(detail::Serializer&)>&& f);
+   PendingCall set_property_async(const char* Name, std::function<void(DBusMessageIter&)>&& f);
 
    char* iface_;
    char* objectpath_;
@@ -129,7 +123,7 @@ protected:
 
    // FIXME use linked lists instead of map...
    std::map<std::string, ClientSignalBase*> signals_;
-   std::map<std::string, std::function<void(detail::Deserializer&)>> properties_;
+   std::map<std::string, std::function<void(DBusMessageIter&)>> properties_;
 };
 
 }   // namespace dbus

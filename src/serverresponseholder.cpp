@@ -1,7 +1,5 @@
 #include "simppl/detail/serverresponseholder.h"
 
-#include "simppl/detail/serialization.h"
-
 
 namespace simppl
 {
@@ -12,7 +10,7 @@ namespace dbus
 namespace detail
 {
    
-ServerResponseHolder::ServerResponseHolder(std::function<void(Serializer&)> f)
+ServerResponseHolder::ServerResponseHolder(std::function<void(DBusMessageIter&)> f)
  : f_(f)
 {
    // NOOP

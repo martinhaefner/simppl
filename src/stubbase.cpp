@@ -1,6 +1,7 @@
 #include "simppl/stub.h"
 
 #include "simppl/dispatcher.h"
+#include "simppl/string.h"
 
 #include "simppl/detail/util.h"
 #include "simppl/clientside.h"
@@ -85,13 +86,15 @@ Dispatcher& StubBase::disp()
 }
 
 
-PendingCall StubBase::send_request(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway)
+PendingCall StubBase::send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
 
-    detail::Serializer s(msg.get());
-    f(s);
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+    
+    f(iter);
 
     if (!is_oneway)
     {
@@ -117,14 +120,16 @@ PendingCall StubBase::send_request(const char* method_name, std::function<void(d
 }
 
 
-message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(detail::Serializer&)>&& f, bool is_oneway)
+message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
     DBusPendingCall* pending = nullptr;
     message_ptr_t rc(nullptr, &dbus_message_unref);
 
-    detail::Serializer s(msg.get());
-    f(s);
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+    
+    f(iter);
 
     if (!is_oneway)
     {
@@ -198,7 +203,7 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 }
 
 
-void StubBase::attach_property(const char* name, std::function<void(detail::Deserializer&)>&& f)
+void StubBase::attach_property(const char* name, std::function<void(DBusMessageIter&)>&& f)
 {
    assert(disp_);
 
@@ -245,8 +250,10 @@ PendingCall StubBase::get_property_async(const char* name)
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
 
-   detail::Serializer s(msg.get());
-   s.write(iface()).write(name);
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+    
+   detail::serialize(iter, iface(), name);
 
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
@@ -259,8 +266,10 @@ message_ptr_t StubBase::get_property(const char* name)
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
 
-   detail::Serializer s(msg.get());
-   s.write(iface()).write(name);
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+
+   detail::serialize(iter, iface(), name);
 
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
@@ -273,13 +282,16 @@ message_ptr_t StubBase::get_property(const char* name)
 }
 
 
-void StubBase::set_property(const char* name, std::function<void(detail::Serializer&)>&& f)
+void StubBase::set_property(const char* name, std::function<void(DBusMessageIter&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
-    detail::Serializer s(msg.get());
-    s.write(iface()).write(name);
-    f(s);   // and now serialize the variant
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+   
+    detail::serialize(iter, iface(), name);
+
+    f(iter);   // and now serialize the variant
 
      DBusError err;
      dbus_error_init(&err);
@@ -301,13 +313,15 @@ void StubBase::set_property(const char* name, std::function<void(detail::Seriali
 }
 
 
-PendingCall StubBase::set_property_async(const char* name, std::function<void(detail::Serializer&)>&& f)
+PendingCall StubBase::set_property_async(const char* name, std::function<void(DBusMessageIter&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
-    detail::Serializer s(msg.get());
-    s.write(iface()).write(name);
-    f(s);   // and now serialize the variant
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+    
+    detail::serialize(iter, iface(), name);
+    f(iter);   // and now serialize the variant
 
     DBusPendingCall* pending = nullptr;
 
@@ -322,28 +336,27 @@ void StubBase::try_handle_signal(DBusMessage* msg)
    // FIXME better check -> include interface!
    if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
    {
-      detail::Deserializer d(msg);
+      DBusMessageIter it;
+      dbus_message_iter_init(msg, &it);
 
       std::string iface;
-      detail::Codec<std::string>::decode(d, iface);
+      Codec<std::string>::decode(it, iface);
       // ignore interface name for now
 
       DBusMessageIter iter;
-      dbus_message_iter_recurse(d.iter_, &iter);
+      dbus_message_iter_recurse(&it, &iter);
 
       while(dbus_message_iter_get_arg_type(&iter) != 0)
       {
          DBusMessageIter item_iterator;
          dbus_message_iter_recurse(&iter, &item_iterator);
 
-         detail::Deserializer s(&item_iterator);
-
          std::string property_name;
-         detail::Codec<std::string>::decode(s, property_name);
+         Codec<std::string>::decode(item_iterator, property_name);
 
          auto found = properties_.find(property_name);
          if (found != properties_.end())
-            found->second(s);
+            found->second(item_iterator);
 
          // advance to next element
          dbus_message_iter_next(&iter);

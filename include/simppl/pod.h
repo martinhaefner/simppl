@@ -1,58 +1,90 @@
+#ifndef __SIMPPL_DBUS_POD_H__
+#define __SIMPPL_DBUS_POD_H__
 
+#ifndef SIMPPL_SERIALIZATION_H
+#   error "Do not include this file manually. Use serialization.h instead."
+#endif
+
+
+namespace simppl
+{
+   
+namespace dbus
+{
+   
+
+namespace detail
+{
 
 template<typename T>
-struct isPod
-{
-   typedef make_typelist<
-      bool,
-      char,
-      signed char,
-      unsigned char,
-      short,
-      unsigned short,
-      int,
-      unsigned int,
-      long,
-      unsigned long,
-      long long,
-      unsigned long long,
-      float,
-      double>::type pod_types;
+struct typecode_switch;
 
-  enum { value = Find<T, pod_types>::value >= 0 };
+template<> struct typecode_switch<char>               { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct typecode_switch<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct typecode_switch<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
+template<> struct typecode_switch<uint32_t>           { enum { value = DBUS_TYPE_UINT32  }; };
+//template<> struct dbus_type_code<uint64_t> { enum { value = DBUS_TYPE_UINT64  }; };
+template<> struct typecode_switch<unsigned long>      { enum { value = DBUS_TYPE_UINT32  }; };
+template<> struct typecode_switch<unsigned long long> { enum { value = DBUS_TYPE_UINT64  }; };
+template<> struct typecode_switch<int8_t>             { enum { value = DBUS_TYPE_BYTE    }; };
+template<> struct typecode_switch<int16_t>            { enum { value = DBUS_TYPE_INT16   }; };
+template<> struct typecode_switch<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
+//template<> struct dbus_type_code<int64_t>  { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct typecode_switch<long>               { enum { value = DBUS_TYPE_INT32   }; };
+template<> struct typecode_switch<long long>          { enum { value = DBUS_TYPE_INT64   }; };
+template<> struct typecode_switch<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
+
+
+template<typename T, bool>
+struct EnumTypeCodeHelper
+{
+   enum { value = DBUS_TYPE_INT32 };
+};
+
+template<typename T>
+struct EnumTypeCodeHelper<T, false>
+{
+   enum { value = typecode_switch<T>::value };
 };
 
 
+}   // namespace detail
+
+
 template<typename T>
-   Deserializer& read(T& t, std::true_type)
+struct CodecImpl<T, Pod>
+{
+   enum { dbus_type_code = detail::EnumTypeCodeHelper<T, std::is_enum<T>::value>::value };
+      
+   static_assert(isPod<T>::value || std::is_enum<T>::value, "not a pod type");
+      
+      
+   static inline
+   void encode(DBusMessageIter& iter, const T& t)
    {
-      dbus_message_iter_get_basic(iter_, &t);
-      dbus_message_iter_next(iter_);
-
-      return *this;
+      dbus_message_iter_append_basic(&iter, dbus_type_code, &t);
    }
-
-
- template<typename T>
-   inline
-   Serializer& write(T t, Pod)
+   
+   
+   static inline
+   void decode(DBusMessageIter& iter, T& t)
    {
-      dbus_message_iter_append_basic(iter_, dbus_type_code<T>::value, &t);
-      return *this;
+      dbus_message_iter_get_basic(&iter, &t);
+      dbus_message_iter_next(&iter);
    }
-  
+   
+   
+   static inline
+   std::ostream& make_type_signature(std::ostream& os)
+   {
+      return os << (char)dbus_type_code;
+   }
+};
 
-template<> struct dbus_type_code<char>               { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
-template<> struct dbus_type_code<uint32_t>           { enum { value = DBUS_TYPE_UINT32  }; };
-//template<> struct dbus_type_code<uint64_t> { enum { value = DBUS_TYPE_UINT64  }; };
-template<> struct dbus_type_code<unsigned long>      { enum { value = DBUS_TYPE_UINT32   }; };
-template<> struct dbus_type_code<unsigned long long> { enum { value = DBUS_TYPE_UINT64   }; };
-template<> struct dbus_type_code<int8_t>             { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct dbus_type_code<int16_t>            { enum { value = DBUS_TYPE_INT16   }; };
-template<> struct dbus_type_code<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
-//template<> struct dbus_type_code<int64_t>  { enum { value = DBUS_TYPE_INT64   }; };
-template<> struct dbus_type_code<long>               { enum { value = DBUS_TYPE_INT32   }; };
-template<> struct dbus_type_code<long long>          { enum { value = DBUS_TYPE_INT64   }; };
-template<> struct dbus_type_code<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
+
+}   // namespace dbus
+
+}   // namespace simppl
+
+
+#endif   // __SIMPPL_DBUS_POD_H__

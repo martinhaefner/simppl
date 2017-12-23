@@ -1,4 +1,3 @@
-#include "simppl/detail/serialization.h"
 #include "simppl/interface.h"
 
 #define SIMPPL_SERVERSIDE_CPP

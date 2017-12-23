@@ -3,6 +3,9 @@
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/interface.h"
+#include "simppl/struct.h"
+#include "simppl/map.h"
+#include "simppl/string.h"
 
 
 using simppl::dbus::in;

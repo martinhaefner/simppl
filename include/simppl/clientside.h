@@ -117,8 +117,10 @@ private:
    {
       ClientSignal* that = (ClientSignal*)(obj);
       
-      detail::Deserializer d(msg);
-      detail::GetCaller<std::tuple<T...>>::type::template eval(d, that->f_);
+      DBusMessageIter iter;
+      dbus_message_iter_init(msg, &iter);
+      
+      detail::GetCaller<std::tuple<T...>>::type::template eval(iter, that->f_);
    }
 };
 
@@ -142,7 +144,7 @@ struct ClientPropertyWritableMixin
 
       Variant<data_type> vt(t);
 
-      that->stub().set_property(that->name(), [&vt](detail::Serializer& s){
+      that->stub().set_property(that->name(), [&vt](DBusMessageIter& s){
          simppl::dbus::detail::serialize(s, vt);
       });
    }
@@ -155,7 +157,7 @@ struct ClientPropertyWritableMixin
 
       Variant<data_type> vt(t);
 
-      return detail::InterimCallbackHolder<holder_type>(that->stub().set_property_async(that->name(), [&vt](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(that->stub().set_property_async(that->name(), [&vt](DBusMessageIter& s){
          simppl::dbus::detail::serialize(s, vt);
       }));
    }
@@ -201,10 +203,11 @@ struct ClientProperty
    {
       message_ptr_t msg = stub().get_property(name_);
 
-      detail::Deserializer ds(msg.get());
+      DBusMessageIter iter;
+      dbus_message_iter_init(msg.get(), &iter);
 
       Variant<DataT> v;
-      ds.read(v);
+      Codec<Variant<DataT>>::decode(iter, v);
 
       return std::move(*v.template get<DataT>());
    }
@@ -253,10 +256,10 @@ private:
 template<typename DataT, int Flags>
 ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
-  stub().attach_property(name_, [this](detail::Deserializer& s){
+  stub().attach_property(name_, [this](DBusMessageIter& iter){
 
      Variant<data_type> d;
-     s.read(d);
+     Codec<Variant<data_type>>::decode(iter, d);
 
      if (this->f_)
         this->f_(CallState(42), *d.template get<data_type>());
@@ -321,7 +324,7 @@ struct ClientMethod
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<T...>>::type,
                     args_type>::value, "args mismatch");
 
-      auto msg = parent_->send_request_and_block(method_name_, [&](detail::Serializer& s){
+      auto msg = parent_->send_request_and_block(method_name_, [&](DBusMessageIter& s){
          serializer_type::eval(s, t...);
       }, is_oneway);
 
@@ -338,7 +341,7 @@ struct ClientMethod
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      return detail::InterimCallbackHolder<holder_type>(parent_->send_request(method_name_, [&](detail::Serializer& s){
+      return detail::InterimCallbackHolder<holder_type>(parent_->send_request(method_name_, [&](DBusMessageIter& s){
          serializer_type::eval(s, t...);
       }, false));
    }

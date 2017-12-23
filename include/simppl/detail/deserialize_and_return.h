@@ -2,9 +2,6 @@
 #define __SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H__
 
 
-#include "serialization.h"
-
-
 namespace simppl
 {
    
@@ -22,8 +19,10 @@ struct deserialize_and_return
    {
       ReturnT rc;
       
-      Deserializer d(msg);
-      Codec<ReturnT>::decode(d, rc);
+      DBusMessageIter iter;
+      dbus_message_iter_init(msg, &iter);
+      
+      Codec<ReturnT>::decode(iter, rc);
       
       return rc; 
    }
@@ -52,8 +51,10 @@ struct deserialize_and_return<std::tuple<T...>>
    {
       return_type rc;
       
-      Deserializer d(msg);
-      Codec<return_type>::decode(d, rc);
+      DBusMessageIter iter;
+      dbus_message_iter_init(msg, &iter);
+      
+      Codec<return_type>::decode_flattened(iter, rc);
       
       return rc; 
    }

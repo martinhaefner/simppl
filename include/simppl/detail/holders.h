@@ -22,7 +22,7 @@ struct InterimCallbackHolder
    InterimCallbackHolder(const InterimCallbackHolder& rhs)
    : pc_(std::move(rhs.pc_))
    {
-	   // NOOP
+      // NOOP
    }
    
    InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
@@ -70,9 +70,11 @@ struct CallbackHolder
        CallState cs(*msg);
 
        // TODO check signature
-
-       Deserializer d(msg.get());
-       GetCaller<ReturnT>::type::template evalResponse(d, that->f_, cs);
+       
+       DBusMessageIter iter;
+       dbus_message_iter_init(msg.get(), &iter);
+       
+       GetCaller<ReturnT>::type::template evalResponse(iter, that->f_, cs);
    }
 
    FuncT f_;
@@ -103,7 +105,7 @@ struct PropertyCallbackHolder
    static
    void pending_notify(DBusPendingCall* pc, void* data)
    {
-	   auto msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pc));
+      auto msg = simppl::dbus::make_message(dbus_pending_call_steal_reply(pc));
 
        auto that = (PropertyCallbackHolder*)data;
        assert(that->f_);
@@ -111,10 +113,11 @@ struct PropertyCallbackHolder
        simppl::dbus::CallState cs(*msg);
        if (cs)
        {
-          Deserializer ds(msg.get());
+          DBusMessageIter iter;
+          dbus_message_iter_init(msg.get(), &iter);
 
           simppl::Variant<DataT> v;
-          ds.read(v);
+          Codec<simppl::Variant<DataT>>::decode(iter, v);
 
           that->f_(cs, *v.template get<DataT>());
        }

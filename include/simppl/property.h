@@ -24,9 +24,9 @@ namespace detail
    
 template<typename T>
 inline
-void serialize_property(Serializer& s, const T& t)
+void serialize_property(DBusMessageIter& iter, const T& t)
 {
-   VariantSerializer<Serializer> vs(s);
+   VariantSerializer vs(iter);
    vs(t);
 }
 

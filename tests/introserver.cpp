@@ -1,5 +1,10 @@
 #include "simppl/skeleton.h"
 #include "simppl/interface.h"
+#include "simppl/map.h"
+#include "simppl/vector.h"
+#include "simppl/struct.h"
+#include "simppl/string.h"
+#include "simppl/variant.h"
 
 
 using simppl::dbus::in;

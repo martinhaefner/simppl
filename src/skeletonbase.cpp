@@ -2,6 +2,8 @@
 
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/string.h"
+#include "simppl/vector.h"
 
 #define SIMPPL_SKELETONBASE_CPP
 #include "simppl/serverside.h"
@@ -105,8 +107,10 @@ void SkeletonBase::respond_with(detail::ServerResponseHolder response)
 
    if (response.f_)
    {
-      detail::Serializer s(rmsg.get());
-      response.f_(s);
+      DBusMessageIter iter;
+      dbus_message_iter_init_append(rmsg.get(), &iter);
+    
+      response.f_(iter);
    }
 
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
@@ -124,8 +128,10 @@ void SkeletonBase::respond_on(ServerRequestDescriptor& req, detail::ServerRespon
 
    if (response.f_)
    {
-      detail::Serializer s(rmsg.get());
-      response.f_(s);
+      DBusMessageIter iter;
+      dbus_message_iter_init_append(rmsg.get(), &iter);
+    
+      response.f_(iter);
    }
 
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
@@ -236,9 +242,11 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
-         detail::Serializer s(reply);
-         detail::Codec<std::string>::encode(s, oss.str());
-
+         DBusMessageIter iter;
+         dbus_message_iter_init_append(reply, &iter);
+    
+         detail::serialize(iter, oss.str());
+         
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
          return DBUS_HANDLER_RESULT_HANDLED;
@@ -254,9 +262,11 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           std::string interface;
           std::string attribute;
 
-          detail::Deserializer ds(msg);
-          detail::Codec<std::string>::decode(ds, interface);
-          detail::Codec<std::string>::decode(ds, attribute);
+          DBusMessageIter iter;
+          dbus_message_iter_init(msg, &iter);
+    
+          Codec<std::string>::decode(iter, interface);
+          Codec<std::string>::decode(iter, attribute);
 
           while(p)
           {
@@ -275,7 +285,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                    
                    try
                    {
-                      p->evalSet(ds);
+                      p->evalSet(iter);
                      
                       response = make_message(dbus_message_new_method_return(msg));
                    }
@@ -340,26 +350,30 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 }
 
 
-void SkeletonBase::send_signal(const char* signame, std::function<void(detail::Serializer&)>&& f)
+void SkeletonBase::send_signal(const char* signame, std::function<void(DBusMessageIter&)>&& f)
 {
     message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
 
-    detail::Serializer s(msg.get());
-    f(s);
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+    
+    f(iter);
 
     dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }
 
 
-void SkeletonBase::send_property_change(const char* prop, std::function<void(detail::Serializer&)>&& f)
+void SkeletonBase::send_property_change(const char* prop, std::function<void(DBusMessageIter&)>&& f)
 {
    static std::vector<std::string> invalid;
 
    message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), "org.freedesktop.DBus.Properties", "PropertiesChanged"));
 
-   detail::Serializer s(msg.get());
-   s.write(iface());
-
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+    
+   detail::serialize(iter, iface());
+   
    // TODO make once
    std::ostringstream buf;
    buf << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
@@ -367,22 +381,21 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(det
        << DBUS_TYPE_VARIANT_AS_STRING
        << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
 
-   DBusMessageIter iter;
-   dbus_message_iter_open_container(s.iter_, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
+   DBusMessageIter vec_iter;
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, buf.str().c_str(), &vec_iter);
 
    DBusMessageIter item_iterator;
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
+   dbus_message_iter_open_container(&vec_iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
 
-   detail::Serializer des(&item_iterator);
-   des.write(prop);
-   f(des);
+   detail::serialize(item_iterator, prop);
+   f(item_iterator);
 
    // the dict entry
-   dbus_message_iter_close_container(&iter, &item_iterator);
+   dbus_message_iter_close_container(&vec_iter, &item_iterator);
 
    // the map
-   dbus_message_iter_close_container(s.iter_, &iter);
-   detail::Codec<std::vector<std::string>>::encode(s, invalid);
+   dbus_message_iter_close_container(&iter, &vec_iter);
+   detail::serialize(iter, invalid);
 
    dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }

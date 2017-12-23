@@ -11,6 +11,9 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/objectpath.h"
+#include "simppl/map.h"
+#include "simppl/string.h"
 
 #include <thread>
 

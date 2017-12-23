@@ -127,7 +127,7 @@ template<typename...T>
 struct SerializerGenerator
 {
    static inline
-   void eval(Serializer& s, const T&... t)
+   void eval(DBusMessageIter& s, const T&... t)
    {
       serialize(s, t...);
    }
@@ -367,7 +367,7 @@ struct IntrospectionHelper
    static inline void eval(std::ostream& os, int i)
    {
       os << "<arg name=\"arg" << i << "\" type=\"";
-      make_type_signature<typename GetRealType<T>::type>::eval(os);
+      Codec<typename GetRealType<T>::type>::make_type_signature(os);
       os << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
    }
 };

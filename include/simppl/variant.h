@@ -3,8 +3,11 @@
 
 
 #include "simppl/typelist.h"
+#include "simppl/serialization.h"
 
 #include <type_traits>
+#include <cstring>
+#include <cassert>
 
 
 namespace simppl
@@ -366,6 +369,7 @@ Variant<T...>& Variant<T...>::operator=(const Variant<T...>& rhs)
    return *this;
 }
 
+
 namespace dbus
 {
 
@@ -373,12 +377,11 @@ namespace detail
 {
 
 
-template<typename SerializerT>
 struct VariantSerializer : StaticVisitor<>
 {
    inline
-   VariantSerializer(SerializerT& s)
-    : orig_(s)
+   VariantSerializer(DBusMessageIter& iter)
+    : iter_(iter)
    {
        // NOOP
    }
@@ -386,16 +389,8 @@ struct VariantSerializer : StaticVisitor<>
    template<typename T>
    void operator()(const T& t);
 
-   SerializerT& orig_;
+   DBusMessageIter& iter_;
 };
-
-
-// FIXME remove forward decls
-template<typename T>
-struct make_type_signature;
-
-template<typename T>
-struct Codec;
 
 
 template<typename... T>
@@ -404,21 +399,22 @@ struct VariantDeserializer;
 template<typename T1, typename... T>
 struct VariantDeserializer<T1, T...>
 {
-   template<typename DeserializerT, typename VariantT>
-   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   template<typename VariantT>
+   static 
+   bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
    {
       std::ostringstream buf;
-      make_type_signature<T1>::eval(buf);
+      Codec<T1>::make_type_signature(buf);
 
       if (!strcmp(buf.str().c_str(), sig))
       {
          v = T1();
-         s.read(*v.template get<T1>());
+         Codec<T1>::decode(iter, *v.template get<T1>());
 
          return true;
       }
       else
-         return VariantDeserializer<T...>::eval(s, v, sig);
+         return VariantDeserializer<T...>::eval(iter, v, sig);
    }
 };
 
@@ -426,16 +422,17 @@ struct VariantDeserializer<T1, T...>
 template<typename T>
 struct VariantDeserializer<T>
 {
-   template<typename DeserializerT, typename VariantT>
-   static bool eval(DeserializerT& s, VariantT& v, const char* sig)
+   template<typename VariantT>
+   static 
+   bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
    {
       std::ostringstream buf;
-      make_type_signature<T>::eval(buf);
+      Codec<T>::make_type_signature(buf);
 
       if (!strcmp(buf.str().c_str(), sig))
       {
          v = T();
-         s.read(*v.template get<T>());
+         Codec<T>::decode(iter, *v.template get<T>());
 
          return true;
       }
@@ -446,66 +443,42 @@ struct VariantDeserializer<T>
 };
 
 
-template<typename DeserializerT, typename... T>
-bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig);
+template<typename... T>
+bool try_deserialize(DBusMessageIter& iter, Variant<T...>& v, const char* sig);
+
+
+}   // namespace detail
 
 
 template<typename... T>
 struct Codec<Variant<T...>>
 {
+   enum { dbus_type_code = DBUS_TYPE_VARIANT };
+
+
    static 
-   void encode(Serializer& s, const Variant<T...>& v)
+   void encode(DBusMessageIter& iter, const Variant<T...>& v)
    {
-      VariantSerializer<Serializer> vs(s);
-      staticVisit(vs, const_cast<Variant<T...>&>(v));   // FIXME need const visitor
+      detail::VariantSerializer vs(iter);
+      staticVisit(vs, const_cast<Variant<T...>&>(v));   // TODO need const visitor
    }
    
    
    static 
-   void decode(Deserializer& s, Variant<T...>& v)
+   void decode(DBusMessageIter& orig, Variant<T...>& v)
    {
       DBusMessageIter iter;
-      dbus_message_iter_recurse(s.iter_, &iter);
-      Deserializer s1(&iter);
+      dbus_message_iter_recurse(&orig, &iter);
 
-      if (!try_deserialize(s1, v, dbus_message_iter_get_signature(&iter)))
+      if (!detail::try_deserialize(iter, v, dbus_message_iter_get_signature(&iter)))
          assert(false);
 
-      dbus_message_iter_next(s.iter_);
+      dbus_message_iter_next(&orig);
    }
-};
-
-
-template<typename DeserializerT, typename... T>
-bool try_deserialize(DeserializerT& d, Variant<T...>& v, const char* sig)
-{
-   return VariantDeserializer<T...>::eval(d, v, sig);
-}
-
-
-template<typename SerializerT>
-template<typename T>
-inline
-void VariantSerializer<SerializerT>::operator()(const T& t)   // seems to be already a reference so no copy is done
-{
-    std::ostringstream buf;
-    make_type_signature<T>::eval(buf);
-
-    DBusMessageIter iter;
-    dbus_message_iter_open_container(orig_.iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
-
-    SerializerT s(&iter);
-    Codec<T>::encode(s, t);
-
-    dbus_message_iter_close_container(orig_.iter_, &iter);
-}
-
-
-template<typename... T>
-struct make_type_signature<simppl::Variant<T...>>
-{
+   
+   
    static inline
-   std::ostream& eval(std::ostream& os)
+   std::ostream& make_type_signature(std::ostream& os)
    {
       return os << DBUS_TYPE_VARIANT_AS_STRING;
    }
@@ -513,12 +486,29 @@ struct make_type_signature<simppl::Variant<T...>>
 
 
 template<typename... T>
-struct dbus_type_code<Variant<T...>>                 { enum { value = DBUS_TYPE_VARIANT }; };
-
-
+bool detail::try_deserialize(DBusMessageIter& iter, Variant<T...>& v, const char* sig)
+{
+   return VariantDeserializer<T...>::eval(iter, v, sig);
 }
 
+
+template<typename T>
+inline
+void detail::VariantSerializer::operator()(const T& t)   // seems to be already a reference so no copy is done
+{
+    std::ostringstream buf;
+    Codec<T>::make_type_signature(buf);
+
+    DBusMessageIter iter;
+    dbus_message_iter_open_container(&iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
+
+    Codec<T>::encode(iter, t);
+
+    dbus_message_iter_close_container(&iter_, &iter);
 }
+
+
+}   // namespace dbus
 
 }   // namespace simppl
 

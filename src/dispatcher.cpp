@@ -13,7 +13,8 @@
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
 #include "simppl/skeletonbase.h"
-#include "simppl/serialization.h"
+#include "simppl/string.h"
+#include "simppl/vector.h"
 
 #define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
@@ -446,8 +447,9 @@ void Dispatcher::init(int have_introspection, const char* busname)
 
    std::vector<std::string> busnames;
 
-   detail::Deserializer ds(reply);
-   detail::Codec<std::vector<std::string>>::decode(ds, busnames);
+   DBusMessageIter iter;
+   dbus_message_iter_init(reply, &iter);
+   Codec<std::vector<std::string>>::decode(iter, busnames);
 
    for(auto& busname : busnames)
    {
@@ -586,8 +588,10 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         {
            std::string busname;
 
-           detail::Deserializer ds(msg);
-           detail::Codec<std::string>::decode(ds, busname);
+           DBusMessageIter iter;
+           dbus_message_iter_init(msg, &iter);
+   
+           Codec<std::string>::decode(iter, busname);
 
            if (d->busnames_.find(busname) != d->busnames_.end())
             notify_clients(busname, ConnectionState::Connected);
@@ -600,10 +604,12 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            std::string old_name;
            std::string new_name;
 
-           detail::Deserializer ds(msg);
-           detail::Codec<std::string>::decode(ds, bus_name);
-           detail::Codec<std::string>::decode(ds, old_name);
-           detail::Codec<std::string>::decode(ds, new_name);
+           DBusMessageIter iter;
+           dbus_message_iter_init(msg, &iter);
+   
+           Codec<std::string>::decode(iter, bus_name);
+           Codec<std::string>::decode(iter, old_name);
+           Codec<std::string>::decode(iter, new_name);
 
            if (bus_name[0] != ':')
            {
@@ -677,8 +683,10 @@ void Dispatcher::add_client(StubBase& clnt)
 
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
    
-      detail::Serializer s(msg);
-      serialize(s, clnt.busname());
+      DBusMessageIter iter;
+      dbus_message_iter_init_append(msg, &iter);
+   
+      detail::serialize(iter, clnt.busname());
 
       dbus_connection_send(conn_, msg, nullptr);
       dbus_message_unref(msg);

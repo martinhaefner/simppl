@@ -10,6 +10,7 @@
 
 // forward decl
 struct DBusMessage;
+struct DBusMessageIter;
 
 
 namespace simppl
@@ -18,16 +19,13 @@ namespace simppl
 namespace dbus
 {
 
-
 namespace detail
 {
-
-struct Serializer;
 
 
 struct ServerResponseHolder 
 {
-   ServerResponseHolder(std::function<void(Serializer&)> f);
+   ServerResponseHolder(std::function<void(DBusMessageIter&)> f);
    
    ~ServerResponseHolder();
    
@@ -37,7 +35,7 @@ struct ServerResponseHolder
    ServerResponseHolder(const ServerResponseHolder& rhs) = delete;
    ServerResponseHolder& operator=(const ServerResponseHolder& rhs) = delete;
    
-   std::function<void(Serializer&)> f_;
+   std::function<void(DBusMessageIter&)> f_;
 };
 
 }   // namespace detail

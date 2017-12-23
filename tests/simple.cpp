@@ -4,6 +4,9 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+#include "simppl/struct.h"
+#include "simppl/string.h"
+#include "simppl/wstring.h"
 
 #include <thread>
 
@@ -114,11 +117,12 @@ struct Client : simppl::dbus::Stub<Simple>
             const wchar_t* wct = L"Hello world";
 
             this->echo_wchart.async(wct) >> [this](simppl::dbus::CallState state, wchar_t* p){
+
                EXPECT_TRUE((bool)state);
                EXPECT_EQ(0, wcscmp(p, L"Hello world"));
 
                // must delete pointer now, it's mine
-               simppl::dbus::detail::Deserializer::free(p);
+               delete[] p;
 
                // shutdown
                this->oneway(7777);
@@ -344,7 +348,7 @@ struct Server : simppl::dbus::Skeleton<Simple>
          this->respond_with(echo_wchart(str));
 
          // clean up pointer
-         simppl::dbus::detail::Deserializer::free(str);
+         delete[] str;
       };
       
       test_rvo >> [this]()
@@ -409,7 +413,7 @@ TEST(Simple, blocking)
 
       EXPECT_EQ(4, s.count_oneway_);
    });
-
+   
    simppl::dbus::Stub<Simple> stub(d, "sb");
 
    // wait for server to get ready
@@ -453,14 +457,14 @@ TEST(Simple, blocking)
       wchar_t* rslt_p = stub.echo_wchart(text);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
 
-      simppl::dbus::detail::Deserializer::free(rslt_p);
+      delete[] rslt_p;
    }
 
    {
       wchar_t* rslt_p = stub.echo_wchart(L"Hello world");
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
 
-      simppl::dbus::detail::Deserializer::free(rslt_p);
+      delete[] rslt_p;
    }
 
    {
@@ -469,7 +473,7 @@ TEST(Simple, blocking)
       wchar_t* rslt_p = stub.echo_wchart(text);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
 
-      simppl::dbus::detail::Deserializer::free(rslt_p);
+      delete[] rslt_p;
    }
 
    {
@@ -479,7 +483,7 @@ TEST(Simple, blocking)
       wchar_t* rslt_p = stub.echo_wchart(tp);
       EXPECT_EQ(0, ::wcscmp(rslt_p, L"Hello world"));
 
-      simppl::dbus::detail::Deserializer::free(rslt_p);
+      delete[] rslt_p;
    }
 
    stub.oneway(7777);   // stop server

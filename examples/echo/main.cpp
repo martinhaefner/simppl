@@ -5,6 +5,7 @@
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
+#include "simppl/string.h"
 
 
 class MyEchoClient : public simppl::dbus::Stub<simppl::example::EchoService>
