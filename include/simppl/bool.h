@@ -20,15 +20,11 @@ struct Codec;
 template<>
 struct Codec<bool>
 {
-   // FIXME can this be removed?
-   enum { dbus_type_code = DBUS_TYPE_BOOLEAN };
-      
-      
    static inline
    void encode(DBusMessageIter& iter, bool b)
    {
       dbus_bool_t _b = b;
-      dbus_message_iter_append_basic(&iter, dbus_type_code, &_b);
+      dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &_b);
    }
 
 

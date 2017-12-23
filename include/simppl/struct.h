@@ -95,10 +95,7 @@ struct Codec<SerializerTuple<T1, T2>>
 
 template<typename T>
 struct CodecImpl<T, Struct>
-{
-   // unused!
-   enum { dbus_type_code = 'X' };
-   
+{   
    typedef typename T::serializer_type s_type;
    
    static 

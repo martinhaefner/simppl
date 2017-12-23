@@ -453,9 +453,6 @@ bool try_deserialize(DBusMessageIter& iter, Variant<T...>& v, const char* sig);
 template<typename... T>
 struct Codec<Variant<T...>>
 {
-   enum { dbus_type_code = DBUS_TYPE_VARIANT };
-
-
    static 
    void encode(DBusMessageIter& iter, const Variant<T...>& v)
    {

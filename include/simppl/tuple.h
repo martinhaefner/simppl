@@ -82,9 +82,6 @@ struct TupleDeserializer // : noncopable
 template<typename... T>
 struct Codec<std::tuple<T...>>
 {
-   enum { dbus_type_code = DBUS_TYPE_STRUCT };
-
-
    static 
    void encode(DBusMessageIter& iter, const std::tuple<T...>& t)
    {

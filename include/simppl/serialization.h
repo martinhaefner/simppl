@@ -67,8 +67,6 @@ struct Codec
       
    typedef CodecImpl<T, deducer_type> impl_type;
    
-   enum { dbus_type_code = impl_type::dbus_type_code };
-      
       
    static inline
    void encode(DBusMessageIter& s, const T& t)
