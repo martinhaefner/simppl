@@ -23,9 +23,6 @@ enum PropertyFlags
 };
 
 
-namespace detail
-{
-
 /// used for OnChange properties
 /// FIXME string and wstring would make trouble as attribute!
 template<typename T, bool do_compare>
@@ -54,6 +51,9 @@ struct PropertyComparator<T, false>
     }
 };
 
+
+namespace detail
+{
 
 template<typename T>
 inline

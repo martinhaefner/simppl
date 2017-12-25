@@ -337,7 +337,7 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (detail::PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
+      if (PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
       {
          this->t_ = data;
 
