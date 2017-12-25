@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_MAP_H__
-#define __SIMPPL_DBUS_MAP_H__
+#ifndef SIMPPL_DBUS_MAP_H
+#define SIMPPL_DBUS_MAP_H
 
 
 #include <map>
@@ -68,4 +68,4 @@ struct Codec<std::map<KeyT, ValueT>>
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_MAP_H__
+#endif   // SIMPPL_DBUS_MAP_H

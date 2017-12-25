@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_WSTRING_H__
-#define __SIMPPL_DBUS_WSTRING_H__
+#ifndef SIMPPL_DBUS_WSTRING_H
+#define SIMPPL_DBUS_WSTRING_H
 
 
 #include <string>
@@ -45,4 +45,4 @@ struct Codec<wchar_t*> : public WStringCodec {};
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_STRING_H__
+#endif   // SIMPPL_DBUS_STRING_H

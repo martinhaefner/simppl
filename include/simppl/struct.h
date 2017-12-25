@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_STRUCT_H__
-#define __SIMPPL_DBUS_STRUCT_H__
+#ifndef SIMPPL_DBUS_STRUCT_H
+#define SIMPPL_DBUS_STRUCT_H
 
 
 #include "simppl/serialization.h"
@@ -156,4 +156,4 @@ struct make_serializer
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_STRUCT_H__
+#endif   // SIMPPL_DBUS_STRUCT_H

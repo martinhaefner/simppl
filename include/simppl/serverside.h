@@ -337,7 +337,7 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (this->t_ != data)
+      if (detail::PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
       {
          this->t_ = data;
 
@@ -359,14 +359,13 @@ protected:
     void __eval_set(ServerPropertyBase* obj, DBusMessageIter& iter)
     {
         ServerProperty* that = (ServerProperty*)obj;
-        
+
         Variant<DataT> v;
         Codec<decltype(v)>::decode(iter, v);
-        
         if (that->__set(*v.template get<DataT>()))
             *that = *v.template get<DataT>();
     }
-   
+
 
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os) const override

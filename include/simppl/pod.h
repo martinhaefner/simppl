@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_POD_H__
-#define __SIMPPL_DBUS_POD_H__
+#ifndef SIMPPL_DBUS_POD_H
+#define SIMPPL_DBUS_POD_H
 
 #ifndef SIMPPL_SERIALIZATION_H
 #   error "Do not include this file manually. Use serialization.h instead."
@@ -87,4 +87,4 @@ struct CodecImpl<T, Pod>
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_POD_H__
+#endif   // SIMPPL_DBUS_POD_H

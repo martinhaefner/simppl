@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_FILEDESCRIPTOR_H__
-#define __SIMPPL_DBUS_FILEDESCRIPTOR_H__
+#ifndef SIMPPL_DBUS_FILEDESCRIPTOR_H
+#define SIMPPL_DBUS_FILEDESCRIPTOR_H
 
 
 #include "simppl/serialization.h"
@@ -62,4 +62,4 @@ struct Codec<FileDescriptor> : public FileDescriptorCodec {};
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_FILEDESCRIPTOR_H__
+#endif   // SIMPPL_DBUS_FILEDESCRIPTOR_H

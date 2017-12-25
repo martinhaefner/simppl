@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_PAIR_H__
-#define __SIMPPL_DBUS_PAIR_H__
+#ifndef SIMPPL_DBUS_PAIR_H
+#define SIMPPL_DBUS_PAIR_H
 
 
 #include <map>
@@ -62,4 +62,4 @@ struct Codec<std::pair<KeyT, ValueT>>
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_PAIR_H__
+#endif   // SIMPPL_DBUS_PAIR_H

@@ -55,6 +55,13 @@ find_path(DBUS_ARCHDEPS_INCLUDE_DIR
     NO_DEFAULT_PATH
 )
 
+find_path(DBUS_LIBDIR
+    libdbus-1.so
+    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
+    ONLY_CMAKE_FIND_ROOT_PATH
+    NO_DEFAULT_PATH
+)
+
 if(DBUS_INCLUDE_DIR)
     message("Found DBus include dir under '${DBUS_INCLUDE_DIR}'")
     include_directories(${DBUS_INCLUDE_DIR})

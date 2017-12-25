@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H__
-#define __SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H__
+#ifndef SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H
+#define SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H
 
 
 namespace simppl
@@ -67,4 +67,4 @@ struct deserialize_and_return<std::tuple<T...>>
 }
 
 
-#endif   // __SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H__
+#endif   // SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H

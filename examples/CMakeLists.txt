@@ -13,4 +13,4 @@ add_executable(mixed
 	mixed/mixed.cpp
 )
 
-target_link_libraries(mixed simppl rt)
+target_link_libraries(mixed simppl)

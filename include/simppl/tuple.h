@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_TUPLE_H__
-#define __SIMPPL_DBUS_TUPLE_H__
+#ifndef SIMPPL_DBUS_TUPLE_H
+#define SIMPPL_DBUS_TUPLE_H
 
 
 #include <tuple>
@@ -161,4 +161,4 @@ void detail::TupleSerializer::operator()(const T& t)   // seems to be already a 
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_TUPLE_H__
+#endif   // SIMPPL_DBUS_TUPLE_H

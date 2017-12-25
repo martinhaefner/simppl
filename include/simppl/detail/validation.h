@@ -8,7 +8,7 @@
 
 #include "simppl/struct.h"
 #include "simppl/objectpath.h"
-#include "simppl/buffer.h"   // FIXME buffer is a valid type
+#include "simppl/buffer.h"
 
 
 namespace simppl
@@ -196,6 +196,21 @@ struct isObjectPath
 };
 
 
+template<typename T>
+struct isBuffer
+{
+   template<typename U>
+   static
+   char eval(U&&);
+   
+   template<int len>
+   static
+   int eval(FixedSizeBuffer<len>&&);
+   
+   enum { value = sizeof(eval(T())) == sizeof(int) };
+};
+
+
 // variant
 template<typename T>
 struct isVariant
@@ -242,6 +257,7 @@ struct isValidType<T>
       || isValidSerializerTuple<T>::value
       || isVariant<T>::value
       || isObjectPath<T>::value
+      || isBuffer<T>::value
    };
 };
 

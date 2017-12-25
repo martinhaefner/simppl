@@ -71,6 +71,9 @@ struct Dispatcher
        return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
    }
 
+   /// Dispatch incoming messages
+   void dispatch();
+
    /// same as run()
    void loop();
 

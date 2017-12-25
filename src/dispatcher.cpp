@@ -414,7 +414,22 @@ void Dispatcher::init(int have_introspection, const char* busname)
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
    else
-      conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+   {
+       if (!strcmp(busname, "bus:system"))
+       {
+          conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+       }
+       else
+       {
+          conn_ = dbus_connection_open_private(busname, &err);
+
+          if (conn_)
+          {
+             dbus_error_init(&err);
+             dbus_bus_register(conn_, &err);
+          }
+       }
+   }
 
    assert(!dbus_error_is_set(&err));
    dbus_error_free(&err);
@@ -712,6 +727,18 @@ void Dispatcher::remove_client(StubBase& clnt)
 void Dispatcher::loop()
 {
    run();
+}
+
+
+void Dispatcher::dispatch()
+{
+    int rc;
+
+    do
+    {
+       rc = dbus_connection_dispatch(conn_);
+    }
+    while(rc != DBUS_DISPATCH_COMPLETE);
 }
 
 

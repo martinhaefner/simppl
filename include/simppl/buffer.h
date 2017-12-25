@@ -1,5 +1,5 @@
-#ifndef __SIMPPL_DBUS_BUFFER_H__
-#define __SIMPPL_DBUS_BUFFER_H__
+#ifndef SIMPPL_DBUS_BUFFER_H
+#define SIMPPL_DBUS_BUFFER_H
 
 
 #include <stdlib.h>
@@ -129,4 +129,4 @@ struct Codec<FixedSizeBuffer<len>>
 }   // namespace simppl
 
 
-#endif   // __SIMPPL_DBUS_BUFFER_H__
+#endif   // SIMPPL_DBUS_BUFFER_H
