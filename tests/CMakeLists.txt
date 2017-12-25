@@ -17,6 +17,7 @@ add_executable(unittests
    properties.cpp
    variant.cpp
    buffer.cpp
+   serialization.cpp
 )
 
 # This is so you can do 'make test' to see all your tests run, instead of

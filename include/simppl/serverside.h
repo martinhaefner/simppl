@@ -307,6 +307,13 @@ struct ServerWritableMixin
 {
     typedef std::function<void(typename CallTraits<DataT>::param_type)> function_type;
     
+    /**
+     * A writable server attribute may automatically overwrite the stored
+     * value if no callback is provided. If a callback function is provided,
+     * the callback will be called and has to decide if it will overwrite
+     * the attribute member (by calling operator=) or just negogiate the
+     * setter call. 
+     */
     bool __set(typename CallTraits<DataT>::param_type d)
     {
         if (f_)
@@ -362,8 +369,9 @@ protected:
 
         Variant<DataT> v;
         Codec<decltype(v)>::decode(iter, v);
+        
         if (that->__set(*v.template get<DataT>()))
-            *that = *v.template get<DataT>();
+            *that = std::move(*v.template get<DataT>());
     }
 
 
