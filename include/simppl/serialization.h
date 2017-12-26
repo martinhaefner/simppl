@@ -90,12 +90,8 @@ struct Codec
 };
 
 
-namespace detail
-{
-
-
 inline
-void serialize(DBusMessageIter&)
+void encode(DBusMessageIter&)
 {
    // NOOP
 }
@@ -103,14 +99,28 @@ void serialize(DBusMessageIter&)
 
 template<typename T1, typename... T>
 inline
-void serialize(DBusMessageIter& iter, const T1& t1, const T&... t)
+void encode(DBusMessageIter& iter, const T1& t1, const T&... t)
 {
    Codec<typename simppl::remove_all_const<T1>::type>::encode(iter, t1);
-   serialize(iter, t...);
+   encode(iter, t...);
 }
 
 
-}   // namespace detail
+inline
+void decode(DBusMessageIter&)
+{
+   // NOOP
+}
+
+
+template<typename T1, typename... T>
+inline
+void decode(DBusMessageIter& iter, T1& t1, T&... t)
+{
+   Codec<typename simppl::remove_all_const<T1>::type>::decode(iter, t1);
+   decode(iter, t...);
+}
+
 
 }   // namespace dbus
 

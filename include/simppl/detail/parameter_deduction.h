@@ -129,7 +129,7 @@ struct SerializerGenerator
    static inline
    void eval(DBusMessageIter& s, const T&... t)
    {
-      serialize(s, t...);
+      encode(s, t...);
    }
 };
 

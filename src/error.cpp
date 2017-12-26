@@ -27,7 +27,7 @@ std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
     dbus_message_iter_init(&msg, &iter);
  
     std::string text;
-    Codec<std::string>::decode(iter, text);
+    decode(iter, text);
     
     return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
 }

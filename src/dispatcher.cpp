@@ -464,7 +464,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
 
    DBusMessageIter iter;
    dbus_message_iter_init(reply, &iter);
-   Codec<std::vector<std::string>>::decode(iter, busnames);
+   decode(iter, busnames);
 
    for(auto& busname : busnames)
    {
@@ -606,7 +606,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            DBusMessageIter iter;
            dbus_message_iter_init(msg, &iter);
    
-           Codec<std::string>::decode(iter, busname);
+           decode(iter, busname);
 
            if (d->busnames_.find(busname) != d->busnames_.end())
             notify_clients(busname, ConnectionState::Connected);
@@ -622,9 +622,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            DBusMessageIter iter;
            dbus_message_iter_init(msg, &iter);
    
-           Codec<std::string>::decode(iter, bus_name);
-           Codec<std::string>::decode(iter, old_name);
-           Codec<std::string>::decode(iter, new_name);
+           decode(iter, bus_name, old_name, new_name);
 
            if (bus_name[0] != ':')
            {
@@ -701,7 +699,7 @@ void Dispatcher::add_client(StubBase& clnt)
       DBusMessageIter iter;
       dbus_message_iter_init_append(msg, &iter);
    
-      detail::serialize(iter, clnt.busname());
+      encode(iter, clnt.busname());
 
       dbus_connection_send(conn_, msg, nullptr);
       dbus_message_unref(msg);

@@ -117,7 +117,7 @@ struct PropertyCallbackHolder
           dbus_message_iter_init(msg.get(), &iter);
 
           simppl::Variant<DataT> v;
-          Codec<simppl::Variant<DataT>>::decode(iter, v);
+          decode(iter, v);
 
           that->f_(cs, *v.template get<DataT>());
        }

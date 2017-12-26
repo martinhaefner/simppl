@@ -253,7 +253,7 @@ PendingCall StubBase::get_property_async(const char* name)
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
     
-   detail::serialize(iter, iface(), name);
+   encode(iter, iface(), name);
 
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
@@ -269,7 +269,7 @@ message_ptr_t StubBase::get_property(const char* name)
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
 
-   detail::serialize(iter, iface(), name);
+   encode(iter, iface(), name);
 
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
@@ -289,7 +289,7 @@ void StubBase::set_property(const char* name, std::function<void(DBusMessageIter
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
    
-    detail::serialize(iter, iface(), name);
+    encode(iter, iface(), name);
 
     f(iter);   // and now serialize the variant
 
@@ -320,7 +320,7 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
     
-    detail::serialize(iter, iface(), name);
+    encode(iter, iface(), name);
     f(iter);   // and now serialize the variant
 
     DBusPendingCall* pending = nullptr;
@@ -340,7 +340,7 @@ void StubBase::try_handle_signal(DBusMessage* msg)
       dbus_message_iter_init(msg, &it);
 
       std::string iface;
-      Codec<std::string>::decode(it, iface);
+      decode(it, iface);
       // ignore interface name for now
 
       DBusMessageIter iter;
@@ -352,7 +352,7 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          dbus_message_iter_recurse(&iter, &item_iterator);
 
          std::string property_name;
-         Codec<std::string>::decode(item_iterator, property_name);
+         decode(item_iterator, property_name);
 
          auto found = properties_.find(property_name);
          if (found != properties_.end())

@@ -145,7 +145,7 @@ struct ClientPropertyWritableMixin
       Variant<data_type> vt(t);
 
       that->stub().set_property(that->name(), [&vt](DBusMessageIter& s){
-         simppl::dbus::detail::serialize(s, vt);
+         encode(s, vt);
       });
    }
 
@@ -158,7 +158,7 @@ struct ClientPropertyWritableMixin
       Variant<data_type> vt(t);
 
       return detail::InterimCallbackHolder<holder_type>(that->stub().set_property_async(that->name(), [&vt](DBusMessageIter& s){
-         simppl::dbus::detail::serialize(s, vt);
+         encode(s, vt);
       }));
    }
 };

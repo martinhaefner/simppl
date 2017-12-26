@@ -22,7 +22,7 @@ struct deserialize_and_return
       DBusMessageIter iter;
       dbus_message_iter_init(msg, &iter);
       
-      Codec<ReturnT>::decode(iter, rc);
+      decode(iter, rc);
       
       return rc; 
    }

@@ -144,7 +144,7 @@ template<typename T>
 inline
 void detail::TupleDeserializer::operator()(T& t)
 {
-   Codec<T>::decode(*use_, t);
+   decode(*use_, t);
 }
 
 
@@ -152,7 +152,7 @@ template<typename T>
 inline
 void detail::TupleSerializer::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
-   Codec<T>::encode(iter_, t);
+   encode(iter_, t);
 }
 
    

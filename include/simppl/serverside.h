@@ -110,7 +110,7 @@ struct ServerSignal : ServerSignalBase
    void notify(typename CallTraits<T>::param_type... args)
    {
        parent_->send_signal(this->name_, [&](DBusMessageIter& iter){
-            detail::serialize(iter, args...);
+            encode(iter, args...);
        });
    }
 
@@ -283,7 +283,7 @@ struct BaseProperty : ServerPropertyBase
       dbus_message_iter_init_append(response, &iter);
 
       Variant<DataT> v(((BaseProperty*)obj)->t_);   // FIXME this copy is overhead, just somehow wrap it...
-      detail::serialize(iter, v);
+      encode(iter, v);
    }
 
 protected:

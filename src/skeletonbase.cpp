@@ -245,7 +245,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
          DBusMessageIter iter;
          dbus_message_iter_init_append(reply, &iter);
     
-         detail::serialize(iter, oss.str());
+         encode(iter, oss.str());
          
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
@@ -265,8 +265,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           DBusMessageIter iter;
           dbus_message_iter_init(msg, &iter);
     
-          Codec<std::string>::decode(iter, interface);
-          Codec<std::string>::decode(iter, attribute);
+          decode(iter, interface, attribute);
 
           while(p)
           {
@@ -372,7 +371,7 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
     
-   detail::serialize(iter, iface());
+   encode(iter, iface());
    
    // TODO make once
    std::ostringstream buf;
@@ -387,7 +386,7 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
    DBusMessageIter item_iterator;
    dbus_message_iter_open_container(&vec_iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
 
-   detail::serialize(item_iterator, prop);
+   encode(item_iterator, prop);
    f(item_iterator);
 
    // the dict entry
@@ -395,7 +394,7 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
 
    // the map
    dbus_message_iter_close_container(&iter, &vec_iter);
-   detail::serialize(iter, invalid);
+   encode(iter, invalid);
 
    dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }

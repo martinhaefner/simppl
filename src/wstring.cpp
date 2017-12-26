@@ -21,7 +21,7 @@ void WStringCodec::encode(DBusMessageIter& iter, const std::wstring& str)
    dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &_iter);
    
    for (auto& t : str) {
-      detail::serialize(_iter, (uint32_t)t);
+      Codec<uint32_t>::encode(_iter, (uint32_t)t);
    }
 
    dbus_message_iter_close_container(&_iter, &_iter);
@@ -65,7 +65,7 @@ void WStringCodec::encode(DBusMessageIter& iter, const wchar_t* str)
    dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &_iter);
    
    while(str && *str) {
-      detail::serialize(_iter, (uint32_t)*str++);
+      Codec<uint32_t>::encode(_iter, (uint32_t)*str++);
    }
 
    dbus_message_iter_close_container(&iter, &_iter);

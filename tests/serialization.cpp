@@ -61,8 +61,7 @@ struct Codec<test::TestStruct>
 
       dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
       
-      // TODO move serialize out of 'detail' and rename to 'encode'
-      detail::serialize(_iter, s.i, s.str, s.j);
+      simppl::dbus::encode(_iter, s.i, s.str, s.j);
       
       dbus_message_iter_close_container(&iter, &_iter);
    }
@@ -74,10 +73,7 @@ struct Codec<test::TestStruct>
       DBusMessageIter _iter;
       dbus_message_iter_recurse(&iter, &_iter);
       
-      // TODO implement appropriate decode function
-      simppl::dbus::Codec<int>::decode(_iter, s.i);
-      simppl::dbus::Codec<std::string>::decode(_iter, s.str);
-      simppl::dbus::Codec<int>::decode(_iter, s.j);
+      simppl::dbus::decode(_iter, s.i, s.str, s.j);
       
       // advance to next element
       dbus_message_iter_next(&iter);
