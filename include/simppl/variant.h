@@ -215,7 +215,7 @@ struct Callfunc<NilType>
 
 
 template<typename VisitorT, typename VariantT>
-typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
+typename VisitorT::return_type static_visit(VisitorT& visitor, VariantT& variant)
 {
    // FIXME subsitute switch with static function table
    // FIXME recursive iterate
@@ -255,7 +255,7 @@ typename VisitorT::return_type staticVisit(VisitorT& visitor, VariantT& variant)
 
 // FIXME make visitor a first class object
 template<typename VisitorT, typename VariantT>
-typename VisitorT::return_type staticVisit(VisitorT& visitor, const VariantT& variant)
+typename VisitorT::return_type static_visit(VisitorT& visitor, const VariantT& variant)
 {
    // FIXME subsitute switch with static function table
    // FIXME recursive iterate
@@ -340,7 +340,7 @@ Variant<T...>::Variant(const Variant<T...>& rhs)
    if (idx_ != unset)
    {
       detail::ConstructionVisitor<Variant<T...>> v(*this);
-      staticVisit(v, rhs);
+      static_visit(v, rhs);
    }
 }
 
@@ -357,12 +357,12 @@ Variant<T...>& Variant<T...>::operator=(const Variant<T...>& rhs)
 
          idx_ = rhs.idx_;
          detail::ConstructionVisitor<Variant<T...>> v(*this);
-         staticVisit(v, rhs);
+         static_visit(v, rhs);
       }
       else
       {
          detail::AssignmentVisitor<Variant<T...>> v(*this);
-         staticVisit(v, rhs);
+         static_visit(v, rhs);
       }
    }
 
@@ -457,7 +457,7 @@ struct Codec<Variant<T...>>
    void encode(DBusMessageIter& iter, const Variant<T...>& v)
    {
       detail::VariantSerializer vs(iter);
-      staticVisit(vs, const_cast<Variant<T...>&>(v));   // TODO need const visitor
+      static_visit(vs, const_cast<Variant<T...>&>(v));   // TODO need const visitor
    }
    
    
