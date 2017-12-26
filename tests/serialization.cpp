@@ -28,16 +28,31 @@ struct TestStruct
 };
 
 
+struct TestStruct2
+{
+   typedef typename 
+         simppl::dbus::make_serializer<int, int, std::string>::type 
+      serializer_type;
+   
+   int i;
+   int j;
+   
+   std::string str;
+};
+
+
 INTERFACE(Serialization)
 {
    Method<simppl::dbus::oneway> stop;
 
    Method<in<TestStruct>, out<TestStruct>> echo;
+   Method<in<TestStruct2>, out<TestStruct2>> echo2;
    
    inline
    Serialization()
     : INIT(stop)
     , INIT(echo)
+    , INIT(echo2)
    {
       // NOOP
    }
@@ -117,6 +132,16 @@ struct Server : simppl::dbus::Skeleton<Serialization>
          
          respond_with(echo(s));
       };
+      
+      
+      echo2 >> [this](const TestStruct2& s)
+      {
+         EXPECT_EQ(42, s.i);
+         EXPECT_EQ(7, s.j);
+         EXPECT_EQ(std::string("Hello World"), s.str);
+         
+         respond_with(echo2(s));
+      };
    }
 };
 
@@ -142,6 +167,34 @@ TEST(Serialization, user_codec)
    TestStruct in{ 42, 7, "Hello World" };
    
    auto out = stub.echo(in);
+   
+   EXPECT_EQ(in.i, out.i);
+   EXPECT_EQ(in.j, out.j);
+   EXPECT_EQ(in.str, out.str);
+   
+   stub.stop();   // stop server
+   t.join();
+}
+
+
+TEST(Serialization, serializer_type)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+   
+   std::thread t([](){
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "ts");
+      d.run();
+   });
+
+   simppl::dbus::Stub<Serialization> stub(d, "ts");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(100ms);
+
+   TestStruct2 in{ 42, 7, "Hello World" };
+   
+   auto out = stub.echo2(in);
    
    EXPECT_EQ(in.i, out.i);
    EXPECT_EQ(in.j, out.j);
