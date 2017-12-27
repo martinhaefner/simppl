@@ -6,9 +6,11 @@
 #   include <boost/fusion/support/is_sequence.hpp>
 #endif
 
-#include "simppl/struct.h"
-#include "simppl/objectpath.h"
-#include "simppl/buffer.h"
+#if SIMPPL_HAVE_VALIDATION
+#   include "simppl/struct.h"
+#   include "simppl/objectpath.h"
+#   include "simppl/buffer.h"
+#endif
 
 
 namespace simppl

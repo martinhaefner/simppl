@@ -28,6 +28,7 @@ else()
    add_definitions(-DSIMPPL_HAVE_INTROSPECTION=0)
 endif()
 
+
 # check signature of request - this should be enabled to improve
 # client and server robustness
 add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
@@ -37,6 +38,14 @@ add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
 add_definitions(-DSIMPPL_HAVE_VALIDATION=0)
 
 include_directories(include)
+
+# boost fusion available?
+find_path(BOOST_INCLUDE_DIR
+     boost/fusion/adapted.hpp
+     PATHS /usr/include /usr/local/include
+     ONLY_CMAKE_FIND_ROOT_PATH
+     NO_DEFAULT_PATH
+)
 
 # DBus includes
 find_path(DBUS_INCLUDE_DIR
@@ -98,6 +107,12 @@ if(GTEST_ROOT)
     add_subdirectory(tests)
 else()
     message("Omitting tests!")
+endif()
+
+
+if(BOOST_INCLUDE_DIR AND GTEST_ROOT)
+   message("Building fusion tests")
+   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=1)   
 endif()
 
 

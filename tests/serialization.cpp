@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#define SIMPPL_HAVE_BOOST_FUSION
+
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
 #include "simppl/string.h"
+#include "simppl/struct.h"
 
 #include <thread>
 
@@ -41,6 +44,17 @@ struct TestStruct2
 };
 
 
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+struct TestStruct3
+{
+   int i;
+   int j;
+   
+   std::string str;
+};
+#endif
+
+
 INTERFACE(Serialization)
 {
    Method<simppl::dbus::oneway> stop;
@@ -48,17 +62,34 @@ INTERFACE(Serialization)
    Method<in<TestStruct>, out<TestStruct>> echo;
    Method<in<TestStruct2>, out<TestStruct2>> echo2;
    
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+   Method<in<TestStruct3>, out<TestStruct3>> echo3;
+#endif
+
    inline
    Serialization()
     : INIT(stop)
     , INIT(echo)
     , INIT(echo2)
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+    , INIT(echo3)
+#endif
    {
       // NOOP
    }
 };
 
 }   // namespace test
+
+
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+BOOST_FUSION_ADAPT_STRUCT(
+   test::TestStruct3,
+   (int, i)
+   (int, j)
+   (std::string, str)
+)
+#endif
 
 
 namespace simppl {
@@ -142,6 +173,17 @@ struct Server : simppl::dbus::Skeleton<Serialization>
          
          respond_with(echo2(s));
       };
+      
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+      echo3 >> [this](const TestStruct3& s)
+      {
+         EXPECT_EQ(42, s.i);
+         EXPECT_EQ(7, s.j);
+         EXPECT_EQ(std::string("Hello World"), s.str);
+         
+         respond_with(echo3(s));
+      };
+#endif
    }
 };
 
@@ -203,3 +245,33 @@ TEST(Serialization, serializer_type)
    stub.stop();   // stop server
    t.join();
 }
+
+
+#ifdef SIMPPL_HAVE_BOOST_FUSION
+TEST(Serialization, fusion)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+   
+   std::thread t([](){
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "ts");
+      d.run();
+   });
+
+   simppl::dbus::Stub<Serialization> stub(d, "ts");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(100ms);
+
+   TestStruct3 in{ 42, 7, "Hello World" };
+   
+   auto out = stub.echo3(in);
+   
+   EXPECT_EQ(in.i, out.i);
+   EXPECT_EQ(in.j, out.j);
+   EXPECT_EQ(in.str, out.str);
+   
+   stub.stop();   // stop server
+   t.join();
+}
+#endif
