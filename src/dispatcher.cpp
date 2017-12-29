@@ -365,12 +365,12 @@ struct Dispatcher::Private
     
     void init(DBusConnection* conn)
     {
-      dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
-      dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
-   }
+        dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
+        dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
+    }
 
 
-   std::atomic_bool running_;
+    std::atomic_bool running_;
     std::vector<pollfd> fds_;
 
     std::multimap<int, DBusWatch*> watch_handlers_;
@@ -722,12 +722,6 @@ void Dispatcher::remove_client(StubBase& clnt)
 }
 
 
-void Dispatcher::loop()
-{
-   run();
-}
-
-
 void Dispatcher::dispatch()
 {
     int rc;
@@ -745,12 +739,7 @@ int Dispatcher::step_ms(int timeout_ms)
 #ifdef SIMPPL_USE_POLL
     d->poll(timeout_ms);
 
-    int rc;
-    do
-    {
-       rc = dbus_connection_dispatch(conn_);
-    }
-    while(rc != DBUS_DISPATCH_COMPLETE);
+    dispatch();
 #else
     dbus_connection_read_write_dispatch(conn_, 100);
 #endif
@@ -759,12 +748,18 @@ int Dispatcher::step_ms(int timeout_ms)
 }
 
 
-int Dispatcher::run()
+void Dispatcher::init()
 {
 #ifdef SIMPPL_USE_POLL
    d->init(conn_);
 #endif
+}
 
+
+int Dispatcher::run()
+{
+   init();
+   
    d->running_.store(true);
 
    while(d->running_.load())

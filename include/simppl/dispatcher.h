@@ -27,6 +27,12 @@ struct CallState;
 void enable_threads();
 
 
+/**
+ * Event dispatcher. Actually the dispatcher wraps the DBusConnection 
+ * and therefore is the access point for event loop integration or 
+ * starting a self-contained event loop via the functions @c init(),
+ * @c run and @c step_ms.
+ */
 struct Dispatcher
 {
    friend struct StubBase;
@@ -55,11 +61,19 @@ struct Dispatcher
    {
       request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
-
-	/**
-	 * Start self-hosted eventloop.
-	 */
-	int run();
+   
+   /**
+    * Initialize a self-hosted eventloop. The function has only to be called
+    * if the mainloop is proved
+    */
+   void init();
+   
+   /**
+    * Start self-hosted eventloop. Will do all steps of initialing the
+    * DBusConnection callouts for I/O and runs @c step_ms() in a loop.
+    * until @c stop() is called.
+    */
+   int run();
 
    /**
     * Do some IO and dispatch the retrieved messages.
@@ -71,11 +85,11 @@ struct Dispatcher
        return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
    }
 
-   /// Dispatch incoming messages
+   /**
+    * Dispatch incoming messages. This function is called from self-hosted
+    * mainloops and must be called after I/O operations on external mainloops.
+    */
    void dispatch();
-
-   /// same as run()
-   void loop();
 
    /**
     * Stop self-hosted eventloop.
@@ -109,13 +123,19 @@ struct Dispatcher
 
 private:
 
+   /** 
+    * 'Inlined constructor' for checking match of introspection macro setting 
+    * in user-code and compiled shared library.
+    */
    void init(int have_introspection, const char* busname);
 
    void register_signal_match(const std::string& match_string);
    void unregister_signal_match(const std::string& match_string);
 
-   /// Add a client to the dispatcher. This is also necessary if blocking
-   /// should be used.
+   /**
+    * Add a client to the dispatcher. This is also necessary if blocking
+    * stubs should be used.
+    */
    void add_client(StubBase& clnt);
 
    /// Remove the client.
@@ -124,6 +144,7 @@ private:
    /// add a server
    void add_server(SkeletonBase& server);
 
+   /// Do a single iteration on the self-hosted mainloop.
    int step_ms(int millis);
 
    void notify_clients(const std::string& boundname, ConnectionState state);

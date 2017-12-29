@@ -66,13 +66,13 @@ Let's start with a simple echo service. See the service description:
 
    INTERFACE(EchoService)
    {
-      Request<in<std::string>, out<std::string>> echo;
+      Method<in<std::string>, out<std::string>> echo;
    };
 
    }   // namespace
 
 
-Remember, this is pure C++. You see a request named 'echo' taking a
+Remember, this is pure C++. You see a method named 'echo' taking a
 string as 'in' argument and a string as 'out' argument.
 The header file with this definition can be included by the server and
 by the client. A complete interface definition also needs some hand-written
@@ -84,7 +84,7 @@ glue code, but it's very simple. The full interface looks like this:
 
    INTERFACE(EchoService)
    {
-      Request<in<std::string>, out<std::string>> echo;
+      Method<in<std::string>, out<std::string>> echo;
 
       // constructor
       EchoService()
@@ -97,8 +97,8 @@ glue code, but it's very simple. The full interface looks like this:
 
 
 Now the interface is complete C++. You need the implement the constructor
-to correctly initialize the members. For oneway requests, you just add
-the keyword oneway to the request definition. oneway, in and out are
+to correctly initialize the members. For oneway methods, you just add
+the keyword oneway to the method definition. oneway, in and out are
 part of the C++ namespace simppl::dbus.
 
 But, how is the service mapped to dbus? Well, have you seen the namespace
@@ -136,7 +136,7 @@ Skeleton:
    };
 
 
-This service instance did not implement a handler for the echo requests
+This service instance did not implement a handler for the echo method
 yet. But you have seen how the service's instance name is provided.
 Let's provide an implementation for the echo method:
 
@@ -189,7 +189,7 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
 
 
 Now it's time to implement a client. Clients are implemented by instantiation
-of a Stub. One can either write blocking clients which is only recommended
+of a stub. One can either write blocking clients which is only recommended
 for simple tools or write a full featured event-driven client. Let's start
 with a simple blocking client:
 
@@ -207,7 +207,7 @@ with a simple blocking client:
    }
 
 
-That's it. The request call blocks until the response is received and
+That's it. The method call blocks until the response is received and
 stored in the echoed variable. In case of an error, an exception is thrown.
 Note that the underlying DBus implementation will block on the fd correlated
 with the request and therefore a blocking client can never be running on the
@@ -216,7 +216,7 @@ client and server typically reside in different applications.
 
 But have a look on the message loop driven client. The best way to implement
 such a client is to derive from the stub base template and delegate the
-callbacks to member functions. Note that the request is called via the async(...)
+callbacks to member functions. Note that the method is called via the async(...)
 member function.
 
 
@@ -250,9 +250,9 @@ member function.
 Event loop driven clients always get callbacks called from the dbus runtime
 when any event occurs. The initial event for a client is the connected event
 which will be emitted when the server registers itself on the bus (remember
-the busname). After being connected, the client may start a sequence of
-request/response pairs like in the example above. These callbacks can be
-any function object fullfilling the response signature, the preferred
+the busname). After being connected, the client may start an
+asynchronous method like in the example above. The method response callbacks 
+can be any function object fullfilling the response signature, the preferred
 way nowadays in a C++ lambda. The main program is as simple as in the
 blocking example:
 
@@ -288,7 +288,7 @@ and server. See the following example:
 
       INTERFACE(ComplexTest)
       {
-         Request<in<Data>, out<int>, out<std::string>> eval;
+         Method<in<Data>, out<int>, out<std::string>> eval;
 
          Signal<std::map<int,int>> sig;
 
@@ -328,7 +328,7 @@ the structure, i.e. the structure can be used as any simple data type:
    }
 
 
-Have you notices how methods with more than one return value are mapped
+Have you noticed how methods with more than one return value are mapped
 to a tuple out parameter which can be tie'd to the local variables in
 this blocking call? Isn't that cool?
 
