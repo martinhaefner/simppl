@@ -2,9 +2,7 @@
 #define SIMPPL_STUBBASE_H
 
 
-#include <cassert>
 #include <functional>
-#include <map>
 
 #include <dbus/dbus.h>
 
@@ -24,6 +22,7 @@ namespace dbus
 // forward decls
 struct Dispatcher;
 struct ClientSignalBase;
+struct ClientPropertyBase;
 
 
 struct StubBase
@@ -96,8 +95,8 @@ protected:
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
-   void attach_property(const char* name, std::function<void(DBusMessageIter&)>&& f);
-   void detach_property(const char* name);
+   void attach_property(ClientPropertyBase& prop);
+   void detach_property(ClientPropertyBase& prop);
 
    /**
     * Blocking call.
@@ -120,9 +119,8 @@ protected:
 
    Dispatcher* disp_;
 
-   // FIXME use linked lists instead of map...
-   std::map<std::string, ClientSignalBase*> signals_;
-   std::map<std::string, std::function<void(DBusMessageIter&)>> properties_;
+   ClientSignalBase* signals_;        ///< attached signals
+   ClientPropertyBase* properties_;   ///< attached properties
 };
 
 }   // namespace dbus

@@ -25,6 +25,8 @@ StubBase::StubBase()
  , objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
+ , signals_(nullptr)
+ , properties_(nullptr)
 {
     // NOOP
 }
@@ -180,12 +182,21 @@ void StubBase::connection_state_changed(ConnectionState state)
 void StubBase::register_signal(ClientSignalBase& sigbase)
 {
    assert(disp_);
-   assert(signals_.find(sigbase.name()) == signals_.end());   // signal already attached by this stub
-
+   
+   auto sig = signals_;
+   while(sig)
+   {
+      // already attached?
+      if (&sigbase == sig)
+         return;
+      
+      sig = sig->next_;
+   }
+   
    disp_->register_signal(*this, sigbase);
 
-   // TODO use intrusive container and iterate instead of using a map -> memory efficiency
-   signals_[sigbase.name()] = &sigbase;
+   sigbase.next_ = signals_;
+   signals_ = &sigbase;
 }
 
 
@@ -193,34 +204,86 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 {
    assert(disp_);
 
-   auto iter = signals_.find(sigbase.name());
-
-   if (iter != signals_.end())
+   ClientSignalBase* last = nullptr;
+   auto sig = signals_;
+   
+   while(sig)
    {
-      disp_->unregister_signal(*this, sigbase);
-      signals_.erase(iter);
+      // found...
+      if (&sigbase == sig)
+      {
+         disp_->unregister_signal(*this, sigbase);
+         
+         // remove from list
+         if (last)
+         {
+            last->next_ = sig->next_;
+         }
+         else
+            signals_ = sig->next_;
+            
+         sigbase.next_ = nullptr;
+         break;
+      }
+      
+      last = sig;
+      sig = sig->next_;
    }
 }
 
 
-void StubBase::attach_property(const char* name, std::function<void(DBusMessageIter&)>&& f)
+void StubBase::attach_property(ClientPropertyBase& prop)
 {
    assert(disp_);
-
-   if (properties_.empty())
+   
+   if (!properties_)
       disp_->register_properties(*this);
 
-   properties_[name] = f;
+   auto p = properties_;
+   while(p)
+   {
+      // already attached?
+      if (&prop == p)
+         return;
+      
+      p = p->next_;
+   }
+   
+   prop.next_ = properties_;
+   properties_ = &prop;
 }
 
 
-void StubBase::detach_property(const char* name)
+void StubBase::detach_property(ClientPropertyBase& prop)
 {
    assert(disp_);
 
-   properties_.erase(name);
-
-   if (properties_.empty())
+   ClientPropertyBase* last = nullptr;
+   auto p = properties_;
+   
+   while(p)
+   {
+      // found...
+      if (&prop == p)
+      {
+         // remove from list
+         if (last)
+         {
+            last->next_ = p->next_;
+         }
+         else
+            properties_ = p->next_;
+            
+         prop.next_ = nullptr;
+         break;
+      }
+      
+      last = p;
+      p = p->next_;
+   }
+   
+   // empty?
+   if (!properties_)
       disp_->unregister_properties(*this);
 }
 
@@ -228,18 +291,20 @@ void StubBase::detach_property(const char* name)
 void StubBase::cleanup()
 {
    // cleanup signal registrations
-   for (auto& sig_entry : signals_)
+   auto sig = signals_;
+   while(sig)
    {
-      disp_->unregister_signal(*this, *sig_entry.second);
+      disp_->unregister_signal(*this, *sig);
+      sig = sig->next_;
    }
-
-   signals_.clear();
+   
+   signals_ = nullptr;
 
    // cleanup property registration
-   if (!properties_.empty())
+   if (properties_)
       disp_->unregister_properties(*this);
 
-   properties_.clear();
+   properties_ = nullptr;
 
    disp_ = nullptr;
 }
@@ -354,20 +419,38 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          std::string property_name;
          decode(item_iterator, property_name);
 
-         auto found = properties_.find(property_name);
-         if (found != properties_.end())
-            found->second(item_iterator);
-
+         auto p = properties_;
+         while(p)
+         {
+            if (property_name == p->name_)
+            {
+               p->eval(item_iterator);
+               break;
+            } 
+            
+            p = p->next_;
+         }
+         
          // advance to next element
          dbus_message_iter_next(&iter);
       }
    }
    else
    {
-      auto iter = signals_.find(dbus_message_get_member(msg));
-      if (iter != signals_.end())
+      auto sig = signals_;
+      
+      while(sig)
       {
-         iter->second->eval(msg);
+         if (!strcmp(sig->name_, dbus_message_get_member(msg)))
+         {
+            DBusMessageIter iter;
+            dbus_message_iter_init(msg, &iter);
+      
+            sig->eval(iter);
+            break;
+         }
+         
+         sig = sig->next_;
       }
    }
 }

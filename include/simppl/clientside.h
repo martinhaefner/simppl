@@ -35,27 +35,21 @@ template<typename> struct InterfaceNamer;
 
 struct ClientSignalBase
 {
-   typedef void (*eval_type)(ClientSignalBase*, DBusMessage*);
+   typedef void (*eval_type)(ClientSignalBase*, DBusMessageIter&);
    
    template<typename, int>
    friend struct ClientProperty;
+   friend struct StubBase;
 
-
-   void eval(DBusMessage* msg)
+   void eval(DBusMessageIter& iter)
    {
-      eval_(this, msg);
+      eval_(this, iter);
    }
    
    //virtual const char* get_signature() const = 0;
 
-   inline
-   ClientSignalBase(const char* name, StubBase* iface)
-    : iface_(iface)
-    , name_(name)
-   {
-      // NOOP
-   }
-
+   ClientSignalBase(const char* name, StubBase* iface);
+   
    inline
    const char* name() const
    {
@@ -68,10 +62,12 @@ protected:
    inline
    ~ClientSignalBase() = default;
 
-   StubBase* iface_;
+   StubBase* stub_;
    const char* name_;
    
    eval_type eval_;
+   
+   ClientSignalBase* next_;
 };
 
 
@@ -91,7 +87,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& attach()
    {
-      iface_->register_signal(*this);
+      stub_->register_signal(*this);
       return *this;
    }
 
@@ -99,7 +95,7 @@ struct ClientSignal : ClientSignalBase
    inline
    ClientSignal& detach()
    {
-      iface_->unregister_signal(*this);
+      stub_->unregister_signal(*this);
       return *this;
    }
    
@@ -111,14 +107,9 @@ struct ClientSignal : ClientSignalBase
 private:
 
    static 
-   void __eval(ClientSignalBase* obj, DBusMessage* msg)
+   void __eval(ClientSignalBase* obj, DBusMessageIter& iter)
    {
-      ClientSignal* that = (ClientSignal*)(obj);
-      
-      DBusMessageIter iter;
-      dbus_message_iter_init(msg, &iter);
-      
-      detail::GetCaller<std::tuple<T...>>::type::template eval(iter, that->f_);
+      detail::GetCaller<std::tuple<T...>>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
    }
 };
 
@@ -126,14 +117,50 @@ private:
 // ---------------------------------------------------------------------------------------------
 
 
+struct ClientPropertyBase
+{
+   friend struct StubBase;
+   
+   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter&);
+ 
+ 
+   ClientPropertyBase(const char* name, StubBase* iface);
+   
+   void eval(DBusMessageIter& iter)
+   {
+      eval_(this, iter);
+   }
+   
+   
+protected:
+
+   inline
+   ~ClientPropertyBase() = default;
+
+   const char* name_;
+   StubBase* stub_;
+
+   eval_type eval_;
+   
+   ClientPropertyBase* next_;
+};
+
+
 template<typename PropertyT, typename DataT>
-struct ClientPropertyWritableMixin
+struct ClientPropertyWritableMixin : ClientPropertyBase
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(CallState)> function_type;
    typedef detail::CallbackHolder<function_type, void> holder_type;
 
+
+   inline
+   ClientPropertyWritableMixin(const char* name, StubBase* iface)
+    : ClientPropertyBase(name, iface)
+   {
+      // NOOP
+   }
 
    /// blocking version
    void set(arg_type t)
@@ -142,7 +169,7 @@ struct ClientPropertyWritableMixin
 
       Variant<data_type> vt(t);
 
-      that->stub().set_property(that->name(), [&vt](DBusMessageIter& s){
+      that->stub_->set_property(that->name_, [&vt](DBusMessageIter& s){
          encode(s, vt);
       });
    }
@@ -155,22 +182,18 @@ struct ClientPropertyWritableMixin
 
       Variant<data_type> vt(t);
 
-      return detail::InterimCallbackHolder<holder_type>(that->stub().set_property_async(that->name(), [&vt](DBusMessageIter& s){
+      return detail::InterimCallbackHolder<holder_type>(that->stub_->set_property_async(that->name_, [&vt](DBusMessageIter& s){
          encode(s, vt);
       }));
    }
 };
 
 
-struct NoopMixin
-{
-};
-
-
 template<typename DataT, int Flags = Notifying|ReadOnly>
 struct ClientProperty
- : std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, NoopMixin>::type
+ : std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, ClientPropertyBase>::type
 {
+   typedef typename std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, ClientPropertyBase>::type base_type;
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(CallState, arg_type)> function_type;
@@ -180,15 +203,9 @@ struct ClientProperty
 
    inline
    ClientProperty(const char* name, StubBase* iface)
-    : name_(name)
-    , iface_(iface)
+    : base_type(name, iface)
    {
-      // NOOP
-   }
-
-   StubBase& stub()
-   {
-      return *iface_;
+      this->eval_ = __eval;
    }
 
    /// only call this after the server is connected.
@@ -197,7 +214,7 @@ struct ClientProperty
    // TODO implement GetAll
    DataT get()
    {
-      message_ptr_t msg = stub().get_property(name_);
+      message_ptr_t msg = this->stub_->get_property(this->name_);
 
       DBusMessageIter iter;
       dbus_message_iter_init(msg.get(), &iter);
@@ -212,7 +229,7 @@ struct ClientProperty
    inline
    detail::InterimCallbackHolder<holder_type> get_async()
    {
-      return detail::InterimCallbackHolder<holder_type>(stub().get_property_async(name_));
+      return detail::InterimCallbackHolder<holder_type>(this->stub_->get_property_async(this->name_));
    }
 
 
@@ -222,29 +239,31 @@ struct ClientProperty
       this->set(t);
       return *this;
    }
-
+   
+   
    /// only call this after the server is connected.
    inline
-   ClientProperty& detach()
+   void detach()
    {
-      stub().detach_property(name_);
-      return *this;
+      this->stub_->detach_property(*this);
    }
-
-
-   inline
-   const char* name() const
-   {
-      return name_;
-   }
-
    
    function_type f_;
 
+
 private:
 
-   const char* name_;
-   StubBase* iface_;
+   static
+   void __eval(ClientPropertyBase* obj, DBusMessageIter& iter)
+   {
+      ClientProperty* that = (ClientProperty*)obj;
+      
+      Variant<data_type> d;
+      Codec<Variant<data_type>>::decode(iter, d);
+
+      if (that->f_)
+         that->f_(CallState(42), *d.template get<data_type>());
+   }
 };
 
 
@@ -252,16 +271,9 @@ private:
 template<typename DataT, int Flags>
 ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
-  stub().attach_property(name_, [this](DBusMessageIter& iter){
+  this->stub_->attach_property(*this);
 
-     Variant<data_type> d;
-     Codec<Variant<data_type>>::decode(iter, d);
-
-     if (this->f_)
-        this->f_(CallState(42), *d.template get<data_type>());
-  });
-
-  dbus_pending_call_set_notify(stub().get_property_async(name_).pending(),
+  dbus_pending_call_set_notify(this->stub_->get_property_async(this->name_).pending(),
      &holder_type::pending_notify,
      new holder_type([this](CallState cs, const arg_type& val){
         if (f_)
