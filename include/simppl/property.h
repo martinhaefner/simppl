@@ -65,15 +65,7 @@ struct PropertyCodec
    static
    void encode(DBusMessageIter& iter, const T& t)
    {
-      std::ostringstream buf;
-      Codec<T>::make_type_signature(buf);
-
-      DBusMessageIter _iter;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, buf.str().c_str(), &_iter);
-
-      Codec<T>::encode(_iter, t);
-      
-      dbus_message_iter_close_container(&iter, &_iter);
+      detail::VariantSerializer(iter).operator()(t);
    }
    
    
