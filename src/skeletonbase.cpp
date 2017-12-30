@@ -373,15 +373,10 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
     
    encode(iter, iface());
    
-   // TODO make once
-   std::ostringstream buf;
-   buf << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-       << DBUS_TYPE_STRING_AS_STRING
-       << DBUS_TYPE_VARIANT_AS_STRING
-       << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
-
    DBusMessageIter vec_iter;
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, buf.str().c_str(), &vec_iter);
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, 
+      DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING DBUS_DICT_ENTRY_END_CHAR_AS_STRING
+      , &vec_iter);
 
    DBusMessageIter item_iterator;
    dbus_message_iter_open_container(&vec_iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
