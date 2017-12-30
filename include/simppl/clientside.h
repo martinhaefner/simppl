@@ -14,8 +14,8 @@
 #include "simppl/timeout.h"
 #include "simppl/parameter_deduction.h"
 
-#include "simppl/detail/validation.h"
 #include "simppl/detail/callinterface.h"
+#include "simppl/detail/validation.h"
 #include "simppl/detail/holders.h"
 #include "simppl/detail/deserialize_and_return.h"
 
@@ -78,8 +78,6 @@ protected:
 template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
-   static_assert(detail::isValidType<T...>::value, "invalid type in interface");
-
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
 
    inline
@@ -173,8 +171,6 @@ template<typename DataT, int Flags = Notifying|ReadOnly>
 struct ClientProperty
  : std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, NoopMixin>::type
 {
-   static_assert(detail::isValidType<DataT>::value, "invalid attribute type");
-
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(CallState, arg_type)> function_type;
@@ -288,8 +284,6 @@ struct ClientMethod
 
     enum {
         valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
-        valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
-        valid_out = AllOf<typename return_type_generator::list_type, detail::IsValidTypeFunctor>::value,
         is_oneway = detail::is_oneway_request<ArgsT...>::value
     };
 

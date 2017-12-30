@@ -1,12 +1,5 @@
 #include <gtest/gtest.h>
 
-// just check if we get compilation errors with validation...
-#ifdef SIMPPL_HAVE_VALIDATION
-#   undef SIMPPL_HAVE_VALIDATION
-#endif
-
-#define SIMPPL_HAVE_VALIDATION 1
-
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"

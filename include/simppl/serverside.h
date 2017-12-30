@@ -12,8 +12,8 @@
 #include "simppl/parameter_deduction.h"
 #include "simppl/serverrequestdescriptor.h"
 
-#include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/validation.h"
+#include "simppl/detail/serverresponseholder.h"
 #include "simppl/detail/callinterface.h"
 
 
@@ -98,8 +98,6 @@ protected:
 template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
-   static_assert(detail::isValidType<T...>::value, "invalid type in interface");
-
    inline
    ServerSignal(const char* name, SkeletonBase* iface)
     : ServerSignalBase(name, iface)
@@ -136,8 +134,6 @@ struct ServerMethod : ServerMethodBase
 
     enum {
         valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
-        valid_in  = AllOf<typename args_type_generator::list_type, detail::IsValidTypeFunctor>::value,
-        valid_out = AllOf<typename return_type_generator::list_type, detail::IsValidTypeFunctor>::value,
         is_oneway = detail::is_oneway_request<ArgsT...>::value
     };
 
@@ -332,8 +328,6 @@ struct ServerWritableMixin
 template<typename DataT, int Flags>
 struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite, ServerWritableMixin<DataT>, ServerNoopMixin<DataT>>::type
 {
-   static_assert(detail::isValidType<DataT>::value, "invalid type in interface");
-
    inline
    ServerProperty(const char* name, SkeletonBase* iface)
     : BaseProperty<DataT>(name, iface)

@@ -33,10 +33,6 @@ endif()
 # client and server robustness
 add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
 
-# extended validation of request/response arguments, just in order
-# to improve compiler error messages  
-add_definitions(-DSIMPPL_HAVE_VALIDATION=0)
-
 include_directories(include)
 
 # boost fusion available?
