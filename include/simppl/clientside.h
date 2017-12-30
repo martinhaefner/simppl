@@ -82,6 +82,12 @@ struct ClientSignal : ClientSignalBase
    {
       eval_ = __eval;
    }
+   
+   template<typename FuncT>
+   void set_callback(const FuncT& f)
+   {
+      f_ = f;
+   }
 
    /// send registration to the server - only attach after the interface is connected.
    inline
@@ -99,10 +105,6 @@ struct ClientSignal : ClientSignalBase
       return *this;
    }
    
-   
-   // TODO make >> a friend
-   function_type f_;
-
 
 private:
 
@@ -111,6 +113,8 @@ private:
    {
       detail::GetCaller<std::tuple<T...>>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
    }
+   
+   function_type f_;
 };
 
 
@@ -130,6 +134,9 @@ struct ClientPropertyBase
    {
       eval_(this, iter);
    }
+   
+   /// only call this after the server is connected.
+   void detach();
    
    
 protected:
@@ -207,25 +214,19 @@ struct ClientProperty
    {
       this->eval_ = __eval;
    }
+   
+   template<typename FuncT>
+   void set_callback(const FuncT& f)
+   {
+      f_ = f;
+   }
 
    /// only call this after the server is connected.
    ClientProperty& attach();
 
    // TODO implement GetAll
-   DataT get()
-   {
-      message_ptr_t msg = this->stub_->get_property(this->name_);
-
-      DBusMessageIter iter;
-      dbus_message_iter_init(msg.get(), &iter);
-
-      Variant<DataT> v;
-      Codec<Variant<DataT>>::decode(iter, v);
-
-      return std::move(*v.template get<DataT>());
-   }
-
-
+   DataT get();
+   
    inline
    detail::InterimCallbackHolder<holder_type> get_async()
    {
@@ -241,16 +242,6 @@ struct ClientProperty
    }
    
    
-   /// only call this after the server is connected.
-   inline
-   void detach()
-   {
-      this->stub_->detach_property(*this);
-   }
-   
-   function_type f_;
-
-
 private:
 
    static
@@ -263,8 +254,26 @@ private:
 
       if (that->f_)
          that->f_(CallState(42), *d.template get<data_type>());
-   }
+   }   
+   
+   
+   function_type f_;
 };
+
+
+template<typename DataT, int Flags>
+DataT ClientProperty<DataT, Flags>::get()
+{
+   message_ptr_t msg = this->stub_->get_property(this->name_);
+
+   DBusMessageIter iter;
+   dbus_message_iter_init(msg.get(), &iter);
+
+   Variant<DataT> v;
+   Codec<Variant<DataT>>::decode(iter, v);
+
+   return std::move(*v.template get<DataT>());
+}
 
 
 /// only call this after the server is connected.
@@ -394,7 +403,7 @@ template<typename DataT, int Flags, typename FuncT>
 inline
 void operator>>(simppl::dbus::ClientProperty<DataT, Flags>& attr, const FuncT& func)
 {
-   attr.f_ = func;
+   attr.set_callback(func);
 }
 
 
@@ -402,7 +411,7 @@ template<typename... T, typename FuncT>
 inline
 void operator>>(simppl::dbus::ClientSignal<T...>& sig, const FuncT& func)
 {
-   sig.f_ = func;
+   sig.set_callback(func);
 }
 
 

@@ -33,6 +33,7 @@ struct StubBase
    template<typename, typename> friend struct ClientPropertyWritableMixin;
 
    friend struct Dispatcher;
+   friend struct ClientPropertyBase;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
