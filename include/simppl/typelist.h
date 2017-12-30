@@ -96,7 +96,7 @@ struct PopBack<TypeList<HeadT, NilType> >
 template<>
 struct PopBack<NilType>
 {
-   // FIXME maybe generate a compiler error here?!
+   // TODO maybe generate a compiler error here?!
    typedef NilType type;
 };
 

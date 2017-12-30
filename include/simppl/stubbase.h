@@ -66,11 +66,6 @@ public:
 
    Dispatcher& disp();
 
-   /// FIXME protected?!
-   void try_handle_signal(DBusMessage* msg);
-
-   void connection_state_changed(ConnectionState state);
-
    DBusConnection* conn();
 
    inline
@@ -87,6 +82,10 @@ public:
 
 
 protected:
+
+   void try_handle_signal(DBusMessage* msg);
+
+   void connection_state_changed(ConnectionState state);
 
    void cleanup();
 

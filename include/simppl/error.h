@@ -18,11 +18,11 @@ namespace dbus
 
 struct Error : public std::exception
 {
+    friend struct CallState;
+    friend struct SkeletonBase;
+   
+   
     Error& operator=(const Error&) = delete;
-
-    // FIXME privates and friend
-    static std::unique_ptr<Error> from_error(const DBusError& err);
-    static std::unique_ptr<Error> from_message(DBusMessage& msg);
 
     Error(const char* name, const char* msg = nullptr, uint32_t serial = SIMPPL_INVALID_SERIAL);
 
@@ -30,8 +30,7 @@ struct Error : public std::exception
 
     ~Error();
 
-    // FIXME privates and friend
-    message_ptr_t make_reply_for(/*FIXME const*/DBusMessage& req) const;
+    message_ptr_t make_reply_for(DBusMessage& req) const;
     void _throw();
 
     const char* what() const throw();
@@ -46,6 +45,8 @@ struct Error : public std::exception
     }
 
 private:
+
+    static std::unique_ptr<Error> from_message(DBusMessage& msg);
 
     char* name_and_message_;
     char* message_;

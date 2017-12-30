@@ -145,31 +145,10 @@ struct StructSerializationHelper
    typedef typename StructT::serializer_type s_type;
    
    static 
-   void encode(DBusMessageIter& iter, const StructT& st)
-   {
-      DBusMessageIter _iter;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+   void encode(DBusMessageIter& iter, const StructT& st);
 
-      const s_type& tuple = *(s_type*)&st;
-      tuple.encode(_iter);
-
-      dbus_message_iter_close_container(&iter, &_iter);
-   }
-
-
-   // FIXME move this out in order to avoid inlining
    static 
-   void decode(DBusMessageIter& iter, const StructT& st)
-   {
-      DBusMessageIter _iter;
-      dbus_message_iter_recurse(&iter, &_iter);
-
-      s_type& tuple = *(s_type*)&st;
-      tuple.decode(_iter);
-
-      dbus_message_iter_next(&iter);
-   }
-   
+   void decode(DBusMessageIter& iter, const StructT& st);
    
    static inline
    std::ostream& make_type_signature(std::ostream& os)
@@ -178,6 +157,32 @@ struct StructSerializationHelper
       return os << DBUS_STRUCT_END_CHAR_AS_STRING;
    }   
 };
+
+
+template<typename StructT, typename SelectorT>
+void StructSerializationHelper<StructT, SelectorT>::encode(DBusMessageIter& iter, const StructT& st)
+{
+   DBusMessageIter _iter;
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+
+   const s_type& tuple = *(s_type*)&st;
+   tuple.encode(_iter);
+
+   dbus_message_iter_close_container(&iter, &_iter);
+}
+
+
+template<typename StructT, typename SelectorT>
+void StructSerializationHelper<StructT, SelectorT>::decode(DBusMessageIter& iter, const StructT& st)
+{
+   DBusMessageIter _iter;
+   dbus_message_iter_recurse(&iter, &_iter);
+
+   s_type& tuple = *(s_type*)&st;
+   tuple.decode(_iter);
+
+   dbus_message_iter_next(&iter);
+}
 
 
 #ifdef SIMPPL_HAVE_BOOST_FUSION

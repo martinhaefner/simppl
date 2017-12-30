@@ -18,7 +18,6 @@ namespace detail
 {
 
 
-// FIXME remove this in favour of lambda expression!
 struct TupleSerializer // : noncopable
 {
    inline
@@ -130,8 +129,8 @@ struct Codec<std::tuple<T...>>
    {
       os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
       
-      std::tuple<T...> t;   // FIXME make this a type based version only, no value based iteration
-      std_tuple_for_each(t, helper(os));
+      std::tuple<T...>* t = nullptr;
+      std_tuple_for_each(*t, helper(os));
       
       os << DBUS_STRUCT_END_CHAR_AS_STRING;
 

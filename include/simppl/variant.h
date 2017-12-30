@@ -98,7 +98,7 @@ struct Variant
    }
 
 
-   // FIXME implement inplace factories and assignment operator
+   // TODO implement inplace factories and assignment operator
 
    Variant(const Variant& rhs);
    Variant& operator=(const Variant& rhs);
@@ -217,7 +217,6 @@ struct Callfunc<NilType>
 template<typename VisitorT, typename VariantT>
 typename VisitorT::return_type static_visit(VisitorT& visitor, VariantT& variant)
 {
-   // FIXME subsitute switch with static function table
    // FIXME recursive iterate
    switch(variant.idx_)
    {

@@ -11,14 +11,7 @@ namespace simppl
 
 namespace dbus
 {
-
-
-/*static*/
-std::unique_ptr<Error> Error::from_error(const DBusError& err)
-{
-    return std::unique_ptr<Error>(new Error(err.name, err.message));
-}
-
+   
 
 /*static*/
 std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
