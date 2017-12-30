@@ -174,10 +174,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
    {
       auto that = (PropertyT*)this;
 
-      Variant<data_type> vt(t);
-
-      that->stub_->set_property(that->name_, [&vt](DBusMessageIter& s){
-         encode(s, vt);
+      that->stub_->set_property(that->name_, [&t](DBusMessageIter& s){
+         detail::PropertyCodec<data_type>::encode(s, t);
       });
    }
 
@@ -187,10 +185,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
    {
       auto that = (PropertyT*)this;
 
-      Variant<data_type> vt(t);
-
-      return detail::InterimCallbackHolder<holder_type>(that->stub_->set_property_async(that->name_, [&vt](DBusMessageIter& s){
-         encode(s, vt);
+      return detail::InterimCallbackHolder<holder_type>(that->stub_->set_property_async(that->name_, [&t](DBusMessageIter& s){
+         detail::PropertyCodec<data_type>::encode(s, t);
       }));
    }
 };
@@ -249,11 +245,11 @@ private:
    {
       ClientProperty* that = (ClientProperty*)obj;
       
-      Variant<data_type> d;
-      Codec<Variant<data_type>>::decode(iter, d);
+      data_type d;
+      detail::PropertyCodec<data_type>::decode(iter, d);
 
       if (that->f_)
-         that->f_(CallState(42), *d.template get<data_type>());
+         that->f_(CallState(42), d);
    }   
    
    
@@ -269,10 +265,10 @@ DataT ClientProperty<DataT, Flags>::get()
    DBusMessageIter iter;
    dbus_message_iter_init(msg.get(), &iter);
 
-   Variant<DataT> v;
-   Codec<Variant<DataT>>::decode(iter, v);
+   DataT t;
+   detail::PropertyCodec<DataT>::decode(iter, t);
 
-   return std::move(*v.template get<DataT>());
+   return t;
 }
 
 

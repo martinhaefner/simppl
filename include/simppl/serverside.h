@@ -278,8 +278,7 @@ struct BaseProperty : ServerPropertyBase
       DBusMessageIter iter;
       dbus_message_iter_init_append(response, &iter);
 
-      Variant<DataT> v(((BaseProperty*)obj)->t_);   // FIXME this copy is overhead, just somehow wrap it...
-      encode(iter, v);
+      detail::PropertyCodec<DataT>::encode(iter, ((BaseProperty*)obj)->t_);
    }
 
 protected:
@@ -345,7 +344,7 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
          if (Flags & Notifying)
          {
             this->parent_->send_property_change(this->name_, [this](DBusMessageIter& iter){
-               detail::serialize_property(iter, this->t_);
+               detail::PropertyCodec<DataT>::encode(iter, this->t_);
             });
          }
       }
@@ -361,11 +360,11 @@ protected:
     {
         ServerProperty* that = (ServerProperty*)obj;
 
-        Variant<DataT> v;
-        Codec<decltype(v)>::decode(iter, v);
+        DataT t;
+        detail::PropertyCodec<DataT>::decode(iter, t);
         
-        if (that->__set(*v.template get<DataT>()))
-            *that = std::move(*v.template get<DataT>());
+        if (that->__set(t))
+            *that = std::move(t);
     }
 
 

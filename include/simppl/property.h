@@ -55,13 +55,40 @@ struct PropertyComparator<T, false>
 namespace detail
 {
 
+
+/**
+ * Wraps the property type in a variant.
+ */
 template<typename T>
-inline
-void serialize_property(DBusMessageIter& iter, const T& t)
+struct PropertyCodec
 {
-   VariantSerializer vs(iter);
-   vs(t);
-}
+   static
+   void encode(DBusMessageIter& iter, const T& t)
+   {
+      std::ostringstream buf;
+      Codec<T>::make_type_signature(buf);
+
+      DBusMessageIter _iter;
+      dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, buf.str().c_str(), &_iter);
+
+      Codec<T>::encode(_iter, t);
+      
+      dbus_message_iter_close_container(&iter, &_iter);
+   }
+   
+   
+   static 
+   void decode(DBusMessageIter& iter, T& t)
+   {
+      DBusMessageIter _iter;
+      dbus_message_iter_recurse(&iter, &_iter);
+
+      Codec<T>::decode(_iter, t);
+
+      dbus_message_iter_next(&iter);
+   } 
+};
+
 
 }   // detail
 
