@@ -17,6 +17,7 @@ template<typename T>
 struct Codec;
    
    
+// FIXME implement in .cpp
 template<>
 struct Codec<bool>
 {
@@ -32,9 +33,8 @@ struct Codec<bool>
    void decode(DBusMessageIter& iter, bool& t)
    {
       dbus_bool_t b;
-      dbus_message_iter_get_basic(&iter, &b);
-      dbus_message_iter_next(&iter);
-
+      simppl_dbus_message_iter_get_basic(&iter, &b, DBUS_TYPE_BOOLEAN);
+      
       t = b;
    }
    

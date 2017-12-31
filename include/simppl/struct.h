@@ -176,7 +176,7 @@ template<typename StructT, typename SelectorT>
 void StructSerializationHelper<StructT, SelectorT>::decode(DBusMessageIter& iter, const StructT& st)
 {
    DBusMessageIter _iter;
-   dbus_message_iter_recurse(&iter, &_iter);
+   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_STRUCT);
 
    s_type& tuple = *(s_type*)&st;
    tuple.decode(_iter);

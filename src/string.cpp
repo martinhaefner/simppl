@@ -21,11 +21,10 @@ void StringCodec::encode(DBusMessageIter& iter, const std::string& str)
 
 /*static*/ 
 void StringCodec::decode(DBusMessageIter& iter, std::string& str)
-{
+{   
    char* c_str = nullptr;
-   dbus_message_iter_get_basic(&iter, &c_str);
-   dbus_message_iter_next(&iter);
-
+   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_STRING);
+   
    if (c_str)
    {
       str.assign(c_str);
@@ -49,9 +48,9 @@ void StringCodec::decode(DBusMessageIter& iter, char*& str)
    assert(str == nullptr);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
 
    char* c_str = nullptr;
-   dbus_message_iter_get_basic(&iter, &c_str);
-   dbus_message_iter_next(&iter);
-
+   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_STRING);
+   
+   // FIXME trouble with allocated memory in case of exception
    if (c_str)
    {
       str = (char*)new char[strlen(c_str)+1];

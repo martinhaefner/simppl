@@ -38,9 +38,9 @@ struct Codec<std::map<KeyT, ValueT>>
    void decode(DBusMessageIter& iter, std::map<KeyT, ValueT>& m)
    {
       m.clear();
-
+      
       DBusMessageIter _iter;
-      dbus_message_iter_recurse(&iter, &_iter);
+      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
 
       while(dbus_message_iter_get_arg_type(&_iter) != 0)
       {

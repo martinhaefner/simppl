@@ -262,52 +262,63 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           std::string interface;
           std::string attribute;
 
-          DBusMessageIter iter;
-          dbus_message_iter_init(msg, &iter);
-    
-          decode(iter, interface, attribute);
-
-          while(p)
+          try
           {
-             if (attribute == p->name_)
+             DBusMessageIter iter;
+             dbus_message_iter_init(msg, &iter);
+       
+             decode(iter, interface, attribute);
+
+             while(p)
              {
-                if (method[0] == 'G')
+                if (attribute == p->name_)
                 {
-                   message_ptr_t response = make_message(dbus_message_new_method_return(msg));
-                   p->eval(response.get());
+                   if (method[0] == 'G')
+                   {
+                      message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+                      p->eval(response.get());
 
-                   dbus_connection_send(disp_->conn_, response.get(), nullptr);
-                }
-                else
-                {
-                   message_ptr_t response = make_message(nullptr);
-                   
-                   try
-                   {
-                      p->evalSet(iter);
-                     
-                      response = make_message(dbus_message_new_method_return(msg));
+                      dbus_connection_send(disp_->conn_, response.get(), nullptr);
                    }
-                   catch(simppl::dbus::Error& err)
+                   else
                    {
-                      response = err.make_reply_for(*msg);
+                      message_ptr_t response = make_message(nullptr);
+                      
+                      try
+                      {
+                         p->evalSet(iter);
+                        
+                         response = make_message(dbus_message_new_method_return(msg));
+                      }
+                      catch(simppl::dbus::Error& err)
+                      {
+                         response = err.make_reply_for(*msg);
+                      }
+                      catch(...)
+                      {
+                         simppl::dbus::Error e("simppl.dbus.UnhandledException");
+                         response = e.make_reply_for(*msg);
+                      }
+                      
+                      dbus_connection_send(disp_->conn_, response.get(), nullptr);
                    }
-                   catch(...)
-                   {
-                      simppl::dbus::Error e("simppl.dbus.UnhandledException");
-                      response = e.make_reply_for(*msg);
-                   }
-                   
-                   dbus_connection_send(disp_->conn_, response.get(), nullptr);
+
+                   return DBUS_HANDLER_RESULT_HANDLED;
                 }
 
-                return DBUS_HANDLER_RESULT_HANDLED;
+                p = p->next_;
              }
 
-             p = p->next_;
+             std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
           }
-
-          std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
+          catch(DecoderError&)
+          {
+             simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
+             auto r = err.make_reply_for(*msg);
+             dbus_connection_send(disp_->conn_, r.get(), nullptr);
+             
+             return DBUS_HANDLER_RESULT_HANDLED;
+          }
        }
    }
    else
@@ -317,24 +328,28 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
       {
          if (!strcmp(method, pm->name_))
          {
-#if SIMPPL_SIGNATURE_CHECK
-            if (strcmp(pm->get_signature(), dbus_message_get_signature(msg)))
-            {
-               std::cerr << "Shit, wrong arguments" << std::endl;
-               return DBUS_HANDLER_RESULT_HANDLED;
-            }
-#endif
-
             current_request_.set(pm, msg);
-            pm->eval(msg);
+            
+            try
+            {
+               pm->eval(msg);
+            }
+            catch(DecoderError&)
+            {
+               simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
+               auto r = err.make_reply_for(*msg);
+               dbus_connection_send(disp_->conn_, r.get(), nullptr);
+            }
+            catch(...)
+            {
+               simppl::dbus::Error e("simppl.dbus.UnhandledException");
+               auto r = e.make_reply_for(*msg);
+               dbus_connection_send(disp_->conn_, r.get(), nullptr);
+            }
 
             // current_request_ is only valid if no response handler was called
             if (current_request_)
-            {
-               // in that case the request must not have a reponse
-               //assert(!current_request_.requestor_->hasResponse());
                current_request_.clear();
-            }
 
             return DBUS_HANDLER_RESULT_HANDLED;
          }

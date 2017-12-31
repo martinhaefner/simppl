@@ -42,14 +42,6 @@ struct ServerMethodBase
       eval_(this, msg);
    }
 
-#if SIMPPL_SIGNATURE_CHECK
-   void get_signature(std::ostream& os) const
-   {
-      sig_(os);
-   }
-
-   const char* get_signature() const;
-#endif
 
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
@@ -65,11 +57,6 @@ protected:
    ~ServerMethodBase();
 
    eval_type eval_;
-
-#if SIMPPL_SIGNATURE_CHECK
-   mutable std::string signature_;
-   sig_type sig_;
-#endif
 };
 
 
@@ -151,18 +138,8 @@ struct ServerMethod : ServerMethodBase
     : ServerMethodBase(name, iface)
     {
         eval_ = __eval;
-#if SIMPPL_SIGNATURE_CHECK
-        sig_ = __sig;
-#endif
     }
 
-#if SIMPPL_SIGNATURE_CHECK
-   static
-   void __sig(std::ostream& os)
-   {
-      ForEach<typename args_type_generator::list_type>::template eval<detail::make_type_signature>(os);
-   }
-#endif
 
    template<typename... T>
    inline

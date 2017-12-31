@@ -73,7 +73,7 @@ struct PropertyCodec
    void decode(DBusMessageIter& iter, T& t)
    {
       DBusMessageIter _iter;
-      dbus_message_iter_recurse(&iter, &_iter);
+      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_VARIANT);
 
       Codec<T>::decode(_iter, t);
 

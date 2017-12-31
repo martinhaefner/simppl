@@ -34,7 +34,7 @@ void WStringCodec::decode(DBusMessageIter& iter, std::wstring& str)
    str.clear();
 
    DBusMessageIter _iter;
-   dbus_message_iter_recurse(&iter, &_iter);
+   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
    
    int count = 
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7
@@ -80,7 +80,7 @@ void WStringCodec::decode(DBusMessageIter& iter, wchar_t*& str)
    //assert(str == nullptr);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
 
    DBusMessageIter _iter;
-   dbus_message_iter_recurse(&iter, &_iter);
+   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
    
    int count = 
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 7

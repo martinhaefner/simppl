@@ -69,8 +69,7 @@ struct CodecImpl<T, Pod>
    static inline
    void decode(DBusMessageIter& iter, T& t)
    {
-      dbus_message_iter_get_basic(&iter, &t);
-      dbus_message_iter_next(&iter);
+      simppl_dbus_message_iter_get_basic(&iter, &t, dbus_type_code);
    }
    
    

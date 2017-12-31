@@ -85,6 +85,7 @@ struct FixedSizeBuffer
 };
    
 
+// FIXME make slim implementation in src file
 template<size_t len>
 struct Codec<FixedSizeBuffer<len>>
 {
@@ -103,7 +104,7 @@ struct Codec<FixedSizeBuffer<len>>
    void decode(DBusMessageIter& iter, FixedSizeBuffer<len>& b)
    {
       DBusMessageIter _iter;
-      dbus_message_iter_recurse(&iter, &_iter);
+      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
       
       unsigned char* buf; 
       int _len = len;

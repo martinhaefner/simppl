@@ -42,7 +42,7 @@ struct Codec<std::vector<T>>
       v.clear();
 
       DBusMessageIter iter;
-      dbus_message_iter_recurse(&s, &iter);
+      simppl_dbus_message_iter_recurse(&s, &iter, DBUS_TYPE_ARRAY);
 
       while(dbus_message_iter_get_arg_type(&iter) != 0)
       {

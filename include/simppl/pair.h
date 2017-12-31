@@ -34,7 +34,7 @@ struct Codec<std::pair<KeyT, ValueT>>
    void decode(DBusMessageIter& iter, std::pair<KeyT, ValueT>& p)
    {
       DBusMessageIter item_iterator;
-      dbus_message_iter_recurse(&iter, &item_iterator);
+      simppl_dbus_message_iter_recurse(&iter, &item_iterator, DBUS_TYPE_DICT_ENTRY);
 
       Codec<KeyT>::decode(item_iterator, p.first);
       Codec<ValueT>::decode(item_iterator, p.second);

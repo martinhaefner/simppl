@@ -15,6 +15,7 @@ add_library(simppl SHARED
    objectpath.cpp
    filedescriptor.cpp
    clientside.cpp
+   serialization.cpp
 )
 
 target_link_libraries(simppl dbus-1)

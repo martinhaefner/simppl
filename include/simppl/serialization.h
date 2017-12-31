@@ -7,8 +7,14 @@
 #include <dbus/dbus.h>
 
 #include "simppl/typelist.h"
-#include "simppl/bool.h"
 
+
+/// throwing exception if expected_type is not met.
+void simppl_dbus_message_iter_recurse(DBusMessageIter* iter, DBusMessageIter* nested, int expected_type);
+
+/// throwing exception if expected_type is not met; advancing iterator
+void simppl_dbus_message_iter_get_basic(DBusMessageIter* iter, void* p, int expected_type);
+      
 
 namespace simppl
 {
@@ -122,12 +128,17 @@ void decode(DBusMessageIter& iter, T1& t1, T&... t)
 }
 
 
+class DecoderError : public std::exception
+{
+};
+
+
 }   // namespace dbus
 
 }   // namespace simppl
 
 
-
+#include "simppl/bool.h"
 #include "simppl/pod.h"
 
 #endif   // SIMPPL_SERIALIZATION_H

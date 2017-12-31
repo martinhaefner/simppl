@@ -53,7 +53,7 @@ struct TupleDeserializer // : noncopable
     , flattened_(flattened)
    {
       if (!flattened)
-         dbus_message_iter_recurse(&orig_, &iter_);
+         simppl_dbus_message_iter_recurse(&orig_, &iter_, DBUS_TYPE_STRUCT);
    }
 
    ~TupleDeserializer()

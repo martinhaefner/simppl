@@ -464,7 +464,7 @@ struct Codec<Variant<T...>>
    void decode(DBusMessageIter& orig, Variant<T...>& v)
    {
       DBusMessageIter iter;
-      dbus_message_iter_recurse(&orig, &iter);
+      simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
 
       if (!detail::try_deserialize(iter, v, dbus_message_iter_get_signature(&iter)))
          assert(false);

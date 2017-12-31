@@ -18,12 +18,10 @@ void ObjectPathCodec::encode(DBusMessageIter& iter, const ObjectPath& p)
 
 /*static*/ 
 void ObjectPathCodec::decode(DBusMessageIter& iter, ObjectPath& p)
-{
-   char* c_str = nullptr;
+{   
+   char* c_str = nullptr;  
+   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_OBJECT_PATH);
    
-   dbus_message_iter_get_basic(&iter, &c_str);
-   dbus_message_iter_next(&iter);
-
    if (c_str)
    {
       p.path.assign(c_str);
