@@ -45,6 +45,9 @@ FileDescriptor& FileDescriptor::operator=(const FileDescriptor& rhs)
 {
    if (this != &rhs)
    {
+      if (fd_ != -1)
+         close(fd_);
+      
       if (rhs.fd_ != -1)
       {
          fd_ = dup(rhs.fd_);
@@ -58,14 +61,31 @@ FileDescriptor& FileDescriptor::operator=(const FileDescriptor& rhs)
 
 
 FileDescriptor::FileDescriptor(FileDescriptor&& rhs)
+ : fd_(rhs.fd_)
 {
-   fd_ = rhs.fd_;
    rhs.fd_ = -1;
+}
+
+
+FileDescriptor& FileDescriptor::operator=(int fd)
+{
+   if (fd_ != -1)
+      close(fd_);
+      
+   fd_ = fd;
+   
+   if (fd_ < 0)
+      fd_ = -1;
+      
+   return *this;
 }
 
 
 FileDescriptor& FileDescriptor::operator=(FileDescriptor&& rhs)
 {
+   if (fd_ != -1)
+      close(fd_);
+      
    fd_ = rhs.fd_;
    rhs.fd_ = -1;
    

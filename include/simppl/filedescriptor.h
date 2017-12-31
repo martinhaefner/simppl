@@ -28,6 +28,7 @@ public:
    
    FileDescriptor(const FileDescriptor& rhs);
    FileDescriptor& operator=(const FileDescriptor& rhs);
+   FileDescriptor& operator=(int fd);
    
    FileDescriptor(FileDescriptor&& rhs);
    FileDescriptor& operator=(FileDescriptor&& rhs);
