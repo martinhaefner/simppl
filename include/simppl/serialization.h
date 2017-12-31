@@ -141,4 +141,5 @@ class DecoderError : public std::exception
 #include "simppl/bool.h"
 #include "simppl/pod.h"
 
+
 #endif   // SIMPPL_SERIALIZATION_H

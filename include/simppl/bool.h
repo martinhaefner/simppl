@@ -11,40 +11,22 @@ namespace simppl
 namespace dbus
 {
 
-
-// forward decl
-template<typename T>
-struct Codec;
    
-   
-// FIXME implement in .cpp
-template<>
-struct Codec<bool>
+struct BoolCodec
 {
-   static inline
-   void encode(DBusMessageIter& iter, bool b)
-   {
-      dbus_bool_t _b = b;
-      dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &_b);
-   }
+   static 
+   void encode(DBusMessageIter& iter, bool b);
 
-
-   static inline 
-   void decode(DBusMessageIter& iter, bool& t)
-   {
-      dbus_bool_t b;
-      simppl_dbus_message_iter_get_basic(&iter, &b, DBUS_TYPE_BOOLEAN);
-      
-      t = b;
-   }
+   static 
+   void decode(DBusMessageIter& iter, bool& t);
    
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return os << DBUS_TYPE_BOOLEAN_AS_STRING;
-   }
+   static
+   std::ostream& make_type_signature(std::ostream& os);
 };
+   
+
+template<>
+struct Codec<bool> : BoolCodec {};
 
 
 }   // namespace dbus

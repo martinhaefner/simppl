@@ -121,7 +121,7 @@ void FileDescriptorCodec::decode(DBusMessageIter& iter, FileDescriptor& fd)
 {
    int _fd;
    simppl_dbus_message_iter_get_basic(&iter, &_fd, DBUS_TYPE_UNIX_FD);
-   fd = FileDescriptor(_fd);
+   fd = _fd;
 }
 
 
