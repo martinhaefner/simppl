@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#define SIMPPL_HAVE_BOOST_FUSION
-
 #include "simppl/stub.h"
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
@@ -44,7 +42,7 @@ struct TestStruct2
 };
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 struct TestStruct3
 {
    int i;
@@ -62,7 +60,7 @@ INTERFACE(Serialization)
    Method<in<TestStruct>, out<TestStruct>> echo;
    Method<in<TestStruct2>, out<TestStruct2>> echo2;
    
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
    Method<in<TestStruct3>, out<TestStruct3>> echo3;
 #endif
 
@@ -71,7 +69,7 @@ INTERFACE(Serialization)
     : INIT(stop)
     , INIT(echo)
     , INIT(echo2)
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
     , INIT(echo3)
 #endif
    {
@@ -82,7 +80,7 @@ INTERFACE(Serialization)
 }   // namespace test
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 BOOST_FUSION_ADAPT_STRUCT(
    test::TestStruct3,
    (int, i)
@@ -174,7 +172,7 @@ struct Server : simppl::dbus::Skeleton<Serialization>
          respond_with(echo2(s));
       };
       
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
       echo3 >> [this](const TestStruct3& s)
       {
          EXPECT_EQ(42, s.i);
@@ -247,7 +245,7 @@ TEST(Serialization, serializer_type)
 }
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 TEST(Serialization, fusion)
 {
    simppl::dbus::Dispatcher d("bus:session");

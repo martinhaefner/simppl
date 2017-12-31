@@ -4,7 +4,7 @@
 
 #include "simppl/serialization.h"
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 #   include <boost/fusion/adapted/struct/adapt_struct.hpp>
 #   include <boost/fusion/support/is_sequence.hpp>
 #   include <boost/fusion/algorithm.hpp>
@@ -75,7 +75,7 @@ namespace detail
 {
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 
 struct FusionEncoder
 {
@@ -185,7 +185,7 @@ void StructSerializationHelper<StructT, SelectorT>::decode(DBusMessageIter& iter
 }
 
 
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
 
 template<typename StructT>
 struct StructSerializationHelper<StructT, boost::mpl::true_>
@@ -223,7 +223,7 @@ struct CodecImpl<T, Struct>
    void encode(DBusMessageIter& iter, const T& st)
    {
       detail::StructSerializationHelper<T,
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int
@@ -236,7 +236,7 @@ struct CodecImpl<T, Struct>
    void decode(DBusMessageIter& iter, T& st)
    {
       detail::StructSerializationHelper<T,
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int /* just any type but mpl::true_*/
@@ -249,7 +249,7 @@ struct CodecImpl<T, Struct>
    std::ostream& make_type_signature(std::ostream& os)
    {
       detail::StructSerializationHelper<T,
-#ifdef SIMPPL_HAVE_BOOST_FUSION
+#if SIMPPL_HAVE_BOOST_FUSION
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int /* just any type but mpl::true_*/

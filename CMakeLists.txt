@@ -29,10 +29,6 @@ else()
 endif()
 
 
-# check signature of request - this should be enabled to improve
-# client and server robustness
-add_definitions(-DSIMPPL_SIGNATURE_CHECK=0)
-
 include_directories(include)
 
 # boost fusion available?
@@ -81,8 +77,6 @@ else()
     message(FATAL_ERROR "Didn't find dbus arch-deps directory")
 endif()
 
-add_subdirectory(src)
-add_subdirectory(examples)
 
 # gtest environment 
 if(NOT GTEST_ROOT)
@@ -97,18 +91,25 @@ if(NOT GTEST_ROOT)
    )
 endif()
 
+
+if(BOOST_INCLUDE_DIR AND GTEST_ROOT)
+   message("Building fusion tests")
+   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=1)
+else()
+   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=0)
+endif()
+
+
+add_subdirectory(src)
+add_subdirectory(examples)
+
+
 # having tests?
 if(GTEST_ROOT)
     message("Building tests")
     add_subdirectory(tests)
 else()
     message("Omitting tests!")
-endif()
-
-
-if(BOOST_INCLUDE_DIR AND GTEST_ROOT)
-   message("Building fusion tests")
-   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=1)   
 endif()
 
 
