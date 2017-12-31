@@ -199,7 +199,6 @@ with a simple blocking client:
       simppl::dbus::Dispatcher disp("bus:session");
 
       simppl::dbus::Stub<EchoService> stub(disp, "myEcho");
-      stub.connect();
 
       std::string echoed = stub.echo("Hello world!");
 
