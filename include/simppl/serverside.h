@@ -74,7 +74,6 @@ struct ServerSignalBase
 
 protected:
 
-   inline
    ~ServerSignalBase() = default;
 
    const char* name_;
@@ -85,7 +84,6 @@ protected:
 template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
-   inline
    ServerSignal(const char* name, SkeletonBase* iface)
     : ServerSignalBase(name, iface)
    {
@@ -142,7 +140,6 @@ struct ServerMethod : ServerMethodBase
 
 
    template<typename... T>
-   inline
    detail::ServerResponseHolder operator()(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
@@ -177,7 +174,6 @@ private:
 
 
    template<typename... T>
-   inline
    detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
       return detail::ServerResponseHolder([&](DBusMessageIter& s){
@@ -186,7 +182,6 @@ private:
    }
 
    template<typename... T>
-   inline
    detail::ServerResponseHolder __impl(std::false_type, const T&... t)
    {
       return detail::ServerResponseHolder([](DBusMessageIter&){ /*NOOP*/ });
@@ -224,7 +219,6 @@ struct ServerPropertyBase
 
 protected:
 
-   inline
    ~ServerPropertyBase() = default;
 
    eval_type eval_;
@@ -235,7 +229,6 @@ protected:
 template<typename DataT>
 struct BaseProperty : ServerPropertyBase
 {
-   inline
    BaseProperty(const char* name, SkeletonBase* iface)
     : ServerPropertyBase(name, iface)
     , t_()
@@ -243,7 +236,6 @@ struct BaseProperty : ServerPropertyBase
       eval_ = __eval;
    }
 
-   inline
    const DataT& value() const
    {
       return t_;
@@ -304,7 +296,6 @@ struct ServerWritableMixin
 template<typename DataT, int Flags>
 struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite, ServerWritableMixin<DataT>, ServerNoopMixin<DataT>>::type
 {
-   inline
    ServerProperty(const char* name, SkeletonBase* iface)
     : BaseProperty<DataT>(name, iface)
    {

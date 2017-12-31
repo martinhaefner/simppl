@@ -68,8 +68,6 @@ struct CallbackHolder
        assert(that->f_);
 
        CallState cs(*msg);
-
-       // TODO check signature
        
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);

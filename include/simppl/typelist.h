@@ -38,7 +38,6 @@ struct Size<TypeList<HeadT, NilType> >
 };
 
 // -------------------------------popfrontN ------------------------------------
-// TODO this should be a generic Erase algorihtm instead
 
 template<int N, typename ListT>
 struct PopFrontN;
@@ -96,7 +95,6 @@ struct PopBack<TypeList<HeadT, NilType> >
 template<>
 struct PopBack<NilType>
 {
-   // TODO maybe generate a compiler error here?!
    typedef NilType type;
 };
 

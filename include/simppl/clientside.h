@@ -45,12 +45,9 @@ struct ClientSignalBase
    {
       eval_(this, iter);
    }
-   
-   //virtual const char* get_signature() const = 0;
 
    ClientSignalBase(const char* name, StubBase* iface);
    
-   inline
    const char* name() const
    {
        return name_;
@@ -59,7 +56,6 @@ struct ClientSignalBase
 
 protected:
 
-   inline
    ~ClientSignalBase() = default;
 
    StubBase* stub_;
@@ -76,7 +72,6 @@ struct ClientSignal : ClientSignalBase
 {
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
 
-   inline
    ClientSignal(const char* name, StubBase* iface)
     : ClientSignalBase(name, iface)
    {
@@ -90,7 +85,6 @@ struct ClientSignal : ClientSignalBase
    }
 
    /// send registration to the server - only attach after the interface is connected.
-   inline
    ClientSignal& attach()
    {
       stub_->register_signal(*this);
@@ -98,7 +92,6 @@ struct ClientSignal : ClientSignalBase
    }
 
    /// send de-registration to the server - only attach after the interface is connected.
-   inline
    ClientSignal& detach()
    {
       stub_->unregister_signal(*this);
@@ -141,7 +134,6 @@ struct ClientPropertyBase
    
 protected:
 
-   inline
    ~ClientPropertyBase() = default;
 
    const char* name_;
@@ -162,7 +154,6 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
    typedef detail::CallbackHolder<function_type, void> holder_type;
 
 
-   inline
    ClientPropertyWritableMixin(const char* name, StubBase* iface)
     : ClientPropertyBase(name, iface)
    {
@@ -204,7 +195,6 @@ struct ClientProperty
    typedef detail::PropertyCallbackHolder<std::function<void(CallState, arg_type)>, data_type> holder_type;
 
 
-   inline
    ClientProperty(const char* name, StubBase* iface)
     : base_type(name, iface)
    {
@@ -223,7 +213,6 @@ struct ClientProperty
    // TODO implement GetAll
    DataT get();
    
-   inline
    detail::InterimCallbackHolder<holder_type> get_async()
    {
       return detail::InterimCallbackHolder<holder_type>(this->stub_->get_property_async(this->name_));
@@ -316,7 +305,6 @@ struct ClientMethod
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
-    inline
     ClientMethod(const char* method_name, StubBase* parent)
      : method_name_(method_name)
      , parent_(parent)   
@@ -339,7 +327,6 @@ struct ClientMethod
          serializer_type::eval(s, t...);
       }, is_oneway);
 
-      // TODO check signature
       return detail::deserialize_and_return<return_type>::eval(msg.get());
    }
 

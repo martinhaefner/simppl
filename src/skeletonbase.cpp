@@ -236,9 +236,10 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                "      <arg name=\"changed_properties\" type=\"a{sv}\"/>\n"
                "      <arg name=\"invalidated_properties\" type=\"as\"/>\n"
                "    </signal>\n"
-               "  </interface>\n"
-               "</node>\n";
+               "  </interface>\n";
          }
+         
+         oss << "</node>\n";
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
