@@ -193,13 +193,23 @@ struct StructSerializationHelper<StructT, boost::mpl::true_>
    static inline
    void encode(DBusMessageIter& iter, const StructT& st)
    {
-      boost::fusion::for_each(st, FusionEncoder(iter));
+      DBusMessageIter _iter;
+      dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+
+      boost::fusion::for_each(st, FusionEncoder(_iter));
+
+      dbus_message_iter_close_container(&iter, &_iter);
    }
 
    static inline
    void decode(DBusMessageIter& iter, StructT& st)
    {
-      boost::fusion::for_each(st, FusionDecoder(iter));
+      DBusMessageIter _iter;
+      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_STRUCT);
+
+      boost::fusion::for_each(st, FusionDecoder(_iter));
+
+      dbus_message_iter_next(&iter);
    }
 
    static inline
