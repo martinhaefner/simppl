@@ -143,7 +143,7 @@ struct ServerMethod : ServerMethodBase
    detail::ServerResponseHolder operator()(const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
-      static_assert(std::is_same<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
+      static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     return_type>::value, "args mismatch");
 
       return __impl(bool_constant<(sizeof...(t) > 0)>(), t...);
@@ -160,7 +160,7 @@ struct ServerMethod : ServerMethodBase
 
 
    callback_type f_;
-   
+
 private:
 
    static
@@ -168,7 +168,7 @@ private:
    {
        DBusMessageIter iter;
        dbus_message_iter_init(msg, &iter);
-       
+
        detail::GetCaller<args_type>::type::template eval(iter, ((ServerMethod*)obj)->f_);
    }
 
@@ -270,13 +270,13 @@ template<typename DataT>
 struct ServerWritableMixin
 {
     typedef std::function<void(typename CallTraits<DataT>::param_type)> function_type;
-    
+
     /**
      * A writable server attribute may automatically overwrite the stored
      * value if no callback is provided. If a callback function is provided,
      * the callback will be called and has to decide if it will overwrite
      * the attribute member (by calling operator=) or just negogiate the
-     * setter call. 
+     * setter call.
      */
     bool __set(typename CallTraits<DataT>::param_type d)
     {
@@ -285,10 +285,10 @@ struct ServerWritableMixin
             f_(d);
             return false;
         }
-        
+
         return true;
     }
-    
+
     function_type f_;
 };
 
@@ -330,7 +330,7 @@ protected:
 
         DataT t;
         detail::PropertyCodec<DataT>::decode(iter, t);
-        
+
         if (that->__set(t))
             *that = std::move(t);
     }

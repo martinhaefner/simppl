@@ -20,7 +20,7 @@ set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -Wall -pedantic -std=c++
 
 
 # enable introspection by default
-OPTION(HAVE_INTROSPECTION "Have introspection" ON) 
+OPTION(HAVE_INTROSPECTION "Have introspection" ON)
 
 if(HAVE_INTROSPECTION)
    add_definitions(-DSIMPPL_HAVE_INTROSPECTION=1)
@@ -77,8 +77,15 @@ else()
     message(FATAL_ERROR "Didn't find dbus arch-deps directory")
 endif()
 
+if(DBUS_LIBDIR)
+    message("Found DBus library in '${DBUS_LIBDIR}'")
+    link_directories(${DBUS_LIBDIR})
+else()
+    message(FATAL_ERROR "Didn't find dbus-1 shared library")
+endif()
 
-# gtest environment 
+
+# gtest environment
 if(NOT GTEST_ROOT)
    message("Searching for gtest installation...")
 

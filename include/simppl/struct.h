@@ -13,7 +13,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -60,7 +60,7 @@ struct SerializerTuple<T, NilType>
       Codec<T>::decode(iter, data_);
    }
 
-   
+
    static
    void make_type_signature(std::ostream& os)
    {
@@ -143,19 +143,19 @@ template<typename StructT, typename SelectorT>
 struct StructSerializationHelper
 {
    typedef typename StructT::serializer_type s_type;
-   
-   static 
+
+   static
    void encode(DBusMessageIter& iter, const StructT& st);
 
-   static 
+   static
    void decode(DBusMessageIter& iter, const StructT& st);
-   
+
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
       s_type::make_type_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
       return os << DBUS_STRUCT_END_CHAR_AS_STRING;
-   }   
+   }
 };
 
 
@@ -201,12 +201,15 @@ struct StructSerializationHelper<StructT, boost::mpl::true_>
    {
       boost::fusion::for_each(st, FusionDecoder(iter));
    }
-   
+
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
+      os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
+
       StructT* st = nullptr;
       boost::fusion::for_each(*st, FusionTypeWriter(os));
+
       return os << DBUS_STRUCT_END_CHAR_AS_STRING;
    }
 };
@@ -218,8 +221,8 @@ struct StructSerializationHelper<StructT, boost::mpl::true_>
 
 template<typename T>
 struct CodecImpl<T, Struct>
-{   
-   static 
+{
+   static
    void encode(DBusMessageIter& iter, const T& st)
    {
       detail::StructSerializationHelper<T,
@@ -232,7 +235,7 @@ struct CodecImpl<T, Struct>
    }
 
 
-   static 
+   static
    void decode(DBusMessageIter& iter, T& st)
    {
       detail::StructSerializationHelper<T,
@@ -244,7 +247,7 @@ struct CodecImpl<T, Struct>
       >::decode(iter, st);
    }
 
-   
+
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
@@ -253,9 +256,9 @@ struct CodecImpl<T, Struct>
          typename boost::fusion::traits::is_sequence<T>::type
 #else
          int /* just any type but mpl::true_*/
-#endif      
-      >::make_type_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
-      return os << DBUS_STRUCT_END_CHAR_AS_STRING;
+#endif
+      >::make_type_signature(os);
+      return os;
    }
 };
 
@@ -276,7 +279,7 @@ namespace detail
    {
       typedef SerializerTuple<T, NilType> type;
    };
-   
+
 }   // namespace detail
 
 
