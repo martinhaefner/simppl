@@ -33,13 +33,13 @@ namespace
 std::string generate_matchstring(simppl::dbus::StubBase& stub, const char* signame)
 {
    std::ostringstream match_string;
-   
-   match_string 
+
+   match_string
       << "type='signal'"
       << ", sender='" << stub.busname() << "'"
       << ", interface='" << stub.iface() << "'"
       << ", member='" << signame << "'";
-      
+
    return match_string.str();
 }
 
@@ -47,14 +47,14 @@ std::string generate_matchstring(simppl::dbus::StubBase& stub, const char* signa
 std::string generate_property_matchstring(simppl::dbus::StubBase& stub)
 {
    std::ostringstream match_string;
-   
-   match_string 
+
+   match_string
       << "type='signal'"
       << ",sender='" << stub.busname() << "'"
       << ",interface='org.freedesktop.DBus.Properties'"
       << ",member='PropertiesChanged'"
       << ",path='" << stub.objectpath() << "'";
-      
+
    return match_string.str();
 }
 
@@ -345,10 +345,10 @@ struct Dispatcher::Private
                         if (t_iter != tm_handlers_.end())
                         {
                             int64_t data;
-                            
+
                             int rc = ::read(pfd.fd, &data, sizeof(data));
                             (void)rc;
-                            
+
 //                            std::cout << "handle timeout" << std::endl;
                             dbus_timeout_handle(t_iter->second);
                         }
@@ -361,8 +361,8 @@ struct Dispatcher::Private
 
         return 0;
     }
-    
-    
+
+
     void init(DBusConnection* conn)
     {
         dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
@@ -375,7 +375,7 @@ struct Dispatcher::Private
 
     std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
-    
+
     std::multimap<std::string, StubBase*> stubs_;
     std::map<std::string, int> signal_matches_;
 
@@ -398,12 +398,12 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // compile check if stubs or skeletons are compiled with the settings
    // used for building the library
    assert(SIMPPL_HAVE_INTROSPECTION == have_introspection);
- 
-   d = new Dispatcher::Private;  
-   
+
+   d = new Dispatcher::Private;
+
    conn_ = nullptr;
    request_timeout_ = DBUS_TIMEOUT_USE_DEFAULT;
-   
+
    DBusError err;
    dbus_error_init(&err);
 
@@ -562,7 +562,7 @@ void Dispatcher::register_signal_match(const std::string& match_string)
 
       dbus_bus_add_match(conn_, match_string.c_str(), &err);
       assert(!dbus_error_is_set(&err));
-         
+
       dbus_error_free(&err);
 
       d->signal_matches_[match_string] = 1;
@@ -605,11 +605,13 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
            DBusMessageIter iter;
            dbus_message_iter_init(msg, &iter);
-   
+
            decode(iter, busname);
 
            if (d->busnames_.find(busname) != d->busnames_.end())
-            notify_clients(busname, ConnectionState::Connected);
+                notify_clients(busname, ConnectionState::Connected);
+
+           return DBUS_HANDLER_RESULT_HANDLED;
         }
         else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
         {
@@ -621,7 +623,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
            DBusMessageIter iter;
            dbus_message_iter_init(msg, &iter);
-   
+
            decode(iter, bus_name, old_name, new_name);
 
            if (bus_name[0] != ':')
@@ -656,12 +658,16 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         }
 
         auto range = d->stubs_.equal_range(originator);
+        if (range.first != range.second)
+        {
+            std::for_each(range.first, range.second, [msg](auto& entry){
+                entry.second->try_handle_signal(msg);
+            });
 
-        std::for_each(range.first, range.second, [msg](auto& entry){
-            entry.second->try_handle_signal(msg);
-        });
-
-        return DBUS_HANDLER_RESULT_HANDLED;
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        // else
+        //     nobody interested in signal - go on with other filters
     }
 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -695,10 +701,10 @@ void Dispatcher::add_client(StubBase& clnt)
       objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
       DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
-   
+
       DBusMessageIter iter;
       dbus_message_iter_init_append(msg, &iter);
-   
+
       encode(iter, clnt.busname());
 
       dbus_connection_send(conn_, msg, nullptr);
@@ -759,14 +765,14 @@ void Dispatcher::init()
 int Dispatcher::run()
 {
    init();
-   
+
    d->running_.store(true);
 
    while(d->running_.load())
    {
        step_ms(100);
    }
-   
+
    return 0;
 }
 
