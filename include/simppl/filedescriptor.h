@@ -20,22 +20,22 @@ class FileDescriptor
 public:
 
    FileDescriptor();
-   
+
    explicit
    FileDescriptor(int fd);
-   
+
    ~FileDescriptor();
-   
+
    FileDescriptor(const FileDescriptor& rhs);
    FileDescriptor& operator=(const FileDescriptor& rhs);
    FileDescriptor& operator=(int fd);
-   
+
    FileDescriptor(FileDescriptor&& rhs);
    FileDescriptor& operator=(FileDescriptor&& rhs);
-   
+
    int native_handle() const;
    int release();
-   
+
 private:
    int fd_;
 };
@@ -43,17 +43,21 @@ private:
 
 struct FileDescriptorCodec
 {
-   static 
+   static
    void encode(DBusMessageIter& iter, const FileDescriptor& fd);
-   
-   static 
+
+   static
    void decode(DBusMessageIter& iter, FileDescriptor& fd);
-   
-   static 
+
+   static
    std::ostream& make_type_signature(std::ostream& os);
 };
 
 
+/**
+ * File descriptors must be valid for transfer, otherwise the fd will
+ * not be part of the message!
+ */
 template<>
 struct Codec<FileDescriptor> : public FileDescriptorCodec {};
 
