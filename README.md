@@ -241,7 +241,7 @@ member function.
       {
          if (st == simppl::dbus::ConnectionState::Connected)
          {
-            echo.async("Hello World!) >> [](const simppl::dbus::Callstate st, const std::string& echo_string)
+            echo.async("Hello World!") >> [](const simppl::dbus::Callstate st, const std::string& echo_string)
             {
                if (st)
                {
