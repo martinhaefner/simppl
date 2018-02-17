@@ -4,7 +4,7 @@ the definition of remote interfaces. No extra tools are necessary to
 generate the binding glue code.
 
 
-Setup
+## Setup
 
 For building the library and tests from source code you need cmake and
 gtest. I use cmake 2.8 and gtest-1.7. You may need some changes in the
@@ -12,7 +12,7 @@ setup for environment variables in the contributed script file update.sh.
 Development libraries of libdbus-1 are also needed for a successful build.
 
 
-Compilers
+## Compilers
 
 I only developed on GCC >=4.9. The code uses features of upto C++14 and 
 g++ specific demangling functions for class symbols. Therefore, I do not
@@ -28,7 +28,7 @@ mappings and will definitely not work with complex data types containing
 virtual functions or containing multiple inheritence.
 
 
-Status
+## Status
 
 The library is used in a production project and but it still can be
 regarded as 'proof of concept'. Interface design may still be under change.
@@ -36,12 +36,12 @@ Due to the simplicity of the glue layer and the main functionality provided
 by libdbus I would recommend to give it a try in real projects.
 
 
-CopyLeft
+## CopyLeft
 
 Feel free to do with the code whatever you want. It's free open-source code.
 
 
-First steps
+## First steps
 
 DBus uses an XML document for interface definition. This is rather tricky
 to read and typically source code is generated in order to provide
@@ -55,12 +55,12 @@ not share these simplifications. But let's go on and see how a simppl
 service is defined. We will recall these facts later.
 
 
-Defining an interface
+### Defining an interface
 
 
 Let's start with a simple echo service. See the service description:
 
-
+```c++
    namespace test
    {
 
@@ -70,7 +70,7 @@ Let's start with a simple echo service. See the service description:
    };
 
    }   // namespace
-
+```
 
 Remember, this is pure C++. You see a request named 'echo' taking a
 string as 'in' argument and a string as 'out' argument.
@@ -79,6 +79,7 @@ by the client. A complete interface definition also needs some hand-written
 glue code, but it's very simple. The full interface looks like this:
 
 
+```c++
    namespace test
    {
 
@@ -94,7 +95,7 @@ glue code, but it's very simple. The full interface looks like this:
    };
 
    }   // namespace
-
+```
 
 Now the interface is complete C++. You need the implement the constructor
 to correctly initialize the members. For oneway requests, you just add
@@ -108,14 +109,16 @@ instance name. For now, let's say the instance name was 'myEcho'.
 With this information provided in the constructor of the service instance,
 the dbus busname requested will be
 
+```
    test.EchoService.myEcho
-
+```
 
 The objectpath of the service is build accordingly so the service is
 provided under
 
+```
    /test/EchoService/myEcho
-
+```
 
 This mapping is done automatically by simppl, for servers this is currently
 fix. But clients may connect to any bus/objectpath layout in order to connect
@@ -127,6 +130,7 @@ service server by inheriting our implementation class from simppl's
 Skeleton:
 
 
+```c++
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho(simppl::dbus::Dispatcher& disp)
@@ -134,13 +138,14 @@ Skeleton:
       {
       }
    };
-
+```
 
 This service instance did not implement a handler for the echo requests
 yet. But you have seen how the service's instance name is provided.
 Let's provide an implementation for the echo method:
 
 
+```c++
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho(simppl::dbus::Dispatcher& disp)
@@ -152,7 +157,7 @@ Let's provide an implementation for the echo method:
          };
       }
    };
-
+```
 
 Now, simppl will receive the echo request, unmarshall the argument and
 forward the request to the provided lambda function (of course, you may 
@@ -160,6 +165,7 @@ also bind any other function via std::bind). But there is still
 no response yet. Let's send a response back to the client:
 
 
+```c++
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho()
@@ -172,11 +178,12 @@ no response yet. Let's send a response back to the client:
          };
       }
    };
-
+```
 
 That's simppl, isn't it? Setup the eventloop and the server is finished:
 
 
+   ```c++
    int main()
    {
       simppl::dbus::Dispatcher disp("bus::session");
@@ -186,7 +193,7 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
 
       return EXIT_SUCCESS;
    }
-
+```
 
 Now it's time to implement a client. Clients are implemented by instantiation
 of a Stub. One can either write blocking clients which is only recommended
@@ -194,6 +201,7 @@ for simple tools or write a full featured event-driven client. Let's start
 with a simple blocking client:
 
 
+```c++
    int main()
    {
       simppl::dbus::Dispatcher disp("bus:session");
@@ -205,7 +213,7 @@ with a simple blocking client:
 
       return EXIT_SUCCESS;
    }
-
+```
 
 That's it. The request call blocks until the response is received and
 stored in the echoed variable. In case of an error, an exception is thrown.
@@ -220,6 +228,7 @@ callbacks to member functions. Note that the request is called via the async(...
 member function.
 
 
+```c++
    class MyEchoClient : simppl::dbus::Stub<EchoService>
    {
       MyEchoClient(simppl::dbus::Dispatcher& disp)
@@ -232,7 +241,7 @@ member function.
       {
          if (st == simppl::dbus::ConnectionState::Connected)
          {
-            echo.async("Hello World!) >> [](const simppl::dbus::Callstate st, const std::string& echo_string)
+            echo.async("Hello World!") >> [](const simppl::dbus::Callstate st, const std::string& echo_string)
             {
                if (st)
                {
@@ -245,7 +254,7 @@ member function.
          }
       }
    };
-
+```
 
 Event loop driven clients always get callbacks called from the dbus runtime
 when any event occurs. The initial event for a client is the connected event
@@ -257,6 +266,7 @@ way nowadays in a C++ lambda. The main program is as simple as in the
 blocking example:
 
 
+```c++
    int main()
    {
       simppl::dbus::Dispatcher disp("bus:session");
@@ -267,13 +277,14 @@ blocking example:
 
       return EXIT_SUCCESS;
    }
-
+```
 
 Easy, isn't it? But with simppl/dbus it is also possible to model signals
 and properties. Moreover, any complex data can be passed between client
 and server. See the following example:
 
 
+```c++
    namespace test
    {
       struct Data
@@ -302,7 +313,7 @@ and server. See the following example:
          }
       };
    }
-
+```
 
 The Data structure is any C/C++ struct but must not include virtual functions.
 For structures with complexer memory layout it is adviced to use boost::fusion
@@ -311,6 +322,7 @@ like above, the make_serializer generates an adequate serializing code for
 the structure, i.e. the structure can be used as any simple data type:
 
 
+```c++
    int main()
    {
       simppl::dbus::Dispatcher disp("bus:session");
@@ -326,7 +338,7 @@ the structure, i.e. the structure can be used as any simple data type:
 
       return EXIT_SUCCESS;
    }
-
+```
 
 Have you notices how methods with more than one return value are mapped
 to a tuple out parameter which can be tie'd to the local variables in
@@ -342,6 +354,7 @@ register for update notifications in order to receive changes on the properties
 on server side. See the clients connected callback:
 
 
+```c++
    class MyComplexClient : simppl::dbus::Stub<ComplexTest>
    {
       MyComplexClient(simppl::dbus::Dispatcher& disp)
@@ -370,7 +383,7 @@ on server side. See the clients connected callback:
          };
       }
    };
-
+```
 
 This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without
