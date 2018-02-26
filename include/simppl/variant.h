@@ -157,6 +157,13 @@ struct Variant
        ((_T*)t)->~_T();
    }
 
+
+   bool empty() const
+   {
+       return idx_ == unset;
+   }
+
+
    // NON INLINE - too long!!!
    // FIXME write with recursive function instead
    void try_destroy()
@@ -399,7 +406,7 @@ template<typename T1, typename... T>
 struct VariantDeserializer<T1, T...>
 {
    template<typename VariantT>
-   static 
+   static
    bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
    {
       std::ostringstream buf;
@@ -422,7 +429,7 @@ template<typename T>
 struct VariantDeserializer<T>
 {
    template<typename VariantT>
-   static 
+   static
    bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
    {
       std::ostringstream buf;
@@ -452,15 +459,15 @@ bool try_deserialize(DBusMessageIter& iter, Variant<T...>& v, const char* sig);
 template<typename... T>
 struct Codec<Variant<T...>>
 {
-   static 
+   static
    void encode(DBusMessageIter& iter, const Variant<T...>& v)
    {
       detail::VariantSerializer vs(iter);
       static_visit(vs, const_cast<Variant<T...>&>(v));   // TODO need const visitor
    }
-   
-   
-   static 
+
+
+   static
    void decode(DBusMessageIter& orig, Variant<T...>& v)
    {
       DBusMessageIter iter;
@@ -471,8 +478,8 @@ struct Codec<Variant<T...>>
 
       dbus_message_iter_next(&orig);
    }
-   
-   
+
+
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
