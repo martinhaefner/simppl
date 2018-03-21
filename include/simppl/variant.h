@@ -473,7 +473,9 @@ struct Codec<Variant<T...>>
       DBusMessageIter iter;
       simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
 
-      if (!detail::try_deserialize(iter, v, dbus_message_iter_get_signature(&iter)))
+      std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(&iter), &dbus_free);
+
+      if (!detail::try_deserialize(iter, v, sig.get()))
          assert(false);
 
       dbus_message_iter_next(&orig);
