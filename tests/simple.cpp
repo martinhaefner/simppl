@@ -24,33 +24,33 @@ using simppl::dbus::out;
 namespace test
 {
 
-   
+
 struct Complex
 {
    typedef typename simppl::dbus::make_serializer<std::string, std::string>::type serializer_type;
-   
+
    std::string str1;
    std::string str2;
-   
+
    Complex() = default;
-   
+
    Complex(const Complex& c)
    {
       str1 = c.str1;
       str2 = c.str2;
-      
+
       ++rvo_count;
    }
-   
+
    Complex& operator=(const Complex& c)
    {
       str1 = c.str1;
       str2 = c.str2;
-      
+
       ++rvo_count;
       return *this;
    }
-   
+
    // not serialized
    static int rvo_count;
 };
@@ -79,6 +79,8 @@ INTERFACE(Simple)
    Signal<int> sig;
    Signal<int, int> sig2;
 
+   Signal<> sig3;
+
    inline
    Simple()
     : INIT(hello)
@@ -93,6 +95,7 @@ INTERFACE(Simple)
     , INIT(data)
     , INIT(sig)
     , INIT(sig2)
+    , INIT(sig3)
    {
       // NOOP
    }
@@ -156,9 +159,9 @@ struct CancelClient : simppl::dbus::Stub<Simple>
             };
 
             std::this_thread::sleep_for(100ms);
-            
+
             p.cancel();
-            
+
             // must stop server
             oneway(7777);
          }
@@ -319,6 +322,15 @@ struct Server : simppl::dbus::Skeleton<Simple>
          {
             this->disp().stop();
          }
+         else if (i == 8888)
+         {
+             sig3.notify();
+             sig3.notify();
+             sig3.notify();
+
+             std::this_thread::sleep_for(200ms);
+             this->disp().stop();
+         }
          else if (i < 100)
          {
             EXPECT_EQ(42, i);
@@ -355,21 +367,21 @@ struct Server : simppl::dbus::Skeleton<Simple>
          // clean up pointer
          delete[] str;
       };
-      
+
       test_rvo >> [this]()
       {
          Complex c;
          c.str1 = "Hello World";
          c.str2 = "Super";
-         
+
          respond_with(test_rvo(c));
       };
-      
+
       test_fd >> [this](const simppl::dbus::FileDescriptor& fd)
       {
          struct stat st;
          fstat(fd.native_handle(), &st);
-         
+
          respond_with(test_fd((int)st.st_size));
       };
    }
@@ -425,7 +437,7 @@ TEST(Simple, blocking)
 
       EXPECT_EQ(4, s.count_oneway_);
    });
-   
+
    simppl::dbus::Stub<Simple> stub(d, "sb");
 
    // wait for server to get ready
@@ -560,10 +572,10 @@ TEST(Simple, fd)
       simppl::dbus::Dispatcher d("bus:session");
       Server s(d, "fd");
       d.run();
-      
+
       exit(0);
    }
-   
+
    // parent
    simppl::dbus::Dispatcher d("bus:session");
    simppl::dbus::Stub<Simple> stub(d, "fd");
@@ -575,22 +587,22 @@ TEST(Simple, fd)
 
    int fd = open("/etc/fstab", O_RDONLY);
    EXPECT_GT(fd, -1);
-   
+
    {
       simppl::dbus::FileDescriptor _fd(fd);
       auto rc = stub.test_fd(_fd);
-   
+
       EXPECT_EQ(0, fstat(fd, &st));
-      
+
       EXPECT_GT(rc, 0);
       EXPECT_EQ(rc, (int)st.st_size);
    }
-   
+
    // file is closed due to constructor
    EXPECT_EQ(-1, fstat(fd, &st));
-   
+
    stub.oneway(7777);   // stop server
-   
+
    int status;
    EXPECT_EQ(pid, waitpid(pid, &status, 0));
 }
@@ -599,7 +611,7 @@ TEST(Simple, fd)
 TEST(Simple, return_value_optimization)
 {
    simppl::dbus::Dispatcher d("bus:session");
-   
+
    std::thread t([](){
       simppl::dbus::Dispatcher d("bus:session");
       Server s(d, "rvo");
@@ -613,12 +625,50 @@ TEST(Simple, return_value_optimization)
 
    // make sure the return value does not create copy operations
    auto rc = stub.test_rvo();
-   
+
    EXPECT_EQ(rc.str1, "Hello World");
-   
+
    // no copy operation took place
    EXPECT_EQ(0, test::Complex::rvo_count);
-   
+
    stub.oneway(7777);   // stop server
    t.join();
+}
+
+
+TEST(Simple, empty_signal_args)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   pid_t pid = fork();
+   if (pid == 0)
+   {
+      // child
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "esa");
+      d.run();
+
+      exit(0);
+   }
+
+   int sig_count = 0;
+
+   simppl::dbus::Stub<Simple> stub(d, "esa");
+
+   stub.connected >> [&stub](simppl::dbus::ConnectionState st){
+       // initiate signal send on server
+       stub.oneway(8888);
+   };
+
+   stub.sig3.attach() >> [&stub, &sig_count](){
+       ++sig_count;
+
+       if (sig_count == 3)
+          stub.disp().stop();
+   };
+
+   d.run();
+
+   // no copy operation took place
+   EXPECT_EQ(3, sig_count);
 }

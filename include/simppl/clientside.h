@@ -36,7 +36,7 @@ template<typename> struct InterfaceNamer;
 struct ClientSignalBase
 {
    typedef void (*eval_type)(ClientSignalBase*, DBusMessageIter&);
-   
+
    template<typename, int>
    friend struct ClientProperty;
    friend struct StubBase;
@@ -47,7 +47,7 @@ struct ClientSignalBase
    }
 
    ClientSignalBase(const char* name, StubBase* iface);
-   
+
    const char* name() const
    {
        return name_;
@@ -60,9 +60,9 @@ protected:
 
    StubBase* stub_;
    const char* name_;
-   
+
    eval_type eval_;
-   
+
    ClientSignalBase* next_;
 };
 
@@ -70,6 +70,8 @@ protected:
 template<typename... T>
 struct ClientSignal : ClientSignalBase
 {
+   typedef typename std::conditional<sizeof...(T) == 0, void, std::tuple<T...>>::type args_type;
+
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
 
    ClientSignal(const char* name, StubBase* iface)
@@ -77,7 +79,7 @@ struct ClientSignal : ClientSignalBase
    {
       eval_ = __eval;
    }
-   
+
    template<typename FuncT>
    void set_callback(const FuncT& f)
    {
@@ -97,16 +99,16 @@ struct ClientSignal : ClientSignalBase
       stub_->unregister_signal(*this);
       return *this;
    }
-   
+
 
 private:
 
-   static 
+   static
    void __eval(ClientSignalBase* obj, DBusMessageIter& iter)
    {
-      detail::GetCaller<std::tuple<T...>>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
+      detail::GetCaller<args_type>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
    }
-   
+
    function_type f_;
 };
 
@@ -117,21 +119,21 @@ private:
 struct ClientPropertyBase
 {
    friend struct StubBase;
-   
+
    typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter&);
- 
- 
+
+
    ClientPropertyBase(const char* name, StubBase* iface);
-   
+
    void eval(DBusMessageIter& iter)
    {
       eval_(this, iter);
    }
-   
+
    /// only call this after the server is connected.
    void detach();
-   
-   
+
+
 protected:
 
    ~ClientPropertyBase() = default;
@@ -140,7 +142,7 @@ protected:
    StubBase* stub_;
 
    eval_type eval_;
-   
+
    ClientPropertyBase* next_;
 };
 
@@ -200,7 +202,7 @@ struct ClientProperty
    {
       this->eval_ = __eval;
    }
-   
+
    template<typename FuncT>
    void set_callback(const FuncT& f)
    {
@@ -212,7 +214,7 @@ struct ClientProperty
 
    // TODO implement GetAll
    DataT get();
-   
+
    detail::InterimCallbackHolder<holder_type> get_async()
    {
       return detail::InterimCallbackHolder<holder_type>(this->stub_->get_property_async(this->name_));
@@ -225,23 +227,23 @@ struct ClientProperty
       this->set(t);
       return *this;
    }
-   
-   
+
+
 private:
 
    static
    void __eval(ClientPropertyBase* obj, DBusMessageIter& iter)
    {
       ClientProperty* that = (ClientProperty*)obj;
-      
+
       data_type d;
       detail::PropertyCodec<data_type>::decode(iter, d);
 
       if (that->f_)
          that->f_(CallState(42), d);
-   }   
-   
-   
+   }
+
+
    function_type f_;
 };
 
@@ -307,7 +309,7 @@ struct ClientMethod
 
     ClientMethod(const char* method_name, StubBase* parent)
      : method_name_(method_name)
-     , parent_(parent)   
+     , parent_(parent)
     {
       // NOOP
     }
