@@ -122,7 +122,7 @@ provided under
 
 This mapping is done automatically by simppl, for servers this is currently
 fix. But clients may connect to any bus/objectpath layout in order to connect
-any D-Bus service. This also means that only one interface can be provided 
+any DBus service. This also means that only one interface can be provided 
 by a distinct objectpath, at least other than the properties interface needed for
 providing service properties. But we will ignore signals and
 properties for now and continue with our EchoService. Let's instantiate the
