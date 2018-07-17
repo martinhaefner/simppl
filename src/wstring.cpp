@@ -24,7 +24,7 @@ void WStringCodec::encode(DBusMessageIter& iter, const std::wstring& str)
       Codec<uint32_t>::encode(_iter, (uint32_t)t);
    }
 
-   dbus_message_iter_close_container(&_iter, &_iter);
+   dbus_message_iter_close_container(&iter, &_iter);
 }
 
 
