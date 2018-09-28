@@ -5,6 +5,7 @@
 #include <cassert>
 #include <functional>
 #include <map>
+#include <string>
 
 #include <dbus/dbus.h>
 
