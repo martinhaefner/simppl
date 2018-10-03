@@ -4,6 +4,8 @@
 
 #include <exception>
 #include <cstdint>
+#include <stdexcept>
+#include <sstream>
 
 #include "simppl/detail/constants.h"
 #include "simppl/types.h"
@@ -54,6 +56,42 @@ private:
     uint32_t serial_;
 };
 
+class RuntimeError : public std::runtime_error
+{
+public:
+    RuntimeError(const char* action, ::DBusError&& error)
+      : std::runtime_error(format_what(action, error))
+    {
+        dbus_error_init(&error_);
+        dbus_move_error(&error, &error_);
+    }
+
+    virtual ~RuntimeError()
+    {
+        dbus_error_free(&error_);
+    }
+
+    const char* name() const noexcept
+    {
+        return error_.name;
+    }
+
+    const char* message() const noexcept
+    {
+        return error_.message;
+    }
+
+private:
+    static std::string format_what(const char* action, const ::DBusError& error)
+    {
+        std::ostringstream ss;
+        ss << action << ": " << error.name << error.message;
+        return ss.str();
+    }
+
+private:
+    ::DBusError error_;
+};
 
 }   // namespace simppl
 
