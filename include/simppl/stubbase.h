@@ -3,6 +3,7 @@
 
 
 #include <functional>
+#include <string>
 
 #include <dbus/dbus.h>
 
