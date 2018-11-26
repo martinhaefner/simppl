@@ -229,6 +229,8 @@ protected:
 template<typename DataT>
 struct BaseProperty : ServerPropertyBase
 {
+   typedef std::function<DataT()> cb_type;
+
    BaseProperty(const char* name, SkeletonBase* iface)
     : ServerPropertyBase(name, iface)
     , t_()
@@ -238,21 +240,37 @@ struct BaseProperty : ServerPropertyBase
 
    const DataT& value() const
    {
-      return t_;
+       const DataT* t = t_.template get<DataT>();
+       assert(t);
+       return *t;
    }
 
    static
    void __eval(ServerPropertyBase* obj, DBusMessage* response)
    {
-      DBusMessageIter iter;
-      dbus_message_iter_init_append(response, &iter);
+       DBusMessageIter iter;
+       dbus_message_iter_init_append(response, &iter);
 
-      detail::PropertyCodec<DataT>::encode(iter, ((BaseProperty*)obj)->t_);
+       auto that = ((BaseProperty*)obj);
+       detail::PropertyCodec<DataT>::encode(iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
+   }
+
+   void notify(const DataT& data)
+   {
+      this->parent_->send_property_change(this->name_, [this, data](DBusMessageIter& iter){
+         detail::PropertyCodec<DataT>::encode(iter, data);
+      });
+   }
+
+   /// set callback for each read
+   void on_read(cb_type cb)
+   {
+       t_ = cb;
    }
 
 protected:
 
-   DataT t_;
+   Variant<DataT, cb_type> t_;
 };
 
 
@@ -305,16 +323,12 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
+      if (!this->t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->value(), data))
       {
          this->t_ = data;
 
          if (Flags & Notifying)
-         {
-            this->parent_->send_property_change(this->name_, [this](DBusMessageIter& iter){
-               detail::PropertyCodec<DataT>::encode(iter, this->t_);
-            });
-         }
+            this->notify(data);
       }
 
       return *this;
