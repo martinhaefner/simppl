@@ -16,6 +16,10 @@ namespace dbus
 
 struct ObjectPath
 {
+    /**
+     * Empty or invalid object paths may not be sent via DBus according to
+     * the specification.
+     */
     inline
     ObjectPath()
     {
@@ -28,7 +32,7 @@ struct ObjectPath
     {
         // NOOP
     }
-    
+
     inline
     ObjectPath(const char* p)
      : path(p)
@@ -42,19 +46,25 @@ struct ObjectPath
         return path < rhs.path;
     }
 
+    inline
+    bool operator!=(const ObjectPath& rhs) const
+    {
+        return path != rhs.path;
+    }
+
     std::string path;
 };
 
 
 struct ObjectPathCodec
 {
-   static 
+   static
    void encode(DBusMessageIter& iter, const ObjectPath& p);
-   
-   static 
+
+   static
    void decode(DBusMessageIter& iter, ObjectPath& p);
-   
-   static 
+
+   static
    std::ostream& make_type_signature(std::ostream& os);
 };
 
