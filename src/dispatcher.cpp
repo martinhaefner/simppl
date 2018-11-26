@@ -502,7 +502,8 @@ void Dispatcher::add_server(SkeletonBase& serv)
    DBusError err;
    dbus_error_init(&err);
 
-   dbus_bus_request_name(conn_, serv.busname(), 0, &err);
+   if (serv.busname()[0] != '\0')
+      dbus_bus_request_name(conn_, serv.busname(), 0, &err);
 
    if (dbus_error_is_set(&err))
    {
@@ -524,6 +525,12 @@ void Dispatcher::add_server(SkeletonBase& serv)
    }
 
    serv.disp_ = this;
+}
+
+
+void Dispatcher::remove_server(SkeletonBase& serv)
+{
+    dbus_connection_unregister_object_path(conn_, serv.objectpath());
 }
 
 

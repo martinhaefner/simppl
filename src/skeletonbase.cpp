@@ -46,6 +46,9 @@ SkeletonBase::SkeletonBase()
 
 SkeletonBase::~SkeletonBase()
 {
+   if (disp_)
+      disp_->remove_server(*this);
+
    delete[] iface_;
    delete[] busname_;
    delete[] objectpath_;
@@ -109,7 +112,7 @@ void SkeletonBase::respond_with(detail::ServerResponseHolder response)
    {
       DBusMessageIter iter;
       dbus_message_iter_init_append(rmsg.get(), &iter);
-    
+
       response.f_(iter);
    }
 
@@ -130,7 +133,7 @@ void SkeletonBase::respond_on(ServerRequestDescriptor& req, detail::ServerRespon
    {
       DBusMessageIter iter;
       dbus_message_iter_init_append(rmsg.get(), &iter);
-    
+
       response.f_(iter);
    }
 
@@ -238,16 +241,16 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                "    </signal>\n"
                "  </interface>\n";
          }
-         
+
          oss << "</node>\n";
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
 
          DBusMessageIter iter;
          dbus_message_iter_init_append(reply, &iter);
-    
+
          encode(iter, oss.str());
-         
+
          dbus_connection_send(disp_->conn_, reply, nullptr);
 
          return DBUS_HANDLER_RESULT_HANDLED;
@@ -267,7 +270,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           {
              DBusMessageIter iter;
              dbus_message_iter_init(msg, &iter);
-       
+
              decode(iter, interface, attribute);
 
              while(p)
@@ -284,11 +287,11 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                    else
                    {
                       message_ptr_t response = make_message(nullptr);
-                      
+
                       try
                       {
                          p->evalSet(iter);
-                        
+
                          response = make_message(dbus_message_new_method_return(msg));
                       }
                       catch(simppl::dbus::Error& err)
@@ -300,7 +303,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                          simppl::dbus::Error e("simppl.dbus.UnhandledException");
                          response = e.make_reply_for(*msg);
                       }
-                      
+
                       dbus_connection_send(disp_->conn_, response.get(), nullptr);
                    }
 
@@ -317,7 +320,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
              simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
              auto r = err.make_reply_for(*msg);
              dbus_connection_send(disp_->conn_, r.get(), nullptr);
-             
+
              return DBUS_HANDLER_RESULT_HANDLED;
           }
        }
@@ -330,7 +333,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
          if (!strcmp(method, pm->name_))
          {
             current_request_.set(pm, msg);
-            
+
             try
             {
                pm->eval(msg);
@@ -371,7 +374,7 @@ void SkeletonBase::send_signal(const char* signame, std::function<void(DBusMessa
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-    
+
     f(iter);
 
     dbus_connection_send(disp_->conn_, msg.get(), nullptr);
@@ -386,11 +389,11 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
 
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
-    
+
    encode(iter, iface());
-   
+
    DBusMessageIter vec_iter;
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, 
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
       DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING DBUS_DICT_ENTRY_END_CHAR_AS_STRING
       , &vec_iter);
 
