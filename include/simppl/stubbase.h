@@ -3,6 +3,8 @@
 
 
 #include <functional>
+#include <string>
+#include <vector>
 
 #include <dbus/dbus.h>
 
@@ -53,9 +55,9 @@ public:
    StubBase();
 
    inline
-   const char* iface() const
+   const char* iface(std::size_t index = 0) const
    {
-      return iface_;
+      return ifaces_[index].c_str();
    }
 
    inline
@@ -113,7 +115,7 @@ protected:
 
    PendingCall set_property_async(const char* Name, std::function<void(DBusMessageIter&)>&& f);
 
-   char* iface_;
+   std::vector<std::string> ifaces_;
    char* objectpath_;
    std::string busname_;
    ConnectionState conn_state_;
