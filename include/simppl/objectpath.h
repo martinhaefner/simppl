@@ -40,10 +40,34 @@ struct ObjectPath
         // NOOP
     }
 
-    inline
-    bool operator<(const ObjectPath& rhs) const
+    inline friend bool operator==(const ObjectPath& lhs, const ObjectPath& rhs)
     {
-        return path < rhs.path;
+        return lhs.path == rhs.path;
+    }
+
+    inline friend bool operator!=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    inline friend bool operator<(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return lhs.path < rhs.path;
+    }
+
+    inline friend bool operator<=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs > rhs);
+    }
+
+    inline friend bool operator>(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return rhs < lhs;
+    }
+
+    inline friend bool operator>=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs < rhs);
     }
 
     inline
