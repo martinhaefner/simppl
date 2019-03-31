@@ -361,7 +361,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
          pm = pm->next_;
       }
 
-      std::cerr << "method '" << method << "' unknown" << std::endl;
+      // std::cerr << "method '" << method << "' unknown" << std::endl;
    }
 
    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

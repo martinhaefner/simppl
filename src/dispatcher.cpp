@@ -409,29 +409,35 @@ void Dispatcher::init(int have_introspection, const char* busname)
 
    assert(!busname || !strncmp(busname, "bus:", 4));
 
+   const char* action = "connect";
    if (!busname || !strcmp(busname, "bus:session"))
    {
+      action = "dbus_bus_get_private";
       conn_ = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
    }
    else
    {
        if (!strcmp(busname, "bus:system"))
        {
+          action = "dbus_bus_get_private";
           conn_ = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
        }
        else
        {
+          action = "dbus_connection_open_private";
           conn_ = dbus_connection_open_private(busname, &err);
 
           if (conn_)
           {
              dbus_error_init(&err);
+             action = "dbus_bus_register";
              dbus_bus_register(conn_, &err);
           }
        }
    }
 
-   assert(!dbus_error_is_set(&err));
+   if (dbus_error_is_set(&err))
+      throw RuntimeError(action, std::move(err));
    dbus_error_free(&err);
 
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);
@@ -440,7 +446,8 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // response is (name, old, new)
    dbus_error_init(&err);
    dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
-   assert(!dbus_error_is_set(&err));
+   if (dbus_error_is_set(&err))
+      throw RuntimeError("dbus_bus_add_match", std::move(err));
    dbus_error_free(&err);
 
    dbus_error_init(&err);
@@ -449,7 +456,8 @@ void Dispatcher::init(int have_introspection, const char* busname)
        << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
 
    dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
-   assert(!dbus_error_is_set(&err));
+   if (dbus_error_is_set(&err))
+      throw RuntimeError("dbus_bus_add_match", std::move(err));
    dbus_error_free(&err);
 
    // call ListNames to get list of available services on the bus
@@ -507,9 +515,7 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
    if (dbus_error_is_set(&err))
    {
-      // FIXME make exception classes
-      std::cerr << "dbus_bus_request_name - DBus error: " << err.name << ": " << err.message << std::endl;
-      dbus_error_free(&err);
+      throw RuntimeError("dbus_bus_request_name", std::move(err));
    }
 
    // register same path as busname, just with / instead of .
@@ -520,8 +526,7 @@ void Dispatcher::add_server(SkeletonBase& serv)
 
    if (dbus_error_is_set(&err))
    {
-       std::cerr << "dbus_connection_register_object_path - DBus error: " << err.name << ": " << err.message << std::endl;
-       dbus_error_free(&err);
+       throw RuntimeError("dbus_connection_register_object_path", std::move(err));
    }
 
    serv.disp_ = this;
@@ -568,8 +573,8 @@ void Dispatcher::register_signal_match(const std::string& match_string)
       dbus_error_init(&err);
 
       dbus_bus_add_match(conn_, match_string.c_str(), &err);
-      assert(!dbus_error_is_set(&err));
-
+      if (dbus_error_is_set(&err))
+         throw RuntimeError("dbus_bus_add_match", std::move(err));
       dbus_error_free(&err);
 
       d->signal_matches_[match_string] = 1;
@@ -591,7 +596,8 @@ void Dispatcher::unregister_signal_match(const std::string& match_string)
          dbus_error_init(&err);
 
          dbus_bus_remove_match(conn_, match_string.c_str(), &err);
-         assert(!dbus_error_is_set(&err));
+         if (dbus_error_is_set(&err))
+            throw RuntimeError("dbus_bus_remove_match", std::move(err));
 
          dbus_error_free(&err);
       }
