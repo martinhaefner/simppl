@@ -18,6 +18,8 @@ add_executable(unittests
    variant.cpp
    buffer.cpp
    serialization.cpp
+   multi_interface.cpp
+   no_interface.cpp
 )
 
 # This is so you can do 'make test' to see all your tests run, instead of
