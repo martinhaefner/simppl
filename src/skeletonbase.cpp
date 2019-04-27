@@ -193,7 +193,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
     const char* method_name = dbus_message_get_member(msg);
     const char* interface_name = dbus_message_get_interface(msg);
 
-#ifdef SIMPPL_HAVE_INTROSPECTION
+#if SIMPPL_HAVE_INTROSPECTION
     if (!strcmp(interface_name, "org.freedesktop.DBus.Introspectable"))
     {
         return handle_introspect_request(msg);
@@ -221,7 +221,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 }
 
 
-#ifdef SIMPPL_HAVE_INTROSPECTION
+#if SIMPPL_HAVE_INTROSPECTION
 DBusHandlerResult SkeletonBase::handle_introspect_request(DBusMessage* msg)
 {
     const char* method = dbus_message_get_member(msg);

@@ -92,7 +92,7 @@ protected:
     void init(std::string busname, std::string objectpath);
 
     DBusHandlerResult handle_request(DBusMessage* msg);
-#ifdef SIMPPL_HAVE_INTROSPECTION
+#if SIMPPL_HAVE_INTROSPECTION
     DBusHandlerResult handle_introspect_request(DBusMessage* msg);
 #endif
     DBusHandlerResult handle_property_request(DBusMessage* msg);
@@ -101,7 +101,9 @@ protected:
     DBusHandlerResult handle_interface_request(DBusMessage* msg, ServerMethodBase& method);
     DBusHandlerResult handle_error(DBusMessage* msg, const char* dbus_error);
 
+#if SIMPPL_HAVE_INTROSPECTION
     void introspect_interface(std::ostream& os, size_type index) const;
+#endif    
     bool has_any_properties() const;
     ServerPropertyBase* find_property(int iface_id, const char* name) const;
     ServerMethodBase* find_method(int iface_id, const char* name) const;

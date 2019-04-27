@@ -68,6 +68,7 @@ private:
 }   // anonymous namespace
 
 
+#if SIMPPL_HAVE_INTROSPECTION
 TEST(NoInterface, introspect)
 {
     struct IntrospectClient : simppl::dbus::Stub<org::freedesktop::DBus::Introspectable>
@@ -99,3 +100,4 @@ TEST(NoInterface, introspect)
     IntrospectClient client(disp);
     disp.run();
 }
+#endif   // SIMPPL_HAVE_INTROSPECTION
