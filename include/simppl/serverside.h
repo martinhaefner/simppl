@@ -254,6 +254,9 @@ struct BaseProperty : ServerPropertyBase
        dbus_message_iter_init_append(response, &iter);
 
        auto that = ((BaseProperty*)obj);
+       
+       // missing initialization?
+       assert(!that->t_.empty());
        detail::PropertyCodec<DataT>::encode(iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
    }
 
