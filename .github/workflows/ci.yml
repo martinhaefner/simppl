@@ -1,0 +1,24 @@
+name: Simppl CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+
+    steps:
+    - name: install system dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends \
+          libdbus-1-dev
+    - name: checkout
+      uses: actions/checkout@v1
+    - name: build
+      run: mkdir build-github
+    - name: configure
+      run: pushd build-github && cmake .. && popd
+    - name: make
+      run: make -C build-github
+    - name: make test
+      run: make -C build-github test
