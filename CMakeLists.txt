@@ -1,123 +1,124 @@
-cmake_minimum_required (VERSION 2.8)
+#
+# Setup the cmake file to be added with a find_package
+# or an add_subdirectory.
+#
+cmake_minimum_required(VERSION 3.5)
+project(simppl VERSION 0.3.0)
 
-project (simppl)
+# Configuration specific to being the main project
+if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+    set(SIMPPL_NOT_SUBPROJECT ON)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+    include(CTest)
+endif()
 
+# Reference the FindDBus module until an upstream one is available
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
+set(CMAKE_CXX_STANDARD 14)
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-#set(CMAKE_CXX_STANDARD 14)
-
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -pedantic -std=c++14 -pthread")
-set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -Wall -pedantic -std=c++14 -pthread")
+# enable introspection by default
+option(HAVE_INTROSPECTION "Have introspection" ON)
+include(CMakeDependentOption)
+cmake_dependent_option(SIMPPL_BUILD_TESTS "Build tests"
+    ON "SIMPPL_NOT_SUBPROJECT" OFF
+)
+cmake_dependent_option(SIMPPL_BUILD_EXAMPLES "Build examples"
+    ON "SIMPPL_NOT_SUBPROJECT" OFF
+)
 
 # enable threading
-#set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-#set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-#find_package(Threads REQUIRED)
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
 
+find_package(DBus REQUIRED)
+find_package(Boost)
 
-# enable introspection by default
-OPTION(HAVE_INTROSPECTION "Have introspection" ON)
+add_library(simppl SHARED
+    src/callstate.cpp
+    src/dispatcher.cpp
+    src/error.cpp
+    src/serverresponseholder.cpp
+    src/skeletonbase.cpp
+    src/serverside.cpp
+    src/stubbase.cpp
+    src/timeout.cpp
+    src/util.cpp
+    src/serverrequestdescriptor.cpp
+    src/pendingcall.cpp
+    src/string.cpp
+    src/wstring.cpp
+    src/objectpath.cpp
+    src/filedescriptor.cpp
+    src/clientside.cpp
+    src/serialization.cpp
+    src/bool.cpp
+)
+# Provide a namespaced alias
+add_library(Simppl::simppl ALIAS simppl)
 
 if(HAVE_INTROSPECTION)
-   add_definitions(-DSIMPPL_HAVE_INTROSPECTION=1)
+    target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_INTROSPECTION=1)
 else()
-   add_definitions(-DSIMPPL_HAVE_INTROSPECTION=0)
+    target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_INTROSPECTION=0)
 endif()
 
-
-include_directories(include)
-
-# boost fusion available?
-find_path(BOOST_INCLUDE_DIR
-     boost/fusion/adapted.hpp
-     PATHS /usr/include /usr/local/include
-     ONLY_CMAKE_FIND_ROOT_PATH
-     NO_DEFAULT_PATH
+target_include_directories(simppl
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-# DBus includes
-find_path(DBUS_INCLUDE_DIR
-    dbus/dbus-bus.h
-    PATHS /usr/include /usr/local/include
-    PATH_SUFFIXES dbus-1.0
-    ONLY_CMAKE_FIND_ROOT_PATH
-    NO_DEFAULT_PATH
+target_compile_options(simppl PRIVATE -Werror -Wall)
+target_link_libraries(simppl PUBLIC
+    DBUS::DBUS
+    ${CMAKE_THREAD_LIBS_INIT}
 )
 
-find_path(DBUS_ARCHDEPS_INCLUDE_DIR
-    dbus/dbus-arch-deps.h
-    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
-    PATH_SUFFIXES dbus-1.0/include
-    ONLY_CMAKE_FIND_ROOT_PATH
-    NO_DEFAULT_PATH
-)
-
-find_path(DBUS_LIBDIR
-    libdbus-1.so
-    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
-    ONLY_CMAKE_FIND_ROOT_PATH
-    NO_DEFAULT_PATH
-)
-
-if(DBUS_INCLUDE_DIR)
-    message("Found DBus include dir under '${DBUS_INCLUDE_DIR}'")
-    include_directories(${DBUS_INCLUDE_DIR})
-else()
-    message(FATAL_ERROR "Didn't find dbus directory")
-endif()
-
-if(DBUS_ARCHDEPS_INCLUDE_DIR)
-    message("Found DBus arch-deps include dir under '${DBUS_ARCHDEPS_INCLUDE_DIR}'")
-    include_directories(${DBUS_ARCHDEPS_INCLUDE_DIR})
-else()
-    message(FATAL_ERROR "Didn't find dbus arch-deps directory")
-endif()
-
-if(DBUS_LIBDIR)
-    message("Found DBus library in '${DBUS_LIBDIR}'")
-    link_directories(${DBUS_LIBDIR})
-else()
-    message(FATAL_ERROR "Didn't find dbus-1 shared library")
-endif()
-
-
-# gtest environment
-if(NOT GTEST_ROOT)
-   message("Searching for gtest installation...")
-
-   find_path(GTEST_ROOT
-       include/gtest/gtest.h
-       PATHS $ENV{HOME}/*
-       PATHS /usr/share/*
-       ONLY_CMAKE_FIND_ROOT_PATH
-       NO_DEFAULT_PATH
-   )
-endif()
-
-
-if(BOOST_INCLUDE_DIR AND GTEST_ROOT)
-   message("Building fusion tests")
-   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=1)
-else()
-   add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=0)
-endif()
-
-
-add_subdirectory(src)
+# Build a set of examples
 add_subdirectory(examples)
 
-
-# having tests?
-if(GTEST_ROOT)
-    message("Building tests")
+if(SIMPPL_BUILD_TESTS AND BUILD_TESTING)
     add_subdirectory(tests)
-else()
-    message("Omitting tests!")
 endif()
 
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/simppl DESTINATION include)
+#
+# Installation of stuff
+#
+if(SIMPPL_NOT_SUBPROJECT)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS simppl
+        EXPORT simppl-targets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(EXPORT simppl-targets
+        FILE SimpplTargets.cmake
+        NAMESPACE Simppl::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/simppl
+    )
+
+    configure_package_config_file(cmake/SimpplConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/SimpplConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/simppl
+    )
+    write_basic_package_version_file(SimpplConfigVersion.cmake
+        VERSION ${PACKAGE_VERSION}
+        COMPATIBILITY
+            SameMajorVersion
+    )
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SimpplConfig.cmake
+                  ${CMAKE_CURRENT_BINARY_DIR}/SimpplConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/simppl
+    )
+
+endif()

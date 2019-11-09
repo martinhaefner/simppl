@@ -1,7 +1,3 @@
-
-include_directories(. ../include)
-
-
 add_executable(echo
     echo/main.cpp
 )
