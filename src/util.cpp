@@ -27,7 +27,7 @@ char* create_objectpath(const char* iface, const char* role)
    {
       if (*p == '.')
          *p = '/';
-         ++p;
+      ++p;
    }
 
    return objectpath;
