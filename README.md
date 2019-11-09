@@ -357,7 +357,7 @@ on server side. See the clients connected callback:
    class MyComplexClient : simppl::dbus::Stub<ComplexTest>
    {
       MyComplexClient(simppl::dbus::Dispatcher& disp)
-       : simppl::dbus::Stub<ComplexTest>(disp, "myEcho")
+       : simppl::dbus::Stub<ComplexTest>(disp, "test")
       {
          connected >> [this](simppl::dbus::ConnectionState st)
          {
@@ -383,6 +383,35 @@ on server side. See the clients connected callback:
       }
    };
 ```
+
+Properties on server side can be either implemented by providing a
+callback function to be called whenever the property is requested by a 
+client or the property value can be stored within the server instance.
+Therefore, you have to decide and initialize the property within the 
+server's constructor. Let's see the difference:
+
+```c++
+   class MyComplexServer : simppl::dbus::Skeleton<ComplexTest>
+   {
+      MyComplexServer(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Skeleton<ComplexTest>(disp, "test")
+      {
+         // either using the callback version... 
+         data.on_read([](){
+            return Data({ 42, "Hallo", ... });
+         });
+         
+         // ... or keep a copy in the server instance
+         data = Data({ 42, "Hallo", ... });
+      }
+   };
+```
+ 
+The notification of property changes is either done by calling the properties
+notify(...) method in case the property is initialized for callback access 
+or by just assigning a new value to the stored property instance. 
+The version of property access to be used in your server is completely
+transparent for the client and depends on your use-case. 
 
 This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without

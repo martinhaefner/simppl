@@ -16,6 +16,10 @@ namespace dbus
 
 struct ObjectPath
 {
+    /**
+     * Empty or invalid object paths may not be sent via DBus according to
+     * the specification.
+     */
     inline
     ObjectPath()
     {
@@ -28,7 +32,7 @@ struct ObjectPath
     {
         // NOOP
     }
-    
+
     inline
     ObjectPath(const char* p)
      : path(p)
@@ -36,10 +40,40 @@ struct ObjectPath
         // NOOP
     }
 
-    inline
-    bool operator<(const ObjectPath& rhs) const
+    inline friend bool operator==(const ObjectPath& lhs, const ObjectPath& rhs)
     {
-        return path < rhs.path;
+        return lhs.path == rhs.path;
+    }
+
+    inline friend bool operator!=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    inline friend bool operator<(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return lhs.path < rhs.path;
+    }
+
+    inline friend bool operator<=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs > rhs);
+    }
+
+    inline friend bool operator>(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return rhs < lhs;
+    }
+
+    inline friend bool operator>=(const ObjectPath& lhs, const ObjectPath& rhs)
+    {
+        return !(lhs < rhs);
+    }
+
+    inline
+    bool operator!=(const ObjectPath& rhs) const
+    {
+        return path != rhs.path;
     }
 
     std::string path;
@@ -48,13 +82,13 @@ struct ObjectPath
 
 struct ObjectPathCodec
 {
-   static 
+   static
    void encode(DBusMessageIter& iter, const ObjectPath& p);
-   
-   static 
+
+   static
    void decode(DBusMessageIter& iter, ObjectPath& p);
-   
-   static 
+
+   static
    std::ostream& make_type_signature(std::ostream& os);
 };
 

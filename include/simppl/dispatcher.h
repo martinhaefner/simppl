@@ -28,8 +28,8 @@ void enable_threads();
 
 
 /**
- * Event dispatcher. Actually the dispatcher wraps the DBusConnection 
- * and therefore is the access point for event loop integration or 
+ * Event dispatcher. Actually the dispatcher wraps the DBusConnection
+ * and therefore is the access point for event loop integration or
  * starting a self-contained event loop via the functions @c init(),
  * @c run and @c step_ms.
  */
@@ -61,13 +61,13 @@ struct Dispatcher
    {
       request_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
    }
-   
+
    /**
     * Initialize a self-hosted eventloop. The function has only to be called
     * if the mainloop is proved
     */
    void init();
-   
+
    /**
     * Start self-hosted eventloop. Will do all steps of initialing the
     * DBusConnection callouts for I/O and runs @c step_ms() in a loop.
@@ -123,8 +123,8 @@ struct Dispatcher
 
 private:
 
-   /** 
-    * 'Inlined constructor' for checking match of introspection macro setting 
+   /**
+    * 'Inlined constructor' for checking match of introspection macro setting
     * in user-code and compiled shared library.
     */
    void init(int have_introspection, const char* busname);
@@ -143,6 +143,8 @@ private:
 
    /// add a server
    void add_server(SkeletonBase& server);
+
+   void remove_server(SkeletonBase& server);
 
    /// Do a single iteration on the self-hosted mainloop.
    int step_ms(int millis);

@@ -11,7 +11,11 @@
 
 #include "simppl/detail/util.h"
 
+#include <cxxabi.h>
+
+#include <algorithm>
 #include <iostream>
+#include <memory>
 
 
 namespace simppl
@@ -19,6 +23,20 @@ namespace simppl
 
 namespace dbus
 {
+
+namespace detail
+{
+
+struct FreeDeleter {
+    template<typename T>
+    void operator()(T* o) {
+        ::free(o);
+    }
+};
+
+using DemangledNamePtr = std::unique_ptr<char, FreeDeleter>;
+
+} // namespace detail
 
 
 /*static*/
@@ -29,56 +47,55 @@ DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusM
 }
 
 
-SkeletonBase::SkeletonBase()
- : iface_(nullptr)
- , busname_(nullptr)
- , objectpath_(nullptr)
- , disp_(nullptr)
- , methods_(nullptr)
- , properties_(nullptr)
+SkeletonBase::SkeletonBase(std::size_t iface_count)
+  : ifaces_(iface_count, std::string())
+  , disp_(nullptr)
+  , method_heads_(iface_count, nullptr)
+  , property_heads_(iface_count, nullptr)
 #if SIMPPL_HAVE_INTROSPECTION
- , signals_(nullptr)
+  , signal_heads_(iface_count, nullptr)
 #endif
-{
-   // NOOP
-}
+{}
 
 
 SkeletonBase::~SkeletonBase()
 {
-   delete[] iface_;
-   delete[] busname_;
-   delete[] objectpath_;
+   if (disp_)
+      disp_->remove_server(*this);
 }
 
 
-void SkeletonBase::init(char* iface, const char* role)
+void SkeletonBase::init(const char* mangled_iface_list, const char* role)
 {
     assert(role);
 
-    iface_ = detail::extract_interface(iface);
+    detail::DemangledNamePtr iface(abi::__cxa_demangle(mangled_iface_list, 0, 0, 0));
+    ifaces_ = detail::extract_interfaces(1, iface.get());
 
-    objectpath_ = detail::create_objectpath(iface_, role);
-    busname_ = detail::create_busname(iface_, role);
-
-    free(iface);
+    objectpath_ = detail::create_objectpath(ifaces_[0].c_str(), role);
+    busname_ = detail::create_busname(ifaces_[0].c_str(), role);
 }
 
 
-void SkeletonBase::init(char* iface, const char* busname, const char* objectpath)
+void SkeletonBase::init(size_type iface_count, const char* mangled_iface_list, std::string busname, std::string objectpath)
 {
-    assert(busname);
-    assert(objectpath);
+    assert(busname.length() > 0);
+    assert(objectpath.length() > 0);
 
-    iface_ = detail::extract_interface(iface);
+    detail::DemangledNamePtr iface(abi::__cxa_demangle(mangled_iface_list, 0, 0, 0));
+    ifaces_ = detail::extract_interfaces(iface_count, iface.get());
+    busname_ = std::move(busname);
+    objectpath_ = std::move(objectpath);
+}
 
-    busname_ = new char[strlen(busname) + 1];
-    strcpy(busname_, busname);
 
-    objectpath_ = new char[strlen(objectpath)+1];
-    strcpy(objectpath_, objectpath);
+void SkeletonBase::init(std::string busname, std::string objectpath)
+{
+    assert(busname.length() > 0);
+    assert(objectpath.length() > 0);
 
-    free(iface);
+    busname_ = std::move(busname);
+    objectpath_ = std::move(objectpath);
 }
 
 
@@ -109,7 +126,7 @@ void SkeletonBase::respond_with(detail::ServerResponseHolder response)
    {
       DBusMessageIter iter;
       dbus_message_iter_init_append(rmsg.get(), &iter);
-    
+
       response.f_(iter);
    }
 
@@ -130,7 +147,7 @@ void SkeletonBase::respond_on(ServerRequestDescriptor& req, detail::ServerRespon
    {
       DBusMessageIter iter;
       dbus_message_iter_init_append(rmsg.get(), &iter);
-    
+
       response.f_(iter);
    }
 
@@ -173,54 +190,66 @@ const ServerRequestDescriptor& SkeletonBase::current_request() const
 
 DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 {
-   const char* method = dbus_message_get_member(msg);
-   const char* interface = dbus_message_get_interface(msg);
+    const char* method_name = dbus_message_get_member(msg);
+    const char* interface_name = dbus_message_get_interface(msg);
 
-   if (!strcmp(interface, "org.freedesktop.DBus.Introspectable"))
-   {
 #if SIMPPL_HAVE_INTROSPECTION
-      if (!strcmp(method, "Introspect"))
-      {
-         std::ostringstream oss;
+    if (!strcmp(interface_name, "org.freedesktop.DBus.Introspectable"))
+    {
+        return handle_introspect_request(msg);
+    }
+#endif
 
-         oss << "<?xml version=\"1.0\" ?>\n"
-             "<node name=\""<< objectpath() << "\">\n"
-             "  <interface name=\""<< iface() << "\">\n";
+    if (!strcmp(interface_name, "org.freedesktop.DBus.Properties"))
+    {
+        return handle_property_request(msg);
+    }
 
-         auto pm = this->methods_;
-         while(pm)
-         {
-            pm->introspect(oss);
-            pm = pm->next_;
-         }
+    int iface_id = find_interface(interface_name);
+    if (iface_id == invalid_iface_id)
+    {
+        return handle_error(msg, DBUS_ERROR_UNKNOWN_INTERFACE);
+    }
 
-         auto pa = this->properties_;
-         while(pa)
-         {
-            pa->introspect(oss);
-            pa = pa->next_;
-         }
+    ServerMethodBase* method = find_method(iface_id, method_name);
+    if (!method)
+    {
+        return handle_error(msg, DBUS_ERROR_UNKNOWN_METHOD);
+    }
 
-         auto ps = this->signals_;
-         while(ps)
-         {
-            ps->introspect(oss);
-            ps = ps->next_;
-         }
+    return handle_interface_request(msg, *method);
+}
 
-         // introspectable
-         oss << "  </interface>\n"
-             "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
-             "    <method name=\"Introspect\">\n"
-             "      <arg name=\"data\" type=\"s\" direction=\"out\"/>\n"
-             "    </method>\n"
-             "  </interface>\n";
 
-         // attributes
-         if (this->properties_)
-         {
-            oss <<
-               "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
+#if SIMPPL_HAVE_INTROSPECTION
+DBusHandlerResult SkeletonBase::handle_introspect_request(DBusMessage* msg)
+{
+    const char* method = dbus_message_get_member(msg);
+
+    if (strcmp(method, "Introspect") != 0)
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    std::ostringstream oss;
+
+    oss << "<?xml version=\"1.0\" ?>\n"
+           "<node name=\""<< objectpath() << "\">\n";
+
+    for (size_type i = 0; i < ifaces_.size(); ++i)
+    {
+        introspect_interface(oss, i);
+    }
+
+    // introspectable
+    oss << "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
+           "    <method name=\"Introspect\">\n"
+           "      <arg name=\"data\" type=\"s\" direction=\"out\"/>\n"
+           "    </method>\n"
+           "  </interface>\n";
+
+    // properties
+    if (has_any_properties())
+    {
+        oss << "  <interface name=\"org.freedesktop.DBus.Properties\">\n"
                "    <method name=\"Get\">\n"
                "      <arg name=\"interface_name\" type=\"s\" direction=\"in\"/>\n"
                "      <arg name=\"property_name\" type=\"s\" direction=\"in\"/>\n"
@@ -237,148 +266,230 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                "      <arg name=\"invalidated_properties\" type=\"as\"/>\n"
                "    </signal>\n"
                "  </interface>\n";
-         }
-         
-         oss << "</node>\n";
+    }
 
-         DBusMessage* reply = dbus_message_new_method_return(msg);
+    oss << "</node>\n";
 
-         DBusMessageIter iter;
-         dbus_message_iter_init_append(reply, &iter);
-    
-         encode(iter, oss.str());
-         
-         dbus_connection_send(disp_->conn_, reply, nullptr);
+    DBusMessage* reply = dbus_message_new_method_return(msg);
 
-         return DBUS_HANDLER_RESULT_HANDLED;
-      }
-#endif   // #if SIMPPL_HAVE_INTROSPECTION
-   }
-   else if (!strcmp(interface, "org.freedesktop.DBus.Properties"))
-   {
-       if (!strcmp(method, "Get") || !strcmp(method, "Set"))
-       {
-          auto p = this->properties_;
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(reply, &iter);
 
-          std::string interface;
-          std::string attribute;
+    encode(iter, oss.str());
 
-          try
-          {
-             DBusMessageIter iter;
-             dbus_message_iter_init(msg, &iter);
-       
-             decode(iter, interface, attribute);
+    dbus_connection_send(disp_->conn_, reply, nullptr);
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+#endif  // defined(SIMPPL_HAVE_INTROSPECTION)
 
-             while(p)
-             {
-                if (attribute == p->name_)
-                {
-                   if (method[0] == 'G')
-                   {
-                      message_ptr_t response = make_message(dbus_message_new_method_return(msg));
-                      p->eval(response.get());
 
-                      dbus_connection_send(disp_->conn_, response.get(), nullptr);
-                   }
-                   else
-                   {
-                      message_ptr_t response = make_message(nullptr);
-                      
-                      try
-                      {
-                         p->evalSet(iter);
-                        
-                         response = make_message(dbus_message_new_method_return(msg));
-                      }
-                      catch(simppl::dbus::Error& err)
-                      {
-                         response = err.make_reply_for(*msg);
-                      }
-                      catch(...)
-                      {
-                         simppl::dbus::Error e("simppl.dbus.UnhandledException");
-                         response = e.make_reply_for(*msg);
-                      }
-                      
-                      dbus_connection_send(disp_->conn_, response.get(), nullptr);
-                   }
+DBusHandlerResult SkeletonBase::handle_property_request(DBusMessage* msg)
+{
+    DBusMessageIter iter;
+    std::string interface_name;
+    std::string property_name;
 
-                   return DBUS_HANDLER_RESULT_HANDLED;
-                }
+    try
+    {
+        dbus_message_iter_init(msg, &iter);
+        decode(iter, interface_name, property_name);
+    }
+    catch(DecoderError&)
+    {
+        return handle_error(msg, DBUS_ERROR_INVALID_ARGS);
+    }
 
-                p = p->next_;
-             }
+    int iface_id = find_interface(interface_name);
+    if (iface_id == invalid_iface_id)
+    {
+        return handle_error(msg, DBUS_ERROR_UNKNOWN_INTERFACE);
+    }
 
-             std::cerr << "attribute '" << attribute << "' unknown" << std::endl;
-          }
-          catch(DecoderError&)
-          {
-             simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
-             auto r = err.make_reply_for(*msg);
-             dbus_connection_send(disp_->conn_, r.get(), nullptr);
-             
-             return DBUS_HANDLER_RESULT_HANDLED;
-          }
-       }
-   }
-   else
-   {
-      auto pm = this->methods_;
-      while(pm)
-      {
-         if (!strcmp(method, pm->name_))
-         {
-            current_request_.set(pm, msg);
-            
-            try
-            {
-               pm->eval(msg);
-            }
-            catch(DecoderError&)
-            {
-               simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
-               auto r = err.make_reply_for(*msg);
-               dbus_connection_send(disp_->conn_, r.get(), nullptr);
-            }
-            catch(...)
-            {
-               simppl::dbus::Error e("simppl.dbus.UnhandledException");
-               auto r = e.make_reply_for(*msg);
-               dbus_connection_send(disp_->conn_, r.get(), nullptr);
-            }
+    ServerPropertyBase* property = find_property(iface_id, property_name);
+    if (!property)
+    {
+        return handle_error(msg, DBUS_ERROR_UNKNOWN_PROPERTY);
+    }
 
-            // current_request_ is only valid if no response handler was called
-            if (current_request_)
-               current_request_.clear();
-
-            return DBUS_HANDLER_RESULT_HANDLED;
-         }
-
-         pm = pm->next_;
-      }
-
-      std::cerr << "method '" << method << "' unknown" << std::endl;
-   }
-
-   return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    const char* method = dbus_message_get_member(msg);
+    if (!strcmp(method, "Get"))
+    {
+        return handle_property_get_request(msg, *property);
+    }
+    else if(!strcmp(method, "Set"))
+    {
+        return handle_property_set_request(msg, *property, iter);
+    }
+    else
+    {
+        return handle_error(msg, DBUS_ERROR_UNKNOWN_METHOD);
+    }
 }
 
 
-void SkeletonBase::send_signal(const char* signame, std::function<void(DBusMessageIter&)>&& f)
+DBusHandlerResult SkeletonBase::handle_property_get_request(DBusMessage* msg, ServerPropertyBase& property)
 {
-    message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(), signame));
+    message_ptr_t response = make_message(dbus_message_new_method_return(msg));
+    property.eval(response.get());
+    dbus_connection_send(disp_->conn_, response.get(), nullptr);
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+
+DBusHandlerResult SkeletonBase::handle_property_set_request(DBusMessage* msg, ServerPropertyBase& property, DBusMessageIter& iter)
+{
+    message_ptr_t response = make_message(nullptr);
+    try
+    {
+        property.evalSet(iter);
+        response = make_message(dbus_message_new_method_return(msg));
+    }
+    catch(simppl::dbus::Error& err)
+    {
+        response = err.make_reply_for(*msg);
+    }
+    catch(...)
+    {
+        simppl::dbus::Error err("simppl.dbus.UnhandledException");
+        response = err.make_reply_for(*msg);
+    }
+
+    dbus_connection_send(disp_->conn_, response.get(), nullptr);
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+
+DBusHandlerResult SkeletonBase::handle_interface_request(DBusMessage* msg, ServerMethodBase& method)
+{
+    current_request_.set(&method, msg);
+
+    try
+    {
+        method.eval(msg);
+    }
+    catch(DecoderError&)
+    {
+        // don't use `handle_error` as we may need to clear the current request
+        simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
+        auto r = err.make_reply_for(*msg);
+        dbus_connection_send(disp_->conn_, r.get(), nullptr);
+    }
+    catch(...)
+    {
+        // don't use `handle_error` as we may need to clear the current request
+        simppl::dbus::Error e("simppl.dbus.UnhandledException");
+        auto r = e.make_reply_for(*msg);
+        dbus_connection_send(disp_->conn_, r.get(), nullptr);
+    }
+
+    // current_request_ is only valid if no response handler was called
+    if (current_request_)
+        current_request_.clear();
+
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+
+DBusHandlerResult SkeletonBase::handle_error(DBusMessage* msg, const char* dbus_error)
+{
+    simppl::dbus::Error err(dbus_error);
+    auto r = err.make_reply_for(*msg);
+    dbus_connection_send(disp_->conn_, r.get(), nullptr);
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+#if SIMPPL_HAVE_INTROSPECTION
+void SkeletonBase::introspect_interface(std::ostream& os, size_type index) const
+{
+    os << "  <interface name=\""<< iface(index) << "\">\n";
+
+    for (auto pm = method_heads_[index]; pm; pm = pm->next_)
+    {
+        pm->introspect(os);
+    }
+
+    for (auto pp = this->property_heads_[index]; pp; pp = pp->next_)
+    {
+        pp->introspect(os);
+    }
+
+    for (auto ps = this->signal_heads_[index]; ps; ps = ps->next_)
+    {
+        ps->introspect(os);
+    }
+
+    os << "  </interface>\n";
+}
+#endif //
+
+bool SkeletonBase::has_any_properties() const
+{
+    const auto first = property_heads_.begin();
+    const auto last = property_heads_.end();
+    return std::find_if(first, last, [](ServerPropertyBase* ptr) { return ptr != nullptr; }) != last;
+}
+
+
+int SkeletonBase::find_interface(const char* name) const
+{
+    for (size_type i = 0; i < ifaces_.size(); ++i)
+    {
+        // use strcmp() because ifaces_[i] contains trailing zeros which causes
+        // operator== to fail.
+        if (!strcmp(ifaces_[i].c_str(), name))
+        {
+            // `ifaces_[0]` has the highest ID (e.g. N-1), so we need to
+            // "reverse" the order.
+            return static_cast<int>(ifaces_.size() - i - 1);
+        }
+    }
+
+    return invalid_iface_id;
+}
+
+
+ServerPropertyBase* SkeletonBase::find_property(int iface_id, const char* name) const
+{
+    for (auto pp = property_heads_[iface_id]; pp; pp = pp->next_)
+    {
+        if (!strcmp(pp->name_, name))
+        {
+            return pp;
+        }
+    }
+
+    return nullptr;
+}
+
+
+ServerMethodBase* SkeletonBase::find_method(int iface_id, const char* name) const
+{
+    for (auto pm = method_heads_[iface_id]; pm; pm = pm->next_)
+    {
+        if (!strcmp(pm->name_, name))
+        {
+            return pm;
+        }
+    }
+
+    return nullptr;
+}
+
+
+void SkeletonBase::send_signal(const char* signame, int iface_id, std::function<void(DBusMessageIter&)>&& f)
+{
+    message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), iface(iface_id).c_str(), signame));
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-    
+
     f(iter);
 
     dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }
 
 
-void SkeletonBase::send_property_change(const char* prop, std::function<void(DBusMessageIter&)>&& f)
+void SkeletonBase::send_property_change(const char* prop, int iface_id, std::function<void(DBusMessageIter&)>&& f)
 {
    static std::vector<std::string> invalid;
 
@@ -386,11 +497,11 @@ void SkeletonBase::send_property_change(const char* prop, std::function<void(DBu
 
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
-    
-   encode(iter, iface());
-   
+
+   encode(iter, iface(iface_id));
+
    DBusMessageIter vec_iter;
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, 
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
       DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING DBUS_DICT_ENTRY_END_CHAR_AS_STRING
       , &vec_iter);
 

@@ -21,8 +21,7 @@ namespace dbus
 {
 
 StubBase::StubBase()
- : iface_(nullptr)
- , objectpath_(nullptr)
+ : objectpath_(nullptr)
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
  , signals_(nullptr)
@@ -37,7 +36,6 @@ StubBase::~StubBase()
    if (disp_)
       disp_->remove_client(*this);
 
-   delete[] iface_;
    delete[] objectpath_;
 }
 
@@ -47,7 +45,7 @@ void StubBase::init(char* iface, const char* busname, const char* objectpath)
     assert(busname);
     assert(objectpath);
 
-    iface_ = detail::extract_interface(iface);
+    ifaces_ = detail::extract_interfaces(1, iface);
 
     objectpath_ = new char[strlen(objectpath)+1];
     strcpy(objectpath_, objectpath);
@@ -62,9 +60,9 @@ void StubBase::init(char* iface, const char* role)
 {
     assert(role);
 
-    iface_ = detail::extract_interface(iface);
+    ifaces_ = detail::extract_interfaces(1, iface);
 
-    objectpath_ = detail::create_objectpath(iface_, role);
+    objectpath_ = detail::create_objectpath(this->iface(), role);
 
     busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
     busname_ = this->iface();

@@ -30,6 +30,8 @@ add_executable(unittests
    variant.cpp
    buffer.cpp
    serialization.cpp
+   multi_interface.cpp
+   no_interface.cpp
 )
 if(BOOST_FOUND)
    target_compile_definitions(unittests PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)

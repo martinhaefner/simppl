@@ -52,7 +52,7 @@ struct ServerMethodBase
 
 protected:
 
-   ServerMethodBase(const char* name, SkeletonBase* iface);
+   ServerMethodBase(const char* name, SkeletonBase* iface, int iface_id);
 
    ~ServerMethodBase();
 
@@ -65,7 +65,7 @@ protected:
 
 struct ServerSignalBase
 {
-   ServerSignalBase(const char* name, SkeletonBase* iface);
+   ServerSignalBase(const char* name, SkeletonBase* iface, int iface_id);
 
 #if SIMPPL_HAVE_INTROSPECTION
    virtual void introspect(std::ostream& os) const = 0;
@@ -77,6 +77,7 @@ protected:
    ~ServerSignalBase() = default;
 
    const char* name_;
+   int iface_id_;
    SkeletonBase* parent_;
 };
 
@@ -84,15 +85,15 @@ protected:
 template<typename... T>
 struct ServerSignal : ServerSignalBase
 {
-   ServerSignal(const char* name, SkeletonBase* iface)
-    : ServerSignalBase(name, iface)
+   ServerSignal(const char* name, SkeletonBase* iface, int iface_id)
+    : ServerSignalBase(name, iface, iface_id)
    {
       // NOOP
    }
 
    void notify(typename CallTraits<T>::param_type... args)
    {
-       parent_->send_signal(this->name_, [&](DBusMessageIter& iter){
+       parent_->send_signal(this->name_, this->iface_id_, [&](DBusMessageIter& iter){
             encode(iter, args...);
        });
    }
@@ -132,8 +133,8 @@ struct ServerMethod : ServerMethodBase
 
 
     inline
-    ServerMethod(const char* name, SkeletonBase* iface)
-    : ServerMethodBase(name, iface)
+    ServerMethod(const char* name, SkeletonBase* iface, int iface_id)
+    : ServerMethodBase(name, iface, iface_id)
     {
         eval_ = __eval;
     }
@@ -197,7 +198,7 @@ struct ServerPropertyBase
    typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
    typedef void (*eval_set_type)(ServerPropertyBase*, DBusMessageIter&);
 
-   ServerPropertyBase(const char* name, SkeletonBase* iface);
+   ServerPropertyBase(const char* name, SkeletonBase* iface, int iface_id);
 
    void eval(DBusMessage* msg)
    {
@@ -215,6 +216,7 @@ struct ServerPropertyBase
 
    ServerPropertyBase* next_;   ///< list hook
    const char* name_;
+   int iface_id_;
    SkeletonBase* parent_;
 
 protected:
@@ -229,8 +231,10 @@ protected:
 template<typename DataT>
 struct BaseProperty : ServerPropertyBase
 {
-   BaseProperty(const char* name, SkeletonBase* iface)
-    : ServerPropertyBase(name, iface)
+   typedef std::function<DataT()> cb_type;
+
+   BaseProperty(const char* name, SkeletonBase* iface, int iface_id)
+    : ServerPropertyBase(name, iface, iface_id)
     , t_()
    {
       eval_ = __eval;
@@ -238,21 +242,40 @@ struct BaseProperty : ServerPropertyBase
 
    const DataT& value() const
    {
-      return t_;
+       const DataT* t = t_.template get<DataT>();
+       assert(t);
+       return *t;
    }
 
    static
    void __eval(ServerPropertyBase* obj, DBusMessage* response)
    {
-      DBusMessageIter iter;
-      dbus_message_iter_init_append(response, &iter);
+       DBusMessageIter iter;
+       dbus_message_iter_init_append(response, &iter);
 
-      detail::PropertyCodec<DataT>::encode(iter, ((BaseProperty*)obj)->t_);
+       auto that = ((BaseProperty*)obj);
+       
+       // missing initialization?
+       assert(!that->t_.empty());
+       detail::PropertyCodec<DataT>::encode(iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
+   }
+
+   void notify(const DataT& data)
+   {
+      this->parent_->send_property_change(this->name_, this->iface_id_, [this, data](DBusMessageIter& iter){
+         detail::PropertyCodec<DataT>::encode(iter, data);
+      });
+   }
+
+   /// set callback for each read
+   void on_read(cb_type cb)
+   {
+       t_ = cb;
    }
 
 protected:
 
-   DataT t_;
+   Variant<DataT, cb_type> t_;
 };
 
 
@@ -296,8 +319,8 @@ struct ServerWritableMixin
 template<typename DataT, int Flags>
 struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite, ServerWritableMixin<DataT>, ServerNoopMixin<DataT>>::type
 {
-   ServerProperty(const char* name, SkeletonBase* iface)
-    : BaseProperty<DataT>(name, iface)
+   ServerProperty(const char* name, SkeletonBase* iface, int iface_id)
+    : BaseProperty<DataT>(name, iface, iface_id)
    {
       if (Flags & ReadWrite)
          this->eval_set_ = __eval_set;
@@ -305,16 +328,12 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->t_, data))
+      if (!this->t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->value(), data))
       {
          this->t_ = data;
 
          if (Flags & Notifying)
-         {
-            this->parent_->send_property_change(this->name_, [this](DBusMessageIter& iter){
-               detail::PropertyCodec<DataT>::encode(iter, this->t_);
-            });
-         }
+            this->notify(data);
       }
 
       return *this;

@@ -65,7 +65,7 @@ struct Client : simppl::dbus::Stub<Properties>
    {
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         
+
          props.attach() >> [this](simppl::dbus::CallState, const std::map<ident_t, std::string>& props){
             ++callback_count_;
 
@@ -88,7 +88,7 @@ struct Client : simppl::dbus::Stub<Properties>
                   if (++count_ == 2)
                   shutdown();
                };
-               
+
                // one more roundtrip to see if further signals arrive...
                set.async(Five, "Five");
                set.async(Six, "Six");
@@ -111,7 +111,7 @@ struct GetterClient : simppl::dbus::Stub<Properties>
    {
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-    
+
          // never use operator= here, it's blocking!
          data.get_async() >> [this](simppl::dbus::CallState cs, int i){
              EXPECT_TRUE((bool)cs);
@@ -141,19 +141,19 @@ struct MultiClient : simppl::dbus::Stub<Properties>
                if (callback_count_ == 1)
                {
                   EXPECT_EQ(2u, props.size());
-                  
+
                   EXPECT_TRUE(props.find(Four) == props.end());
                }
                else if (callback_count_ == 2)
                {
                   EXPECT_EQ(3u, props.size());
-                  
+
                   EXPECT_TRUE(props.find(Four) != props.end());
 
                   shutdown();
                }
             };
-            
+
             set.async(Four, "Four");
          }
       };
@@ -171,7 +171,7 @@ struct SetterClient : simppl::dbus::Stub<Properties>
    {
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         
+
          data.attach() >> [this](simppl::dbus::CallState, int i){
             ++callback_count_;
 
@@ -193,7 +193,7 @@ struct SetterClient : simppl::dbus::Stub<Properties>
          };
       };
    }
-   
+
    int callback_count_ = 0;
 };
 
@@ -205,17 +205,17 @@ struct InvalidSetterClient : simppl::dbus::Stub<Properties>
    {
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
-         
+
          data.attach() >> [this](simppl::dbus::CallState, int) {
              ++callback_count_;
          };
-         
+
          // never use operator= here, it's blocking!
          data.set_async(-1) >> [this](simppl::dbus::CallState cs){
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.exception().what(), "simppl.dbus.UnhandledException");
          };
-         
+
          data.set_async(1) >> [this](simppl::dbus::CallState cs){
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.exception().what(), "Invalid.Argument");
@@ -224,14 +224,14 @@ struct InvalidSetterClient : simppl::dbus::Stub<Properties>
          data.set_async(2) >> [this](simppl::dbus::CallState cs){
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(2, callback_count_);   // one from attach, one from data change
-             
+
              // finished, stop event loops
              shutdown();
              disp().stop();
          };
       };
    }
-   
+
    int callback_count_ = 0;
 };
 
@@ -244,7 +244,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
       shutdown >> [this](){
          disp().stop();
       };
-      
+
       set >> [this](int id, const std::string& str){
          ++calls_;
 
@@ -255,8 +255,8 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          mayShutdown.notify(42);
       };
-      
-      // initialize attribute
+
+      // initialize properties
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
    }
@@ -273,20 +273,71 @@ struct InvalidSetterServer : simppl::dbus::Skeleton<Properties>
       shutdown >> [this](){
          disp().stop();
       };
-      
+
       data >> [this](int newval){
-          
+
           if (newval < 0)
              throw std::runtime_error("out of bounds");  // will be mapped to simppl.dbus.UnhandledException
-             
+
           if (newval == 1)
              throw simppl::dbus::Error("Invalid.Argument");
-             
+
           data = newval;
       };
-      
-      // initialize attribute
+
+      // initialize property
       data = 4711;
+   }
+};
+
+
+struct NonCachingTestClient : simppl::dbus::Stub<Properties>
+{
+   NonCachingTestClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Properties>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+         // never use operator= here, it's blocking!
+         data.get_async() >> [this](simppl::dbus::CallState cs, int i){
+             EXPECT_TRUE((bool)cs);
+             EXPECT_EQ(i, 4711);
+
+             data.attach() >> [this](simppl::dbus::CallState cs, int i){
+                EXPECT_TRUE((bool)cs);
+
+                if (i == 4711)
+                {
+                    set.async(42, "Huhu");
+                }
+                else
+                   disp().stop();
+             };
+         };
+      };
+   }
+};
+
+
+struct NonCachingPropertyServer : simppl::dbus::Skeleton<Properties>
+{
+   NonCachingPropertyServer(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Properties>(d, rolename)
+   {
+      set >> [this](int id, const std::string& /*str*/){
+         data.notify(id);
+      };
+
+      // initialize attributes callbacks
+      data.on_read([](){
+          return 4711;
+      });
+
+      props.on_read([](){
+          std::map<ident_t, std::string> rc = { { One, "One" }, { Two, "Two" } };
+          return rc;
+      });
    }
 };
 
@@ -402,6 +453,17 @@ TEST(Properties, invalid_set)
 
    InvalidSetterServer s(d, "s");
    InvalidSetterClient c(d);
+
+   d.run();
+}
+
+
+TEST(Properties, non_caching)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   NonCachingPropertyServer s(d, "s");
+   NonCachingTestClient c(d);
 
    d.run();
 }

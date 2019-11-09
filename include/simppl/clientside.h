@@ -46,7 +46,7 @@ struct ClientSignalBase
       eval_(this, iter);
    }
 
-   ClientSignalBase(const char* name, StubBase* iface);
+   ClientSignalBase(const char* name, StubBase* iface, int iface_id);
 
    const char* name() const
    {
@@ -74,8 +74,8 @@ struct ClientSignal : ClientSignalBase
 
    typedef std::function<void(typename CallTraits<T>::param_type...)> function_type;
 
-   ClientSignal(const char* name, StubBase* iface)
-    : ClientSignalBase(name, iface)
+   ClientSignal(const char* name, StubBase* iface, int iface_id)
+    : ClientSignalBase(name, iface, iface_id)
    {
       eval_ = __eval;
    }
@@ -123,7 +123,7 @@ struct ClientPropertyBase
    typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter&);
 
 
-   ClientPropertyBase(const char* name, StubBase* iface);
+   ClientPropertyBase(const char* name, StubBase* iface, int iface_id);
 
    void eval(DBusMessageIter& iter)
    {
@@ -156,8 +156,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
    typedef detail::CallbackHolder<function_type, void> holder_type;
 
 
-   ClientPropertyWritableMixin(const char* name, StubBase* iface)
-    : ClientPropertyBase(name, iface)
+   ClientPropertyWritableMixin(const char* name, StubBase* iface, int iface_id)
+    : ClientPropertyBase(name, iface, iface_id)
    {
       // NOOP
    }
@@ -197,8 +197,8 @@ struct ClientProperty
    typedef detail::PropertyCallbackHolder<std::function<void(CallState, arg_type)>, data_type> holder_type;
 
 
-   ClientProperty(const char* name, StubBase* iface)
-    : base_type(name, iface)
+   ClientProperty(const char* name, StubBase* iface, int iface_id)
+    : base_type(name, iface, iface_id)
    {
       this->eval_ = __eval;
    }
@@ -307,7 +307,7 @@ struct ClientMethod
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
-    ClientMethod(const char* method_name, StubBase* parent)
+    ClientMethod(const char* method_name, StubBase* parent, int iface_id)
      : method_name_(method_name)
      , parent_(parent)
     {
