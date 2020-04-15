@@ -77,7 +77,8 @@ std::string make_interface_name(const char* src, const char* end)
    assert(end > src);
 
    std::string name(end - src, '\0');
-   for (auto dst = name.begin(); src != end; ++dst, ++src) {
+   auto dst = name.begin();
+   for (; src != end; ++dst, ++src) {
       if (*src == ':') {
          *dst = '.';
          ++src;
@@ -85,6 +86,7 @@ std::string make_interface_name(const char* src, const char* end)
          *dst = *src;
       }
    }
+   name.resize(dst-name.begin());
    return name;
 }
 
