@@ -8,14 +8,16 @@
 
 
 #define INTERFACE(iface) \
-   template<template<typename...> class Method, \
+   template<int InterfaceID, \
+            typename AncestorT, \
+            template<typename...> class Method, \
             template<typename...> class Signal, \
             template<typename, int Flags=simppl::dbus::Notifying|simppl::dbus::ReadOnly|simppl::dbus::OnChange> class Property, \
             typename BaseT> \
-      struct iface : public BaseT
+      struct iface : BaseT
 
 #define INIT(what) \
-   what(# what, this)
+   what(# what, this, InterfaceID)
 
 
 #endif   // SIMPPL_INTERFACE_H

@@ -8,7 +8,7 @@ namespace dbus
 {
    
 
-ClientSignalBase::ClientSignalBase(const char* name, StubBase* stub)
+ClientSignalBase::ClientSignalBase(const char* name, StubBase* stub, int)
  : stub_(stub)
  , name_(name)
  , next_(nullptr)
@@ -17,7 +17,7 @@ ClientSignalBase::ClientSignalBase(const char* name, StubBase* stub)
 }
 
 
-ClientPropertyBase::ClientPropertyBase(const char* name, StubBase* stub)
+ClientPropertyBase::ClientPropertyBase(const char* name, StubBase* stub, int)
  : name_(name)
  , stub_(stub)
  , next_(nullptr)

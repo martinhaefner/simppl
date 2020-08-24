@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+# Same syntax as find_package
+find_dependency(DBUS REQUIRED)
+
+check_required_components(Simppl)
+
+if(NOT TARGET Simppl::simppl)
+    # Provide path for scripts
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+
+    include(${CMAKE_CURRENT_LIST_DIR}/Catch2Targets.cmake)
+endif()

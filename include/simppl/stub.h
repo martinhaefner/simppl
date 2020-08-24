@@ -8,6 +8,7 @@
 
 #include "simppl/stubbase.h"
 #include "simppl/clientside.h"
+#include "simppl/typelist.h"
 
 #include "simppl/detail/constants.h"
 
@@ -22,34 +23,36 @@ namespace dbus
 // forward decl
 void dispatcher_add_stub(Dispatcher&, StubBase&);
 
-
-template<template<template<typename...> class,
+// Client stubs do not require multiple interface support - you can simply
+// create multiple stubs with different interfaces.
+template<template<int,
+                  typename,
                   template<typename...> class,
-                  template<typename,int> class, typename> class IfaceT>
-struct Stub : IfaceT<ClientMethod, ClientSignal, ClientProperty, StubBase>
+                  template<typename...> class,
+                  template<typename,int> class,
+                  typename> class IfaceT>
+struct Stub : IfaceT<0, StubBase, ClientMethod, ClientSignal, ClientProperty, StubBase>
 {
    friend struct Dispatcher;
 
 private:
 
-   typedef IfaceT<ClientMethod, ClientSignal, ClientProperty, StubBase> interface_type;
+   using interface_list = make_typelist<IfaceT<0, StubBase, ClientMethod, ClientSignal, ClientProperty, StubBase>>;
 
 public:
 
    inline
-   Stub(Dispatcher& disp, const char* role)	
-    : interface_type()
+   Stub(Dispatcher& disp, const char* role)
    {
-	   this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), role);
+	   this->init(abi::__cxa_demangle(typeid(interface_list).name(), 0, 0, 0), role);
        dispatcher_add_stub(disp, *this);
    }
 
 
    inline
    Stub(Dispatcher& disp, const char* busname, const char* objectpath)
-    : interface_type()
    {
-	  this->init(abi::__cxa_demangle(typeid(interface_type).name(), 0, 0, 0), busname, objectpath);
+	  this->init(abi::__cxa_demangle(typeid(interface_list).name(), 0, 0, 0), busname, objectpath);
       dispatcher_add_stub(disp, *this);
    }
 };

@@ -256,7 +256,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mayShutdown.notify(42);
       };
 
-      // initialize attribute
+      // initialize properties
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
    }
@@ -285,7 +285,7 @@ struct InvalidSetterServer : simppl::dbus::Skeleton<Properties>
           data = newval;
       };
 
-      // initialize attribute
+      // initialize property
       data = 4711;
    }
 };
