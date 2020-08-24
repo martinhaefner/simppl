@@ -32,6 +32,14 @@ namespace simppl
 namespace dbus
 {
 
+namespace detail
+{
+    // forward decl
+    template<bool Notifying, int Flags>
+    struct Assigner;
+}
+
+
 struct ServerMethodBase
 {
    typedef void(*eval_type)(ServerMethodBase*, DBusMessage*);
@@ -229,6 +237,8 @@ protected:
 template<typename DataT>
 struct BaseProperty : ServerPropertyBase
 {
+   template<bool Notifying, int Flags> friend struct detail::Assigner;
+
    typedef std::function<DataT()> cb_type;
 
    BaseProperty(const char* name, SkeletonBase* iface)
@@ -311,6 +321,38 @@ struct ServerWritableMixin
 };
 
 
+namespace detail
+{
+    // do not instantiate the comparison operator if not notifying!
+    template<bool Notifying, int Flags>
+    struct Assigner
+    {
+        template<typename DataT>
+        static
+        void eval(BaseProperty<DataT>& p, const DataT& d)
+        {
+            p.t_ = d;
+        }
+    };
+
+
+    template<int Flags>
+    struct Assigner<true, Flags>
+    {
+        template<typename DataT>
+        static
+        void eval(BaseProperty<DataT>& p, const DataT& d)
+        {
+            if (!p.t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
+            {
+                p.t_ = d;
+                p.notify(d);
+            }
+        }
+    };
+}
+
+
 template<typename DataT, int Flags>
 struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite, ServerWritableMixin<DataT>, ServerNoopMixin<DataT>>::type
 {
@@ -323,14 +365,7 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      if (!this->t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(this->value(), data))
-      {
-         this->t_ = data;
-
-         if (Flags & Notifying)
-            this->notify(data);
-      }
-
+      detail::Assigner<Flags & Notifying ? true : false, Flags>::eval(*this, data);
       return *this;
    }
 
