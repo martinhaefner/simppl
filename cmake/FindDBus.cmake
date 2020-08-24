@@ -52,7 +52,7 @@ find_path(DBUS_ARCH_INCLUDE_DIR
           ${PC_DBUS_INCLUDE_DIRS}
           ${_DBUS_LIBRARY_DIR}
           ${DBUS_INCLUDE_DIR}
-    PATH_SUFFIXES include
+    PATH_SUFFIXES include dbus-1.0/include
 )
 
 include(FindPackageHandleStandardArgs)

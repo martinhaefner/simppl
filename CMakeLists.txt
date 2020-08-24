@@ -2,7 +2,7 @@
 # Setup the cmake file to be added with a find_package
 # or an add_subdirectory.
 #
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.2)
 project(simppl VERSION 0.3.0)
 
 # Configuration specific to being the main project
@@ -74,7 +74,7 @@ target_include_directories(simppl
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_compile_options(simppl PRIVATE -Werror -Wall)
+target_compile_options(simppl PRIVATE -Werror -Wall -Wno-error=deprecated-declarations)
 target_link_libraries(simppl PUBLIC
     DBUS::DBUS
     ${CMAKE_THREAD_LIBS_INIT}
