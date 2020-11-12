@@ -242,6 +242,23 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                "  </interface>\n";
          }
 
+         // recurse into any objects below this path
+         char** children = nullptr;
+         dbus_connection_list_registered(disp_->conn_, objectpath(), &children);
+
+         if (children)
+         {
+             char** child = children;
+
+             while(*child != nullptr)
+             {
+                 oss << "<node name=\"" << *child << "\"/>\n";
+                 ++child;
+             }
+
+             dbus_free_string_array(children);
+         }
+
          oss << "</node>\n";
 
          DBusMessage* reply = dbus_message_new_method_return(msg);
