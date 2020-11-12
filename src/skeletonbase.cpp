@@ -268,6 +268,23 @@ DBusHandlerResult SkeletonBase::handle_introspect_request(DBusMessage* msg)
                "  </interface>\n";
     }
 
+    // recurse into any objects below this path
+    char** children = nullptr;
+    dbus_connection_list_registered(disp_->conn_, objectpath(), &children);
+
+    if (children)
+    {
+        char** child = children;
+
+        while(*child != nullptr)
+        {
+            oss << "<node name=\"" << *child << "\"/>\n";
+            ++child;
+        }
+
+        dbus_free_string_array(children);
+    }
+
     oss << "</node>\n";
 
     DBusMessage* reply = dbus_message_new_method_return(msg);
@@ -401,7 +418,7 @@ DBusHandlerResult SkeletonBase::handle_error(DBusMessage* msg, const char* dbus_
 #if SIMPPL_HAVE_INTROSPECTION
 void SkeletonBase::introspect_interface(std::ostream& os, size_type index) const
 {
-    os << "  <interface name=\""<< iface(index) << "\">\n";
+    os << "  <interface name=\""<< iface(index).c_str() << "\">\n";
 
     for (auto pm = method_heads_[index]; pm; pm = pm->next_)
     {

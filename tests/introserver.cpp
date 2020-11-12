@@ -119,13 +119,13 @@ using namespace test;
 
 struct Server : simppl::dbus::Skeleton<Properties>
 {
-   Server(simppl::dbus::Dispatcher& d, const char* rolename)
-    : simppl::dbus::Skeleton<Properties>(d, rolename)
+   Server(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Properties>(d, "s")
    {
       shutdown >> [this](){
          disp().stop();
       };
-      
+
       set >> [this](int id, const std::string& str){
          ++calls_;
 
@@ -137,7 +137,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mayShutdown.notify(42);
          hi.notify();
       };
-      
+
       get_all >> [this](){
          Menu mainmenu;
 
@@ -162,7 +162,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          respond_with(get_all(mainmenu));
       };
-      
+
       trigger_data >> [this](){
          data = 8888;
       };
@@ -176,10 +176,43 @@ struct Server : simppl::dbus::Skeleton<Properties>
 };
 
 
+struct Server2 : simppl::dbus::Skeleton<Properties>
+{
+   Server2(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Properties>(d, "test.Properties.s", "/test/Properties/s/s2")
+   {
+      // NOOP
+   }
+};
+
+
+struct Server3 : simppl::dbus::Skeleton<Properties>
+{
+   Server3(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Properties>(d, "test.Properties.s", "/test/Properties/s/s3")
+   {
+      // NOOP
+   }
+};
+
+
+struct Server4 : simppl::dbus::Skeleton<Properties>
+{
+   Server4(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Properties>(d, "test.Properties.s", "/test/Properties/s/s2/s4")
+   {
+      // NOOP
+   }
+};
+
+
 int main()
 {
    simppl::dbus::Dispatcher d("bus:session");
-   Server s(d, "s");
+   Server s(d);
+   Server2 s2(d);
+   Server3 s3(d);
+   Server4 s4(d);
 
    d.run();
 
