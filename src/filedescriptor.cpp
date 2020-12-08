@@ -59,7 +59,12 @@ FileDescriptor::FileDescriptor(const FileDescriptor& rhs)
  , destructor_(rhs.destructor_)
 {
    if (rhs.fd_ != -1)
-      fd_ = dup(rhs.fd_);
+   {
+       if (destructor_ == &noop)
+          fd_ = rhs.fd_;
+       else
+          fd_ = dup(rhs.fd_);
+   }
 }
 
 
@@ -72,7 +77,10 @@ FileDescriptor& FileDescriptor::operator=(const FileDescriptor& rhs)
 
       if (rhs.fd_ != -1)
       {
-         fd_ = dup(rhs.fd_);
+         if (rhs.destructor_ == &noop)
+            fd_ = rhs.fd_;
+         else
+            fd_ = dup(rhs.fd_);
       }
       else
          fd_ = -1;
