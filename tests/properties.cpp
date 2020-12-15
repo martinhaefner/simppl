@@ -124,6 +124,26 @@ struct GetterClient : simppl::dbus::Stub<Properties>
 };
 
 
+struct GetterErrorClient : simppl::dbus::Stub<Properties>
+{
+   GetterErrorClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Properties>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+         // never use operator= here, it's blocking!
+         data.get_async() >> [this](simppl::dbus::CallState cs, int i){
+             EXPECT_FALSE((bool)cs);
+             EXPECT_STREQ(cs.exception().what(), "Not.Available");
+
+             disp().stop();
+         };
+      };
+   }
+};
+
+
 struct MultiClient : simppl::dbus::Stub<Properties>
 {
    MultiClient(simppl::dbus::Dispatcher& d, bool attach)
@@ -342,6 +362,27 @@ struct NonCachingPropertyServer : simppl::dbus::Skeleton<Properties>
 };
 
 
+struct ErrorThrowingPropertyServer : simppl::dbus::Skeleton<Properties>
+{
+   ErrorThrowingPropertyServer(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<Properties>(d, rolename)
+   {
+      // initialize attributes callbacks
+      data.on_read([](){
+          throw simppl::dbus::Error("Not.Available");
+
+          // complete lambda with return value
+          return 42;
+      });
+
+      // stop thread
+      shutdown >> [this](){
+         disp().stop();
+      };
+   }
+};
+
+
 }   // anonymous namespace
 
 
@@ -464,6 +505,52 @@ TEST(Properties, non_caching)
 
    NonCachingPropertyServer s(d, "s");
    NonCachingTestClient c(d);
+
+   d.run();
+}
+
+
+TEST(Properties, blocking_get_error)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   std::thread t([](){
+
+       simppl::dbus::Dispatcher d("bus:session");
+       ErrorThrowingPropertyServer s(d, "s");
+
+       d.run();
+   });
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   simppl::dbus::Stub<Properties> c(d, "s");
+
+   try
+   {
+      int val = c.data.get();
+      (void)val;
+
+      // never arrive here!
+      EXPECT_FALSE(true);
+   }
+   catch(simppl::dbus::Error& err)
+   {
+       EXPECT_STREQ("Not.Available", err.name());
+   }
+
+   c.shutdown();   // stop server
+   t.join();
+}
+
+
+TEST(Properties, get_async_error)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   ErrorThrowingPropertyServer s(d, "s");
+   GetterErrorClient c(d);
 
    d.run();
 }

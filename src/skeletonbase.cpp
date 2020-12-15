@@ -297,7 +297,20 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                    if (method[0] == 'G')
                    {
                       message_ptr_t response = make_message(dbus_message_new_method_return(msg));
-                      p->eval(response.get());
+
+                      try
+                      {
+                         p->eval(response.get());
+                      }
+                      catch(simppl::dbus::Error& err)
+                      {
+                         response = err.make_reply_for(*msg);
+                      }
+                      catch(...)
+                      {
+                         simppl::dbus::Error e("simppl.dbus.UnhandledException");
+                         response = e.make_reply_for(*msg);
+                      }
 
                       dbus_connection_send(disp_->conn_, response.get(), nullptr);
                    }
