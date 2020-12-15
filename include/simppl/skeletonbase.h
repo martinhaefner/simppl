@@ -78,6 +78,7 @@ struct SkeletonBase
     }
 
     void send_property_change(const char* prop, std::function<void(DBusMessageIter&)>&& f);
+    void send_property_invalidate(const char* prop);
 
     void send_signal(const char* signame, std::function<void(DBusMessageIter&)>&& f);
 

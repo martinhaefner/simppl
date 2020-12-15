@@ -120,12 +120,12 @@ struct ClientPropertyBase
 {
    friend struct StubBase;
 
-   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter&);
+   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter*);
 
 
    ClientPropertyBase(const char* name, StubBase* iface);
 
-   void eval(DBusMessageIter& iter)
+   void eval(DBusMessageIter* iter)
    {
       eval_(this, iter);
    }
@@ -232,15 +232,21 @@ struct ClientProperty
 private:
 
    static
-   void __eval(ClientPropertyBase* obj, DBusMessageIter& iter)
+   void __eval(ClientPropertyBase* obj, DBusMessageIter* iter)
    {
       ClientProperty* that = (ClientProperty*)obj;
 
-      data_type d;
-      detail::PropertyCodec<data_type>::decode(iter, d);
-
       if (that->f_)
-         that->f_(CallState(42), d);
+      {
+         if (iter)
+         {
+            data_type d;
+            detail::PropertyCodec<data_type>::decode(*iter, d);
+            that->f_(CallState(42), d);
+         }
+         else
+             that->f_(CallState(new Error("simppl.dbus.Invalid")), data_type());
+      }
    }
 
 

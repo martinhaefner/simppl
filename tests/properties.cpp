@@ -256,6 +256,28 @@ struct InvalidSetterClient : simppl::dbus::Stub<Properties>
 };
 
 
+struct InvalidatedPropertyClient : simppl::dbus::Stub<Properties>
+{
+   InvalidatedPropertyClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Properties>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+         data.attach() >> [this](simppl::dbus::CallState cs, int) {
+             ++calls_;
+             EXPECT_FALSE((bool)cs);
+             EXPECT_STREQ(cs.what(), "simppl.dbus.Invalid");
+
+             shutdown();
+         };
+      };
+   }
+
+   int calls_ = 0;
+};
+
+
 struct Server : simppl::dbus::Skeleton<Properties>
 {
    Server(simppl::dbus::Dispatcher& d, const char* rolename)
@@ -380,6 +402,37 @@ struct ErrorThrowingPropertyServer : simppl::dbus::Skeleton<Properties>
          disp().stop();
       };
    }
+};
+
+
+struct InvalidatedPropertyServer : simppl::dbus::Skeleton<Properties>
+{
+   InvalidatedPropertyServer(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Skeleton<Properties>(d, "s")
+    , countdown_(3)
+   {
+      // initialize attributes callbacks
+      data.on_read([](){
+
+          throw simppl::dbus::Error("simppl.dbus.Invalid");
+
+          // complete lambda with return value
+          return 42;
+      });
+
+      // just send message
+      shutdown >> [this](){
+
+         if(--countdown_ > 0)
+         {
+            data.invalidate();   // sending error simppl.dbus.Invalid
+         }
+         else
+            disp().stop();
+      };
+   }
+
+   int countdown_;
 };
 
 
@@ -553,4 +606,16 @@ TEST(Properties, get_async_error)
    GetterErrorClient c(d);
 
    d.run();
+}
+
+
+TEST(Properties, invalidate)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   InvalidatedPropertyServer s(d);
+   InvalidatedPropertyClient c(d);
+
+   d.run();
+   EXPECT_EQ(c.calls_, 3);
 }

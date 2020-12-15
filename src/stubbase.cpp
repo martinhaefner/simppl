@@ -329,7 +329,6 @@ PendingCall StubBase::get_property_async(const char* name)
 message_ptr_t StubBase::get_property(const char* name)
 {
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
-   DBusPendingCall* pending = nullptr;
 
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
@@ -435,7 +434,32 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          {
             if (property_name == p->name_)
             {
-               p->eval(item_iterator);
+               p->eval(&item_iterator);
+               break;
+            }
+
+            p = p->next_;
+         }
+
+         // advance to next element
+         dbus_message_iter_next(&iter);
+      }
+
+      // check for invalidated properties
+      dbus_message_iter_next(&it);
+      dbus_message_iter_recurse(&it, &iter);
+
+      while(dbus_message_iter_get_arg_type(&iter) != 0)
+      {
+         std::string property_name;
+         decode(iter, property_name);
+
+         auto p = properties_;
+         while(p)
+         {
+            if (property_name == p->name_)
+            {
+               p->eval(nullptr);
                break;
             }
 
