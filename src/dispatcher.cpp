@@ -365,7 +365,7 @@ struct Dispatcher::Private
 
     void init(DBusConnection* conn)
     {
-        dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, &toggle_watch, this, nullptr);
+        dbus_connection_set_watch_functions(conn, &add_watch, &remove_watch, nullptr, this, nullptr);
         dbus_connection_set_timeout_functions (conn, &add_timeout, &remove_timeout, &toggle_timeout, this, nullptr);
     }
 
