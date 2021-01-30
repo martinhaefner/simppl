@@ -210,7 +210,6 @@ struct ClientProperty
    /// only call this after the server is connected.
    ClientProperty& attach();
 
-   // TODO implement GetAll
    DataT get();
 
    detail::InterimCallbackHolder<holder_type> get_async()
