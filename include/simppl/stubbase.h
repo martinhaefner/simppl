@@ -28,11 +28,34 @@ namespace dbus
 struct Dispatcher;
 struct ClientSignalBase;
 struct ClientPropertyBase;
+struct StubBase;
+
+
+// TODO move away from here
+namespace detail
+{
+struct GetAllProperties
+{
+    typedef detail::InterimGetAllPropertiesCallbackHolder getall_properties_holder_type;
+
+    GetAllProperties(simppl::dbus::StubBase& stub);
+
+    GetAllProperties& operator[](int flags);
+
+    void operator()();
+
+    getall_properties_holder_type
+    async();
+
+    simppl::dbus::StubBase& stub_;
+};
+
+}
 
 
 struct StubBase
 {
-   typedef detail::InterimGetAllPropertiesCallbackHolder getall_properties_holder_type;
+   typedef detail::GetAllProperties::getall_properties_holder_type getall_properties_holder_type;
 
    template<typename... T> friend struct ClientSignal;
    template<typename... T> friend struct ClientMethod;
@@ -42,6 +65,7 @@ struct StubBase
    friend struct Dispatcher;
    friend struct ClientPropertyBase;
    friend struct detail::GetAllPropertiesHolder;
+   friend struct detail::GetAllProperties;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
@@ -91,26 +115,16 @@ public:
    /**
     * Implementation of org.freedesktop.DBus.Properties.GetAll(). Blocking call.
     *
-    * Before calling this method all Properties callbacks shall be installed.
-    * The properties callbacks will then be called before this function returns.
-    *
-    * Issues a call like this:
-    * dbus-send --print-reply --dest=test.Properties.s /test/Properties/s org.freedesktop.DBus.Properties.GetAll string:test.Properties
-    *
-    * @TODO complete async support
-    */
-   void get_all_properties();
-
-   /**
-    * Implementation of org.freedesktop.DBus.Properties.GetAll(). Asynchronous call.
-    *
     * Before calling this method all Properties callbacks shall be installed. You may install
     * only some of the property callbacks. If a callback is not registered the property will
     * just omitted.
     *
     * The asynchronous return will arrive as soon as call the property callbacks are evaluated.
+    *
+    * Issues a call like this:
+    * dbus-send --print-reply --dest=test.Properties.s /test/Properties/s org.freedesktop.DBus.Properties.GetAll string:test.Properties
     */
-   getall_properties_holder_type get_all_properties_async();
+   detail::GetAllProperties get_all_properties;
 
 
 protected:
@@ -156,6 +170,9 @@ protected:
     */
    simppl::dbus::CallState get_all_properties_handle_response(DBusMessage& response);
 
+   void get_all_properties_request();
+   getall_properties_holder_type get_all_properties_request_async();
+
    std::vector<std::string> ifaces_;
    char* objectpath_;
    std::string busname_;
@@ -185,3 +202,4 @@ void operator>>(simppl::dbus::detail::InterimGetAllPropertiesCallbackHolder&& r,
 
 
 #endif   // SIMPPL_STUBBASE_H
+

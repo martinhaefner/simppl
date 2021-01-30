@@ -374,7 +374,7 @@ struct GetAllClient : simppl::dbus::Stub<Properties>
 
          // now call - callbacks will be called in background just before
          // this callback gets called...
-         get_all_properties_async() >> [this](simppl::dbus::CallState cs){
+         get_all_properties.async() >> [this](simppl::dbus::CallState cs){
              EXPECT_TRUE((bool)cs);
 
              // the other two callbacks are already evaluated...
@@ -517,6 +517,8 @@ TEST(Properties, getall_blocking)
 
    // now call - callbacks will be called in background
    c.get_all_properties();
+
+   c.get_all_properties[42]();
 
    EXPECT_EQ(ival, 4711);
    EXPECT_EQ(sval, "Hallo Welt");

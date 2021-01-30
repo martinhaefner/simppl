@@ -11,6 +11,11 @@ namespace simppl
 namespace dbus
 {
 
+// forward decl
+struct StubBase;
+struct CallState;
+
+
 namespace detail
 {
 
@@ -19,12 +24,12 @@ struct InterimCallbackHolder
 {
    typedef HolderT holder_type;
 
-   InterimCallbackHolder(const InterimCallbackHolder& rhs)
+   /*InterimCallbackHolder(const InterimCallbackHolder& rhs)
    : pc_(std::move(rhs.pc_))
    {
       // NOOP
-   }
-   
+   }*/
+
    InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
 
    explicit inline
@@ -33,9 +38,34 @@ struct InterimCallbackHolder
    {
       // NOOP
    }
-   
+
    PendingCall pc_;
 };
+
+
+struct InterimGetAllPropertiesCallbackHolder
+{
+   /*inline
+   InterimGetAllPropertiesCallbackHolder(const InterimGetAllPropertiesCallbackHolder& rhs, StubBase& stub)
+    : pc_(std::move(rhs.pc_))
+    , stub_(stub)
+   {
+      // NOOP
+   }*/
+
+   InterimGetAllPropertiesCallbackHolder& operator=(const InterimGetAllPropertiesCallbackHolder&) = delete;
+
+   InterimGetAllPropertiesCallbackHolder(const PendingCall& pc, StubBase& stub)
+    : pc_(std::move(pc))
+    , stub_(stub)
+   {
+      // NOOP
+   }
+
+   PendingCall pc_;
+   StubBase& stub_;
+};
+
 
 
 template<typename FuncT, typename ReturnT>
@@ -51,7 +81,7 @@ struct CallbackHolder
    {
       // NOOP
    }
-   
+
    static inline
    void _delete(void* p)
    {
@@ -68,10 +98,10 @@ struct CallbackHolder
        assert(that->f_);
 
        CallState cs(*msg);
-       
+
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
-       
+
        GetCaller<ReturnT>::type::template evalResponse(iter, that->f_, cs);
    }
 
@@ -125,6 +155,26 @@ struct PropertyCallbackHolder
 
    FuncT f_;
 };
+
+
+struct GetAllPropertiesHolder
+{
+   GetAllPropertiesHolder(const GetAllPropertiesHolder&) = delete;
+   GetAllPropertiesHolder& operator=(const GetAllPropertiesHolder&) = delete;
+
+
+   GetAllPropertiesHolder(std::function<void(CallState)> f, StubBase& stub);
+
+   static
+   void _delete(void* p);
+
+   static
+   void pending_notify(DBusPendingCall* pc, void* data);
+
+   std::function<void(CallState)> f_;
+   StubBase& stub_;
+};
+
 
 }   // detail
 
