@@ -35,6 +35,7 @@ INTERFACE(Properties)
 
    Property<int, simppl::dbus::ReadWrite|simppl::dbus::Notifying> data;
    Property<std::map<ident_t, std::string>> props;
+   Property<std::string> str_prop;
 
    Signal<int> mayShutdown;
 
@@ -44,7 +45,21 @@ INTERFACE(Properties)
     , INIT(shutdown)
     , INIT(data)
     , INIT(props)
+    , INIT(str_prop)
     , INIT(mayShutdown)
+   {
+      // NOOP
+   }
+};
+
+
+INTERFACE(NoProperties)
+{
+   Method<simppl::dbus::oneway> shutdown;
+
+   inline
+   NoProperties()
+    : INIT(shutdown)
    {
       // NOOP
    }
@@ -259,9 +274,22 @@ struct Server : simppl::dbus::Skeleton<Properties>
       // initialize properties
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
+      str_prop = "Hallo Welt";
    }
 
    int calls_ = 0;
+};
+
+
+struct NoPropertiesServer : simppl::dbus::Skeleton<NoProperties>
+{
+   NoPropertiesServer(simppl::dbus::Dispatcher& d, const char* rolename)
+    : simppl::dbus::Skeleton<NoProperties>(d, rolename)
+   {
+      shutdown >> [this](){
+         disp().stop();
+      };
+   }
 };
 
 
@@ -317,6 +345,48 @@ struct NonCachingTestClient : simppl::dbus::Stub<Properties>
          };
       };
    }
+};
+
+
+struct GetAllClient : simppl::dbus::Stub<Properties>
+{
+   GetAllClient(simppl::dbus::Dispatcher& d)
+    : simppl::dbus::Stub<Properties>(d, "s")
+   {
+      connected >> [this](simppl::dbus::ConnectionState s){
+         EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+         // you only get the properties with a callback set
+         // so first connect the desired properties
+         data >> [this](simppl::dbus::CallState cs, int i) {
+             EXPECT_TRUE((bool)cs);
+             EXPECT_EQ(i, 4711);
+
+             ++count_;
+         };
+
+         str_prop >> [this](simppl::dbus::CallState cs, const std::string& str) {
+             EXPECT_TRUE((bool)cs);
+             EXPECT_EQ(str, "Hallo Welt");
+
+             ++count_;
+         };
+
+         // now call - callbacks will be called in background just before
+         // this callback gets called...
+         get_all_properties_async() >> [this](simppl::dbus::CallState cs){
+             EXPECT_TRUE((bool)cs);
+
+             // the other two callbacks are already evaluated...
+             EXPECT_EQ(2, count_);
+
+             // ok, test finished
+             disp().stop();
+         };
+      };
+   }
+
+   int count_ = 0;
 };
 
 
@@ -405,7 +475,7 @@ TEST(Properties, blocking_set)
 }
 
 
-TEST(Properties, blocking_get)
+TEST(Properties, get_blocking)
 {
    simppl::dbus::Dispatcher d("bus:session");
 
@@ -419,6 +489,82 @@ TEST(Properties, blocking_get)
    int val = c.data.get();
 
    EXPECT_EQ(val, 4711);
+
+   c.shutdown();   // stop server
+   t.join();
+}
+
+
+TEST(Properties, getall_blocking)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   std::thread t(blockrunner);
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   simppl::dbus::Stub<Properties> c(d, "s");
+
+   int ival = 0;
+   std::map<ident_t, std::string> mval;
+   std::string sval;
+
+   // first connect all properties
+   c.data     >> [&ival](simppl::dbus::CallState, int i) { ival = i; };
+   c.props    >> [&mval](simppl::dbus::CallState, const std::map<ident_t, std::string>& val) { mval = val; };
+   c.str_prop >> [&sval](simppl::dbus::CallState, const std::string& str) { sval = str; };
+
+   // now call - callbacks will be called in background
+   c.get_all_properties();
+
+   EXPECT_EQ(ival, 4711);
+   EXPECT_EQ(sval, "Hallo Welt");
+
+   c.shutdown();   // stop server
+   t.join();
+}
+
+
+TEST(Properties, getall_async)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   Server s(d, "s");
+   GetAllClient c(d);
+
+   d.run();
+}
+
+
+TEST(Properties, getall_no_properties_blocking)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   std::thread t([](){
+       simppl::dbus::Dispatcher d("bus:session");
+       NoPropertiesServer s(d, "s");
+
+       d.run();
+   });
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   simppl::dbus::Stub<NoProperties> c(d, "s");
+
+   try
+   {
+      // now call - no properties -> exception
+      c.get_all_properties();
+
+      // never reached
+      EXPECT_TRUE(false);
+   }
+   catch(simppl::dbus::Error& err)
+   {
+       EXPECT_NE(nullptr, strstr(err.what(), "UnknownInterface"));
+   }
 
    c.shutdown();   // stop server
    t.join();

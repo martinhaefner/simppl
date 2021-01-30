@@ -3,15 +3,14 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
-   
+
 
 ClientSignalBase::ClientSignalBase(const char* name, StubBase* stub, int)
  : stub_(stub)
  , name_(name)
- , next_(nullptr)
 {
    // NOOP
 }
@@ -20,16 +19,15 @@ ClientSignalBase::ClientSignalBase(const char* name, StubBase* stub, int)
 ClientPropertyBase::ClientPropertyBase(const char* name, StubBase* stub, int)
  : name_(name)
  , stub_(stub)
- , next_(nullptr)
 {
-   // NOOP
+   stub_->add_property(this);
 }
 
 
 /// only call this after the server is connected.
 void ClientPropertyBase::detach()
 {
-   stub_->detach_property(*this);
+   stub_->detach_property(this);
 }
 
 

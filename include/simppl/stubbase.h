@@ -10,7 +10,10 @@
 
 #include "simppl/callstate.h"
 #include "simppl/pendingcall.h"
+#include "simppl/variant.h"
+
 #include "simppl/detail/constants.h"
+#include "simppl/detail/holders.h"
 
 #include "simppl/connectionstate.h"
 
@@ -29,6 +32,8 @@ struct ClientPropertyBase;
 
 struct StubBase
 {
+   typedef detail::InterimGetAllPropertiesCallbackHolder getall_properties_holder_type;
+
    template<typename... T> friend struct ClientSignal;
    template<typename... T> friend struct ClientMethod;
    template<typename, int> friend struct ClientProperty;
@@ -36,6 +41,7 @@ struct StubBase
 
    friend struct Dispatcher;
    friend struct ClientPropertyBase;
+   friend struct detail::GetAllPropertiesHolder;
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
@@ -82,6 +88,30 @@ public:
       return busname_;
    }
 
+   /**
+    * Implementation of org.freedesktop.DBus.Properties.GetAll(). Blocking call.
+    *
+    * Before calling this method all Properties callbacks shall be installed.
+    * The properties callbacks will then be called before this function returns.
+    *
+    * Issues a call like this:
+    * dbus-send --print-reply --dest=test.Properties.s /test/Properties/s org.freedesktop.DBus.Properties.GetAll string:test.Properties
+    *
+    * @TODO complete async support
+    */
+   void get_all_properties();
+
+   /**
+    * Implementation of org.freedesktop.DBus.Properties.GetAll(). Asynchronous call.
+    *
+    * Before calling this method all Properties callbacks shall be installed. You may install
+    * only some of the property callbacks. If a callback is not registered the property will
+    * just omitted.
+    *
+    * The asynchronous return will arrive as soon as call the property callbacks are evaluated.
+    */
+   getall_properties_holder_type get_all_properties_async();
+
 
 protected:
 
@@ -98,8 +128,8 @@ protected:
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
 
-   void attach_property(ClientPropertyBase& prop);
-   void detach_property(ClientPropertyBase& prop);
+   void attach_property(ClientPropertyBase* prop);
+   void detach_property(ClientPropertyBase* prop);
 
    /**
     * Blocking call.
@@ -113,7 +143,18 @@ protected:
     */
    void set_property(const char* Name, std::function<void(DBusMessageIter&)>&& f);
 
+   /**
+    * Just register the property within the stub.
+    */
+   void add_property(ClientPropertyBase* property);
+
    PendingCall set_property_async(const char* Name, std::function<void(DBusMessageIter&)>&& f);
+
+   /**
+    * Second part of get_all_properties_async. Once the callback arrives
+    * the property callbacks have to be called.
+    */
+   simppl::dbus::CallState get_all_properties_handle_response(DBusMessage& response);
 
    std::vector<std::string> ifaces_;
    char* objectpath_;
@@ -122,13 +163,25 @@ protected:
 
    Dispatcher* disp_;
 
-   ClientSignalBase* signals_;        ///< attached signals
-   ClientPropertyBase* properties_;   ///< attached properties
+   ClientSignalBase* signals_;       ///< attached signals
+
+   std::vector<std::pair<ClientPropertyBase*, bool /*attached*/>> properties_;   ///< all properties TODO maybe take another container...
+   int attached_properties_;         ///< attach counter
 };
 
 }   // namespace dbus
 
 }   // namespace simppl
+
+
+inline
+void operator>>(simppl::dbus::detail::InterimGetAllPropertiesCallbackHolder&& r, const std::function<void(simppl::dbus::CallState)>& f)
+{
+   dbus_pending_call_set_notify(r.pc_.pending(),
+                                &simppl::dbus::detail::GetAllPropertiesHolder::pending_notify,
+                                new simppl::dbus::detail::GetAllPropertiesHolder(f, r.stub_),
+                                &simppl::dbus::detail::GetAllPropertiesHolder::_delete);
+}
 
 
 #endif   // SIMPPL_STUBBASE_H

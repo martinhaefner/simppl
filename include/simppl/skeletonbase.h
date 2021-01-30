@@ -100,10 +100,11 @@ protected:
     DBusHandlerResult handle_property_set_request(DBusMessage* msg, ServerPropertyBase& property, DBusMessageIter& iter);
     DBusHandlerResult handle_interface_request(DBusMessage* msg, ServerMethodBase& method);
     DBusHandlerResult handle_error(DBusMessage* msg, const char* dbus_error);
+    DBusHandlerResult handle_property_getall_request(DBusMessage* msg, int iface_id);
 
 #if SIMPPL_HAVE_INTROSPECTION
     void introspect_interface(std::ostream& os, size_type index) const;
-#endif    
+#endif
     bool has_any_properties() const;
     ServerPropertyBase* find_property(int iface_id, const char* name) const;
     ServerMethodBase* find_method(int iface_id, const char* name) const;

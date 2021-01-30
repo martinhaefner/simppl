@@ -58,6 +58,7 @@ add_library(simppl SHARED
     src/clientside.cpp
     src/serialization.cpp
     src/bool.cpp
+    src/holders.cpp
 )
 # Provide a namespaced alias
 add_library(Simppl::simppl ALIAS simppl)

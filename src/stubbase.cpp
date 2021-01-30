@@ -1,4 +1,5 @@
 #include "simppl/stub.h"
+#include <iostream>
 
 #include "simppl/dispatcher.h"
 #include "simppl/string.h"
@@ -25,7 +26,7 @@ StubBase::StubBase()
  , conn_state_(ConnectionState::Disconnected)
  , disp_(nullptr)
  , signals_(nullptr)
- , properties_(nullptr)
+ , attached_properties_(0)
 {
     // NOOP
 }
@@ -73,6 +74,12 @@ void StubBase::init(char* iface, const char* role)
 }
 
 
+void StubBase::add_property(ClientPropertyBase* property)
+{
+    properties_.push_back(std::make_pair(property, false));
+}
+
+
 DBusConnection* StubBase::conn()
 {
     return disp().conn_;
@@ -86,6 +93,87 @@ Dispatcher& StubBase::disp()
 }
 
 
+void StubBase::get_all_properties()
+{
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "GetAll"));
+    DBusPendingCall* pending = nullptr;
+
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+
+    encode(iter, iface());
+
+    // TODO timeout handling here
+    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
+
+    dbus_pending_call_block(pending);
+
+    msg.reset(dbus_pending_call_steal_reply(pending));
+    dbus_pending_call_unref(pending);
+
+    auto cs = get_all_properties_handle_response(*msg);
+
+    if (!cs)
+        cs.throw_exception();
+}
+
+
+simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage& response)
+{
+    DBusMessageIter iter;
+    dbus_message_iter_init(&response, &iter);
+
+    CallState cs(response);
+
+    if (cs)
+    {
+        // open array container
+        DBusMessageIter _iter;
+        dbus_message_iter_recurse(&iter, &_iter);
+
+        while(dbus_message_iter_get_arg_type(&_iter) != 0)
+        {
+            // open dict container
+            DBusMessageIter __iter;
+            dbus_message_iter_recurse(&_iter, &__iter);
+
+            std::string propname;
+            decode(__iter, propname);
+
+            // get property by name
+            auto propiter = std::find_if(properties_.begin(), properties_.end(), [propname](auto& pair){ return propname == pair.first->name_; });
+
+            // get value and call
+            if (propiter != properties_.end())
+                propiter->first->eval(__iter);
+
+            dbus_message_iter_next(&_iter);
+        }
+    }
+
+    return std::move(cs);
+}
+
+
+StubBase::getall_properties_holder_type StubBase::get_all_properties_async()
+{
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "GetAll"));
+    DBusPendingCall* pending = nullptr;
+
+    {
+        DBusMessageIter iter;
+        dbus_message_iter_init_append(msg.get(), &iter);
+
+        encode(iter, iface());
+    }
+
+    // TODO timeout handling here
+    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
+
+    return getall_properties_holder_type(PendingCall(dbus_message_get_serial(msg.get()), pending), *this);
+}
+
+
 PendingCall StubBase::send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
@@ -93,7 +181,7 @@ PendingCall StubBase::send_request(const char* method_name, std::function<void(D
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-    
+
     f(iter);
 
     if (!is_oneway)
@@ -128,7 +216,7 @@ message_ptr_t StubBase::send_request_and_block(const char* method_name, std::fun
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-    
+
     f(iter);
 
     if (!is_oneway)
@@ -180,17 +268,17 @@ void StubBase::connection_state_changed(ConnectionState state)
 void StubBase::register_signal(ClientSignalBase& sigbase)
 {
    assert(disp_);
-   
+
    auto sig = signals_;
    while(sig)
    {
       // already attached?
       if (&sigbase == sig)
          return;
-      
+
       sig = sig->next_;
    }
-   
+
    disp_->register_signal(*this, sigbase);
 
    sigbase.next_ = signals_;
@@ -204,14 +292,14 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
 
    ClientSignalBase* last = nullptr;
    auto sig = signals_;
-   
+
    while(sig)
    {
       // found...
       if (&sigbase == sig)
       {
          disp_->unregister_signal(*this, sigbase);
-         
+
          // remove from list
          if (last)
          {
@@ -219,70 +307,47 @@ void StubBase::unregister_signal(ClientSignalBase& sigbase)
          }
          else
             signals_ = sig->next_;
-            
+
          sigbase.next_ = nullptr;
          break;
       }
-      
+
       last = sig;
       sig = sig->next_;
    }
 }
 
 
-void StubBase::attach_property(ClientPropertyBase& prop)
+void StubBase::attach_property(ClientPropertyBase* prop)
 {
    assert(disp_);
-   
-   if (!properties_)
-      disp_->register_properties(*this);
 
-   auto p = properties_;
-   while(p)
+   auto propiter = std::find_if(properties_.begin(), properties_.end(), [prop](auto& pair){ return prop == pair.first; });
+
+   if (propiter->second == false)
    {
-      // already attached?
-      if (&prop == p)
-         return;
-      
-      p = p->next_;
+      propiter->second = true;
+
+      if (++attached_properties_ == 1)
+         disp_->register_properties(*this);
    }
-   
-   prop.next_ = properties_;
-   properties_ = &prop;
 }
 
 
-void StubBase::detach_property(ClientPropertyBase& prop)
+void StubBase::detach_property(ClientPropertyBase* prop)
 {
    assert(disp_);
 
-   ClientPropertyBase* last = nullptr;
-   auto p = properties_;
-   
-   while(p)
+
+   auto propiter = std::find_if(properties_.begin(), properties_.end(), [prop](auto& pair){ return prop == pair.first; });
+
+   if (propiter->second)
    {
-      // found...
-      if (&prop == p)
-      {
-         // remove from list
-         if (last)
-         {
-            last->next_ = p->next_;
-         }
-         else
-            properties_ = p->next_;
-            
-         prop.next_ = nullptr;
-         break;
-      }
-      
-      last = p;
-      p = p->next_;
+      propiter->second = false;
+
+      if (--attached_properties_ == 0)
+        disp_->unregister_properties(*this);
    }
-   
-   // empty?
-   if (!properties_)
-      disp_->unregister_properties(*this);
 }
 
 
@@ -295,14 +360,14 @@ void StubBase::cleanup()
       disp_->unregister_signal(*this, *sig);
       sig = sig->next_;
    }
-   
+
    signals_ = nullptr;
 
    // cleanup property registration
-   if (properties_)
+   if (attached_properties_)
       disp_->unregister_properties(*this);
 
-   properties_ = nullptr;
+   attached_properties_ = 0;
 
    disp_ = nullptr;
 }
@@ -315,9 +380,10 @@ PendingCall StubBase::get_property_async(const char* name)
 
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
-    
+
    encode(iter, iface(), name);
 
+    // TODO timeout handling here
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
    return PendingCall(dbus_message_get_serial(msg.get()), pending);
@@ -334,6 +400,7 @@ message_ptr_t StubBase::get_property(const char* name)
 
    encode(iter, iface(), name);
 
+   // TODO timeout handling here
    dbus_connection_send_with_reply(conn(), msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
    dbus_pending_call_block(pending);
@@ -351,7 +418,7 @@ void StubBase::set_property(const char* name, std::function<void(DBusMessageIter
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-   
+
     encode(iter, iface(), name);
 
     f(iter);   // and now serialize the variant
@@ -359,6 +426,7 @@ void StubBase::set_property(const char* name, std::function<void(DBusMessageIter
      DBusError err;
      dbus_error_init(&err);
 
+     // TODO timeout handling here
      DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg.get(), DBUS_TIMEOUT_USE_DEFAULT, &err);
 
      // drop original message
@@ -382,12 +450,13 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg.get(), &iter);
-    
+
     encode(iter, iface(), name);
     f(iter);   // and now serialize the variant
 
     DBusPendingCall* pending = nullptr;
 
+    // TODO timeout handling here
     dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, DBUS_TIMEOUT_USE_DEFAULT);
 
     return PendingCall(dbus_message_get_serial(msg.get()), pending);
@@ -417,18 +486,11 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          std::string property_name;
          decode(item_iterator, property_name);
 
-         auto p = properties_;
-         while(p)
-         {
-            if (property_name == p->name_)
-            {
-               p->eval(item_iterator);
-               break;
-            } 
-            
-            p = p->next_;
-         }
-         
+         auto propiter = std::find_if(properties_.begin(), properties_.end(), [&property_name](auto& pair){ return property_name == pair.first->name_; });
+
+         if (propiter != properties_.end() && propiter->second)
+            propiter->first->eval(item_iterator);
+
          // advance to next element
          dbus_message_iter_next(&iter);
       }
@@ -436,18 +498,18 @@ void StubBase::try_handle_signal(DBusMessage* msg)
    else
    {
       auto sig = signals_;
-      
+
       while(sig)
       {
          if (!strcmp(sig->name_, dbus_message_get_member(msg)))
          {
             DBusMessageIter iter;
             dbus_message_iter_init(msg, &iter);
-      
+
             sig->eval(iter);
             break;
          }
-         
+
          sig = sig->next_;
       }
    }

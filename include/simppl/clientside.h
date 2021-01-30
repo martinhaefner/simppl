@@ -142,8 +142,6 @@ protected:
    StubBase* stub_;
 
    eval_type eval_;
-
-   ClientPropertyBase* next_;
 };
 
 
@@ -267,7 +265,7 @@ DataT ClientProperty<DataT, Flags>::get()
 template<typename DataT, int Flags>
 ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
-  this->stub_->attach_property(*this);
+  this->stub_->attach_property(this);
 
   dbus_pending_call_set_notify(this->stub_->get_property_async(this->name_).pending(),
      &holder_type::pending_notify,
