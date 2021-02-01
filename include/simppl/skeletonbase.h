@@ -82,6 +82,8 @@ struct SkeletonBase
     }
 
     void send_property_change(const char* prop, int iface_id, std::function<void(DBusMessageIter&)>&& f);
+    void send_property_invalidate(const char* prop, int iface_id);
+
     void send_signal(const char* signame, int iface_id, std::function<void(DBusMessageIter&)>&& f);
 
 protected:

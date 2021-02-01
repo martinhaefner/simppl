@@ -4,6 +4,7 @@
 #include "simppl/interface.h"
 #include "simppl/string.h"
 #include "simppl/vector.h"
+#include "simppl/map.h"
 
 #define SIMPPL_SKELETONBASE_CPP
 #include "simppl/serverside.h"
@@ -394,7 +395,20 @@ DBusHandlerResult SkeletonBase::handle_property_get_request(DBusMessage* msg, Se
     DBusMessageIter iter;
 
     dbus_message_iter_init_append(response.get(), &iter);
-    property.eval(&iter);
+
+    try
+    {
+        property.eval(&iter);
+    }
+    catch(simppl::dbus::Error& err)
+    {
+        response = err.make_reply_for(*msg);
+    }
+    catch(...)
+    {
+        simppl::dbus::Error e("simppl.dbus.UnhandledException");
+        response = e.make_reply_for(*msg);
+    }
 
     dbus_connection_send(disp_->conn_, response.get(), nullptr);
     return DBUS_HANDLER_RESULT_HANDLED;
@@ -551,6 +565,30 @@ void SkeletonBase::send_signal(const char* signame, int iface_id, std::function<
     f(iter);
 
     dbus_connection_send(disp_->conn_, msg.get(), nullptr);
+}
+
+
+void SkeletonBase::send_property_invalidate(const char* prop, int iface_id)
+{
+   // dummy map for changed properties, is empty -> type doesn't matter
+   static std::map<int, int> m;
+
+   message_ptr_t msg = make_message(dbus_message_new_signal(objectpath(), "org.freedesktop.DBus.Properties", "PropertiesChanged"));
+
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+
+   encode(iter, iface(iface_id));
+   encode(iter, m);
+
+   // the invalidated property as the only element in a vector
+   DBusMessageIter inv_iter;
+   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING_AS_STRING, &inv_iter);
+   encode(inv_iter, prop);
+
+   dbus_message_iter_close_container(&iter, &inv_iter);
+
+   dbus_connection_send(disp_->conn_, msg.get(), nullptr);
 }
 
 

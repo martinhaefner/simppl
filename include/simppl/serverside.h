@@ -268,11 +268,24 @@ struct BaseProperty : ServerPropertyBase
        detail::PropertyCodec<DataT>::encode(*iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
    }
 
+   /**
+    * Shall be used with properties implementing on_read callback in order
+    * to send property changes. Not suitable with value holding properties.
+    */
    void notify(const DataT& data)
    {
       this->parent_->send_property_change(this->name_, this->iface_id_, [this, data](DBusMessageIter& iter){
          detail::PropertyCodec<DataT>::encode(iter, data);
       });
+   }
+
+   /**
+    * Send an invalidation message, shall only be used in conjunction with the notify message and
+    * the on_read callback. Currently, value holding properties cannot be invalidated.
+    */
+   void invalidate()
+   {
+      this->parent_->send_property_invalidate(this->name_, this->iface_id_);
    }
 
    /// set callback for each read

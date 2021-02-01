@@ -175,7 +175,7 @@ simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage
 
             // get value and call
             if (propiter != properties_.end())
-                propiter->first->eval(__iter);
+                propiter->first->eval(&__iter);
 
             dbus_message_iter_next(&_iter);
         }
@@ -408,20 +408,30 @@ PendingCall StubBase::get_property_async(const char* name)
 message_ptr_t StubBase::get_property(const char* name)
 {
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
-   DBusPendingCall* pending = nullptr;
 
    DBusMessageIter iter;
    dbus_message_iter_init_append(msg.get(), &iter);
 
    encode(iter, iface(), name);
 
+   DBusError err;
+   dbus_error_init(&err);
+
    // TODO request specific timeout handling here
-   dbus_connection_send_with_reply(conn(), msg.get(), &pending, disp().request_timeout());
+   DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn(), msg.get(), disp().request_timeout(), &err);
 
-   dbus_pending_call_block(pending);
+   // drop original message
+   msg.reset(reply);
 
-   msg.reset(dbus_pending_call_steal_reply(pending));
-   dbus_pending_call_unref(pending);
+   // check for reponse
+   if (dbus_error_is_set(&err))
+   {
+      // TODO make static function to throw from DBusError
+      Error ex(err.name, err.message);
+
+      dbus_error_free(&err);
+      throw ex;
+   }
 
    return msg;
 }
@@ -504,7 +514,25 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          auto propiter = std::find_if(properties_.begin(), properties_.end(), [&property_name](auto& pair){ return property_name == pair.first->name_; });
 
          if (propiter != properties_.end() && propiter->second)
-            propiter->first->eval(item_iterator);
+            propiter->first->eval(&item_iterator);
+
+         // advance to next element
+         dbus_message_iter_next(&iter);
+      }
+
+      // check for invalidated properties
+      dbus_message_iter_next(&it);
+      dbus_message_iter_recurse(&it, &iter);
+
+      while(dbus_message_iter_get_arg_type(&iter) != 0)
+      {
+         std::string property_name;
+         decode(iter, property_name);
+
+         auto propiter = std::find_if(properties_.begin(), properties_.end(), [&property_name](auto& pair){ return property_name == pair.first->name_; });
+
+         if (propiter != properties_.end() && propiter->second)
+            propiter->first->eval(nullptr);
 
          // advance to next element
          dbus_message_iter_next(&iter);
