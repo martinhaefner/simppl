@@ -24,7 +24,7 @@ struct InterimCallbackHolder
    {
       // NOOP
    }
-   
+
    InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
 
    explicit inline
@@ -33,12 +33,12 @@ struct InterimCallbackHolder
    {
       // NOOP
    }
-   
+
    PendingCall pc_;
 };
 
 
-template<typename FuncT, typename ReturnT>
+template<typename FuncT, typename ReturnT, typename ErrorT>
 struct CallbackHolder
 {
    CallbackHolder(const CallbackHolder&) = delete;
@@ -51,7 +51,7 @@ struct CallbackHolder
    {
       // NOOP
    }
-   
+
    static inline
    void _delete(void* p)
    {
@@ -67,11 +67,11 @@ struct CallbackHolder
        auto that = (CallbackHolder*)data;
        assert(that->f_);
 
-       CallState cs(*msg);
-       
+       TCallState<ErrorT> cs(*msg);
+
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
-       
+
        GetCaller<ReturnT>::type::template evalResponse(iter, that->f_, cs);
    }
 

@@ -29,6 +29,13 @@ struct out
    typedef T real_type;
 };
 
+// marker
+template<typename T>
+struct _throw
+{
+   typedef T real_type;
+};
+
 
 }   // namespace dbus
 

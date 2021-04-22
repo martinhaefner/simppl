@@ -23,7 +23,7 @@ private:
     {
         if (st == simppl::dbus::ConnectionState::Connected)
         {
-            echo.async("Hello World!") >> [this](const simppl::dbus::CallState st, const std::string& echo_string)
+            echo.async("Hello World!") >> [this](const simppl::dbus::CallState& st, const std::string& echo_string)
             {
                 if (st)
                 {
@@ -31,7 +31,7 @@ private:
                 }
                 else
                     std::cout << "Got error: " << st.what() << std::endl;
-                    
+
                 disp().stop();
             };
         }
@@ -56,7 +56,7 @@ public:
 int main(int argc, char** argv)
 {
    simppl::dbus::Dispatcher disp("bus:session");
-    
+
    if (argc == 1)
    {
       MyEchoClient client(disp);
@@ -73,6 +73,6 @@ int main(int argc, char** argv)
       MyEchoClient client(disp);
       disp.run();
    }
-   
+
    return EXIT_SUCCESS;
 }

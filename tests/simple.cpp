@@ -117,14 +117,14 @@ struct Client : simppl::dbus::Stub<Simple>
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-         this->hello.async() >> [this](simppl::dbus::CallState state){
+         this->hello.async() >> [this](const simppl::dbus::CallState& state){
             EXPECT_TRUE((bool)state);
 
             this->oneway(42);
 
             const wchar_t* wct = L"Hello world";
 
-            this->echo_wchart.async(wct) >> [this](simppl::dbus::CallState state, wchar_t* p){
+            this->echo_wchart.async(wct) >> [this](const simppl::dbus::CallState& state, wchar_t* p){
 
                EXPECT_TRUE((bool)state);
                EXPECT_EQ(0, wcscmp(p, L"Hello world"));
@@ -150,7 +150,7 @@ struct CancelClient : simppl::dbus::Stub<Simple>
 
          if (s == simppl::dbus::ConnectionState::Connected)   // FIXME add bool cast operator
          {
-            simppl::dbus::PendingCall p = this->hello_wait_for_some_time.async() >> [this](simppl::dbus::CallState state){
+            simppl::dbus::PendingCall p = this->hello_wait_for_some_time.async() >> [this](const simppl::dbus::CallState& state){
 
                 // never called!!!
                 EXPECT_TRUE(false);
@@ -207,14 +207,14 @@ struct PropertyClient : simppl::dbus::Stub<Simple>
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
          // like for signals, attributes must be attached when the client is connected
-         this->data.attach() >> [this](simppl::dbus::CallState state, int new_value)
+         this->data.attach() >> [this](const simppl::dbus::CallState& state, int new_value)
          {
             this->attributeChanged(state, new_value);
          };
       };
    }
 
-   void attributeChanged(simppl::dbus::CallState state, int new_value)
+   void attributeChanged(const simppl::dbus::CallState& state, int new_value)
    {
       EXPECT_TRUE((bool)state);
 

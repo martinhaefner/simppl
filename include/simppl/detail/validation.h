@@ -12,13 +12,13 @@ namespace detail
 {
 
 
-struct InOutOrOneway
+struct InOutThrowOrOneway
 {
     template<typename T>
     struct apply_
     {
-        static_assert(is_in<T>::value || is_out<T>::value || std::is_same<T, oneway>::value, "neither in, out nor oneway parameter");
-        enum { value = is_in<T>::value || is_out<T>::value || std::is_same<T, oneway>::value };
+        static_assert(is_in<T>::value || is_out<T>::value || std::is_same<T, oneway>::value || is_throw<T>::value, "neither in, out nor oneway parameter and no throw directive");
+        enum { value = is_in<T>::value || is_out<T>::value || std::is_same<T, oneway>::value || is_throw<T>::value };
     };
 };
 

@@ -43,11 +43,17 @@ namespace detail
 struct ServerMethodBase
 {
    typedef void(*eval_type)(ServerMethodBase*, DBusMessage*);
+   typedef message_ptr_t(*throw_type)(ServerMethodBase*, DBusMessage&, const Error&);
    typedef void(*sig_type)(std::ostream&);
 
    void eval(DBusMessage* msg)
    {
       eval_(this, msg);
+   }
+
+   message_ptr_t _throw(DBusMessage& msg, const Error& err)
+   {
+       return throw_(this, msg, err);
    }
 
 
@@ -65,6 +71,7 @@ protected:
    ~ServerMethodBase();
 
    eval_type eval_;
+   throw_type throw_;
 };
 
 
@@ -126,15 +133,17 @@ struct ServerMethod : ServerMethodBase
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
     enum {
-        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
-        is_oneway = detail::is_oneway_request<ArgsT...>::value
+        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutThrowOrOneway>::value,
+        is_oneway = detail::is_oneway_request<ArgsT...>::value,
     };
 
-    typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
-    typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
+    typedef typename detail::canonify<typename args_type_generator::type>::type                   args_type;
+    typedef typename detail::canonify<typename return_type_generator::type>::type                 return_type;
 
-    typedef typename detail::generate_server_callback_function<ArgsT...>::type                     callback_type;
+    typedef typename detail::generate_server_callback_function<ArgsT...>::type                    callback_type;
     typedef typename detail::generate_serializer<typename return_type_generator::list_type>::type serializer_type;
+
+    typedef typename detail::get_exception_type<ArgsT...>::type                                   exception_type;
 
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
@@ -144,6 +153,7 @@ struct ServerMethod : ServerMethodBase
     : ServerMethodBase(name, iface)
     {
         eval_ = __eval;
+        throw_ = __throw<exception_type>;
     }
 
 
@@ -178,6 +188,14 @@ private:
        dbus_message_iter_init(msg, &iter);
 
        detail::GetCaller<args_type>::type::template eval(iter, ((ServerMethod*)obj)->f_);
+   }
+
+
+   template<typename T>
+   static
+   message_ptr_t __throw(ServerMethodBase* obj, DBusMessage& req, const Error& err)
+   {
+       return detail::ErrorFactory<T>::reply(req, err);
    }
 
 

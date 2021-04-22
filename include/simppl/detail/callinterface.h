@@ -29,9 +29,9 @@ struct FunctionCaller
       FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
    }
 
-   template<typename FunctorT>
+   template<typename FunctorT, typename ErrorT>
    static inline
-   void eval_cs(FunctorT& f, const CallState& cs, const TupleT& tuple)
+   void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& tuple)
    {
       FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
    }
@@ -43,9 +43,9 @@ struct FunctionCaller
      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
    }
 
-   template<typename FunctorT, typename... T>
+   template<typename FunctorT, typename ErrorT, typename... T>
    static inline
-   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& tuple, const T&... t)
+   void eval_intern_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& tuple, const T&... t)
    {
       FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs(f, cs, tuple, t..., std::get<N>(tuple));
    }
@@ -61,9 +61,9 @@ struct FunctionCaller<-1, TupleT>
       f(t...);
    }
 
-   template<typename FunctorT, typename... T>
+   template<typename FunctorT, typename ErrorT, typename... T>
    static inline
-   void eval_intern_cs(FunctorT& f, const CallState& cs, const TupleT& /*tuple*/, const T&... t)
+   void eval_intern_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& /*tuple*/, const T&... t)
    {
       f(cs, t...);
    }
@@ -72,9 +72,9 @@ struct FunctionCaller<-1, TupleT>
 template<>
 struct FunctionCaller<0, std::tuple<>>
 {
-   template<typename FunctorT, typename... T>
+   template<typename FunctorT, typename ErrorT, typename... T>
    static inline
-   void eval_cs(FunctorT& f, const CallState& cs, const std::tuple<>& tuple)
+   void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const std::tuple<>& tuple)
    {
       f(cs);
    }
@@ -85,7 +85,7 @@ template<typename T>
 struct DeserializeAndCall : simppl::NonInstantiable
 {
    template<typename FunctorT>
-   static 
+   static
    void eval(DBusMessageIter& iter, FunctorT& f)
    {
       std::tuple<T> tuple;
@@ -94,9 +94,9 @@ struct DeserializeAndCall : simppl::NonInstantiable
       FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
    }
 
-   template<typename FunctorT>
+   template<typename FunctorT, typename ErrorT>
    static
-   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::CallState& cs)
+   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
       std::tuple<T> tuple;
 
@@ -121,9 +121,9 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
       FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
 
-   template<typename FunctorT>
-   static 
-   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::CallState& cs)
+   template<typename FunctorT, typename ErrorT>
+   static
+   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
       std::tuple<T...> tuple;
 
@@ -144,9 +144,9 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
       f();
    }
 
-   template<typename FunctorT>
+   template<typename FunctorT, typename ErrorT>
    static inline
-   void evalResponse(DBusMessageIter& /*iter*/, FunctorT& f, const simppl::dbus::CallState& cs)
+   void evalResponse(DBusMessageIter& /*iter*/, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
       f(cs);
    }

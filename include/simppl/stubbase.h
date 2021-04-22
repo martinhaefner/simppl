@@ -23,6 +23,7 @@ namespace dbus
 struct Dispatcher;
 struct ClientSignalBase;
 struct ClientPropertyBase;
+struct ClientMethodBase;
 
 
 struct StubBase
@@ -89,9 +90,9 @@ protected:
 
    void cleanup();
 
-   PendingCall send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   PendingCall send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
-   message_ptr_t send_request_and_block(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   message_ptr_t send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
