@@ -5,7 +5,7 @@
 #include "simppl/detail/holders.h"
 
 
-simppl::dbus::detail::GetAllPropertiesHolder::GetAllPropertiesHolder(std::function<void(CallState)> f, StubBase& stub)
+simppl::dbus::detail::GetAllPropertiesHolder::GetAllPropertiesHolder(std::function<void(const CallState&)> f, StubBase& stub)
  : f_(f)
  , stub_(stub)
 {
@@ -29,6 +29,6 @@ void simppl::dbus::detail::GetAllPropertiesHolder::pending_notify(DBusPendingCal
    auto that = (GetAllPropertiesHolder*)data;
    assert(that->f_);
 
-   auto cs = that->stub_.get_all_properties_handle_response(*msg);
+   auto cs = that->stub_.get_all_properties_handle_response(*msg, false);
    that->f_(cs);
 }

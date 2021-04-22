@@ -79,7 +79,7 @@ TEST(NoInterface, introspect)
             connected >> [this](simppl::dbus::ConnectionState s) {
                 EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-                Introspect.async() >> [&](simppl::dbus::CallState state, std::string result) {
+                Introspect.async() >> [&](const simppl::dbus::CallState& state, std::string result) {
                     EXPECT_TRUE(static_cast<bool>(state));
                     EXPECT_EQ(result, "<?xml version=\"1.0\" ?>\n"
                                       "<node name=\"/\">\n"

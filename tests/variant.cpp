@@ -70,7 +70,7 @@ namespace {
        : simppl::dbus::Stub<test::variant::VServer>(d, "role")
       {
          connected >> [this](simppl::dbus::ConnectionState s){
-            getData.async() >> [this](simppl::dbus::CallState state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping){
+            getData.async() >> [this](const simppl::dbus::CallState& state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping){
                EXPECT_EQ(3u, mapping.size());
 
                auto hello = mapping.find("Hello");
@@ -113,7 +113,7 @@ TEST(Variant, basic)
 {
    constructs = 0;
    destructs = 0;
-   
+
    simppl::Variant<int, double, std::string, TestHelper> v;
 
    v = 42;

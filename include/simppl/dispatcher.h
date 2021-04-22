@@ -7,6 +7,7 @@
 
 #include <dbus/dbus.h>
 
+#include "simppl/callstate.h"
 #include "simppl/connectionstate.h"
 #include "simppl/detail/constants.h"
 
@@ -21,7 +22,6 @@ namespace dbus
 struct StubBase;
 struct SkeletonBase;
 struct ClientSignalBase;
-struct CallState;
 
 
 void enable_threads();

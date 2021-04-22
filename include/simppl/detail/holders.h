@@ -13,7 +13,6 @@ namespace dbus
 
 // forward decl
 struct StubBase;
-struct CallState;
 
 
 namespace detail
@@ -23,12 +22,6 @@ template<typename HolderT>
 struct InterimCallbackHolder
 {
    typedef HolderT holder_type;
-
-   /*InterimCallbackHolder(const InterimCallbackHolder& rhs)
-   : pc_(std::move(rhs.pc_))
-   {
-      // NOOP
-   }*/
 
    InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
 
@@ -45,14 +38,6 @@ struct InterimCallbackHolder
 
 struct InterimGetAllPropertiesCallbackHolder
 {
-   /*inline
-   InterimGetAllPropertiesCallbackHolder(const InterimGetAllPropertiesCallbackHolder& rhs, StubBase& stub)
-    : pc_(std::move(rhs.pc_))
-    , stub_(stub)
-   {
-      // NOOP
-   }*/
-
    InterimGetAllPropertiesCallbackHolder& operator=(const InterimGetAllPropertiesCallbackHolder&) = delete;
 
    InterimGetAllPropertiesCallbackHolder(const PendingCall& pc, StubBase& stub)
@@ -67,8 +52,7 @@ struct InterimGetAllPropertiesCallbackHolder
 };
 
 
-
-template<typename FuncT, typename ReturnT>
+template<typename FuncT, typename ReturnT, typename ErrorT>
 struct CallbackHolder
 {
    CallbackHolder(const CallbackHolder&) = delete;
@@ -97,7 +81,7 @@ struct CallbackHolder
        auto that = (CallbackHolder*)data;
        assert(that->f_);
 
-       CallState cs(*msg);
+       TCallState<ErrorT> cs(*msg);
 
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
@@ -163,7 +147,7 @@ struct GetAllPropertiesHolder
    GetAllPropertiesHolder& operator=(const GetAllPropertiesHolder&) = delete;
 
 
-   GetAllPropertiesHolder(std::function<void(CallState)> f, StubBase& stub);
+   GetAllPropertiesHolder(std::function<void(const CallState&)> f, StubBase& stub);
 
    static
    void _delete(void* p);
@@ -171,7 +155,7 @@ struct GetAllPropertiesHolder
    static
    void pending_notify(DBusPendingCall* pc, void* data);
 
-   std::function<void(CallState)> f_;
+   std::function<void(const CallState&)> f_;
    StubBase& stub_;
 };
 

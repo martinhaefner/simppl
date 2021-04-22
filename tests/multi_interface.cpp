@@ -95,7 +95,7 @@ TEST(MultiInterface, adder_interface)
             connected >> [this](simppl::dbus::ConnectionState s) {
                 EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-                Add.async(1, 1) >> [&](simppl::dbus::CallState state, int result) {
+                Add.async(1, 1) >> [&](const simppl::dbus::CallState& state, int result) {
                     EXPECT_TRUE(static_cast<bool>(state));
                     EXPECT_EQ(result, 2);
                     disp().stop();
@@ -121,7 +121,7 @@ TEST(MultiInterface, multiplier_interface)
             connected >> [this](simppl::dbus::ConnectionState s) {
                 EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-                Multiply.async(1, 1) >> [&](simppl::dbus::CallState state, int result) {
+                Multiply.async(1, 1) >> [&](const simppl::dbus::CallState& state, int result) {
                     EXPECT_TRUE(static_cast<bool>(state));
                     EXPECT_EQ(result, 1);
                     disp().stop();

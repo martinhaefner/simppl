@@ -81,7 +81,7 @@ struct Client : simppl::dbus::Stub<Properties>
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-         props.attach() >> [this](simppl::dbus::CallState, const std::map<ident_t, std::string>& props){
+         props.attach() >> [this](const simppl::dbus::CallState&, const std::map<ident_t, std::string>& props){
             ++callback_count_;
 
             if (callback_count_ == 1)   // the property Get(...) from the attach
@@ -128,7 +128,7 @@ struct GetterClient : simppl::dbus::Stub<Properties>
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
          // never use operator= here, it's blocking!
-         data.get_async() >> [this](simppl::dbus::CallState cs, int i){
+         data.get_async() >> [this](const simppl::dbus::CallState& cs, int i){
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(i, 4711);
 
@@ -148,7 +148,7 @@ struct GetterErrorClient : simppl::dbus::Stub<Properties>
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
          // never use operator= here, it's blocking!
-         data.get_async() >> [this](simppl::dbus::CallState cs, int i){
+         data.get_async() >> [this](const simppl::dbus::CallState& cs, int i){
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.exception().what(), "Not.Available");
 
@@ -170,7 +170,7 @@ struct MultiClient : simppl::dbus::Stub<Properties>
 
          if (attach_)
          {
-            props.attach() >> [this](simppl::dbus::CallState, const std::map<ident_t, std::string>& props){
+            props.attach() >> [this](const simppl::dbus::CallState&, const std::map<ident_t, std::string>& props){
                ++callback_count_;
 
                if (callback_count_ == 1)
@@ -207,7 +207,7 @@ struct SetterClient : simppl::dbus::Stub<Properties>
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-         data.attach() >> [this](simppl::dbus::CallState, int i){
+         data.attach() >> [this](const simppl::dbus::CallState&, int i){
             ++callback_count_;
 
             if (callback_count_ == 1)   // the property Get(...) from the attach
@@ -221,7 +221,7 @@ struct SetterClient : simppl::dbus::Stub<Properties>
          };
 
          // never use operator= here, it's blocking!
-         data.set_async(5555) >> [this](simppl::dbus::CallState cs){
+         data.set_async(5555) >> [this](const simppl::dbus::CallState& cs){
              EXPECT_TRUE((bool)cs);
 
              disp().stop();
@@ -241,22 +241,22 @@ struct InvalidSetterClient : simppl::dbus::Stub<Properties>
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-         data.attach() >> [this](simppl::dbus::CallState, int) {
+         data.attach() >> [this](const simppl::dbus::CallState&, int) {
              ++callback_count_;
          };
 
          // never use operator= here, it's blocking!
-         data.set_async(-1) >> [this](simppl::dbus::CallState cs){
+         data.set_async(-1) >> [this](const simppl::dbus::CallState& cs){
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.exception().what(), "simppl.dbus.UnhandledException");
          };
 
-         data.set_async(1) >> [this](simppl::dbus::CallState cs){
+         data.set_async(1) >> [this](const simppl::dbus::CallState& cs){
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.exception().what(), "Invalid.Argument");
          };
 
-         data.set_async(2) >> [this](simppl::dbus::CallState cs){
+         data.set_async(2) >> [this](const simppl::dbus::CallState& cs){
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(2, callback_count_);   // one from attach, one from data change
 
@@ -348,11 +348,11 @@ struct NonCachingTestClient : simppl::dbus::Stub<Properties>
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
          // never use operator= here, it's blocking!
-         data.get_async() >> [this](simppl::dbus::CallState cs, int i){
+         data.get_async() >> [this](const simppl::dbus::CallState& cs, int i){
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(i, 4711);
 
-             data.attach() >> [this](simppl::dbus::CallState cs, int i){
+             data.attach() >> [this](const simppl::dbus::CallState& cs, int i){
                 EXPECT_TRUE((bool)cs);
 
                 if (i == 4711)
@@ -378,14 +378,14 @@ struct GetAllClient : simppl::dbus::Stub<Properties>
 
          // you only get the properties with a callback set
          // so first connect the desired properties
-         data >> [this](simppl::dbus::CallState cs, int i) {
+         data >> [this](const simppl::dbus::CallState& cs, int i) {
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(i, 4711);
 
              ++count_;
          };
 
-         str_prop >> [this](simppl::dbus::CallState cs, const std::string& str) {
+         str_prop >> [this](const simppl::dbus::CallState& cs, const std::string& str) {
              EXPECT_TRUE((bool)cs);
              EXPECT_EQ(str, "Hallo Welt");
 
@@ -394,7 +394,7 @@ struct GetAllClient : simppl::dbus::Stub<Properties>
 
          // now call - callbacks will be called in background just before
          // this callback gets called...
-         get_all_properties.async() >> [this](simppl::dbus::CallState cs){
+         get_all_properties.async() >> [this](const simppl::dbus::CallState& cs){
              EXPECT_TRUE((bool)cs);
 
              // the other two callbacks are already evaluated...
@@ -418,7 +418,7 @@ struct InvalidatedPropertyClient : simppl::dbus::Stub<Properties>
       connected >> [this](simppl::dbus::ConnectionState s){
          EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
 
-         data.attach() >> [this](simppl::dbus::CallState cs, int) {
+         data.attach() >> [this](const simppl::dbus::CallState& cs, int) {
              ++calls_;
              EXPECT_FALSE((bool)cs);
              EXPECT_STREQ(cs.what(), "simppl.dbus.Invalid");
@@ -649,9 +649,9 @@ TEST(Properties, getall_blocking)
    std::string sval;
 
    // first connect all properties
-   c.data     >> [&ival](simppl::dbus::CallState, int i) { ival = i; };
-   c.props    >> [&mval](simppl::dbus::CallState, const std::map<ident_t, std::string>& val) { mval = val; };
-   c.str_prop >> [&sval](simppl::dbus::CallState, const std::string& str) { sval = str; };
+   c.data     >> [&ival](const simppl::dbus::CallState&, int i) { ival = i; };
+   c.props    >> [&mval](const simppl::dbus::CallState&, const std::map<ident_t, std::string>& val) { mval = val; };
+   c.str_prop >> [&sval](const simppl::dbus::CallState&, const std::string& str) { sval = str; };
 
    // now call - callbacks will be called in background
    c.get_all_properties();

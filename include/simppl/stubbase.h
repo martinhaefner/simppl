@@ -29,6 +29,7 @@ struct Dispatcher;
 struct ClientSignalBase;
 struct ClientPropertyBase;
 struct StubBase;
+struct ClientMethodBase;
 
 
 // TODO move away from here
@@ -135,9 +136,9 @@ protected:
 
    void cleanup();
 
-   PendingCall send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   PendingCall send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
-   message_ptr_t send_request_and_block(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   message_ptr_t send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
@@ -167,8 +168,10 @@ protected:
    /**
     * Second part of get_all_properties_async. Once the callback arrives
     * the property callbacks have to be called.
+    *
+    * @param __throw blocking call throws exception
     */
-   simppl::dbus::CallState get_all_properties_handle_response(DBusMessage& response);
+   simppl::dbus::CallState get_all_properties_handle_response(DBusMessage& response, bool __throw);
 
    void get_all_properties_request();
    getall_properties_holder_type get_all_properties_request_async();
@@ -192,7 +195,7 @@ protected:
 
 
 inline
-void operator>>(simppl::dbus::detail::InterimGetAllPropertiesCallbackHolder&& r, const std::function<void(simppl::dbus::CallState)>& f)
+void operator>>(simppl::dbus::detail::InterimGetAllPropertiesCallbackHolder&& r, const std::function<void(const simppl::dbus::CallState&)>& f)
 {
    dbus_pending_call_set_notify(r.pc_.pending(),
                                 &simppl::dbus::detail::GetAllPropertiesHolder::pending_notify,

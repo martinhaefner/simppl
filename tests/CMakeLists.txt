@@ -33,7 +33,7 @@ add_executable(unittests
    multi_interface.cpp
    no_interface.cpp
 )
-if(BOOST_FOUND)
+if(Boost_FOUND)
    target_compile_definitions(unittests PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)
 endif()
 target_link_libraries(unittests gtest gtest_main simppl rt)
@@ -48,11 +48,11 @@ if(DBUS_RUN_SESSION)
 endif()
 
 
-# not a test, just an introspection example  
+# not a test, just an introspection example
 add_executable(introserver
    introserver.cpp
 )
-if(BOOST_FOUND)
+if(Boost_FOUND)
    target_compile_definitions(introserver PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)
 endif()
 target_link_libraries(introserver simppl rt)
