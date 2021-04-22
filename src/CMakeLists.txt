@@ -1,9 +1,8 @@
 add_library(simppl SHARED
-   callstate.cpp
-   dispatcher.cpp 
-   error.cpp 
-   serverresponseholder.cpp 
-   skeletonbase.cpp 
+   dispatcher.cpp
+   error.cpp
+   serverresponseholder.cpp
+   skeletonbase.cpp
    serverside.cpp
    stubbase.cpp
    timeout.cpp

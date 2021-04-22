@@ -125,7 +125,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
       shutdown >> [this](){
          disp().stop();
       };
-      
+
       set >> [this](int id, const std::string& str){
          ++calls_;
 
@@ -137,7 +137,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mayShutdown.notify(42);
          hi.notify();
       };
-      
+
       get_all >> [this](){
          Menu mainmenu;
 
@@ -162,7 +162,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
 
          respond_with(get_all(mainmenu));
       };
-      
+
       trigger_data >> [this](){
          data = 8888;
       };

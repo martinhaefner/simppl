@@ -37,6 +37,12 @@ struct Size<TypeList<HeadT, NilType> >
     enum { value = 1 };
 };
 
+template<>
+struct Size<TypeList<NilType, NilType> >
+{
+    enum { value = 0 };
+};
+
 // -------------------------------popfrontN ------------------------------------
 
 template<int N, typename ListT>

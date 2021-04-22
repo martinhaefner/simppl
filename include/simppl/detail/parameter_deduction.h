@@ -43,6 +43,18 @@ struct is_out<simppl::dbus::out<T>>
    enum { value = true };
 };
 
+template<typename T>
+struct is_throw
+{
+   enum { value = false };
+};
+
+template<typename T>
+struct is_throw<simppl::dbus::_throw<T>>
+{
+   enum { value = true };
+};
+
 // ---------------------------------------------------------------------
 
 // flatten typelist into std::tuple
@@ -201,7 +213,7 @@ struct add_const_for_pointer
    {
       typedef T type;
    };
-   
+
    template<typename T>
    struct apply_<T*>
    {
@@ -248,16 +260,16 @@ struct generate_argument_type
 {
    typedef typename filter<is_in, T...>::list_type list_type;
    typedef typename transform<list_type, add_const_for_pointer>::type const_list_type;
-   
+
    typedef typename make_tuple_from_list<list_type, std::tuple<>>::type type;
    typedef typename make_tuple_from_list<const_list_type, std::tuple<>>::type const_type;
 };
 
-template<typename... T>
+template<typename ErrorT, typename... T>
 struct generate_callback_function
 {
    typedef typename filter<is_out, T...>::list_type list_type;
-   typedef typename make_function_from_list<list_type, std::function<void(CallState)>>::type type;
+   typedef typename make_function_from_list<list_type, std::function<void(const TCallState<ErrorT>&)>>::type type;
 };
 
 template<typename... T>
@@ -302,6 +314,27 @@ struct is_oneway_request
    enum { value = Find<simppl::dbus::oneway, typename make_typelist<ArgsT...>::type>::value != -1 };
 };
 
+
+template<typename... ArgsT>
+struct has_exception
+{
+   typedef typename filter<is_throw, ArgsT...>::list_type list_type;
+   enum { value = Size<list_type>::value == 0 };
+};
+
+
+template<typename... ArgsT>
+struct get_exception_type
+{
+    typedef typename filter<is_throw, ArgsT...>::list_type list_type;
+    enum { size = Size<list_type>::value };
+
+    static_assert(size <= 1, "multiple throw clauses encountered");
+    static_assert(size == 0 || std::is_base_of<Error, typename TypeAt<0, list_type>::type>::value, "not a valid exception type");
+    static_assert(size == 0 || (size && !is_oneway_request<ArgsT...>::value), "oneway with exception not possible");
+
+    typedef typename std::conditional<Size<list_type>::value == 0, Error, typename TypeAt<0, list_type>::type>::type type;
+};
 
 
 // --- introspection stuff ---------------------------------------------
@@ -374,6 +407,15 @@ struct IntrospectionHelper
 
 template<>
 struct IntrospectionHelper<::simppl::dbus::oneway>
+{
+   static inline void eval(std::ostream& os, int i)
+   {
+      // NOOP
+   }
+};
+
+template<typename T>
+struct IntrospectionHelper<::simppl::dbus::_throw<T>>
 {
    static inline void eval(std::ostream& os, int i)
    {

@@ -149,7 +149,7 @@ void SkeletonBase::respond_with(const Error& err)
    assert(current_request_);
    //assert(current_request_.requestor_->hasResponse());
 
-   message_ptr_t rmsg = err.make_reply_for(*current_request().msg_);
+   message_ptr_t rmsg = current_request_.requestor_->_throw(*current_request_.msg_, err);
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
    current_request_.clear();   // only respond once!!!
@@ -161,7 +161,7 @@ void SkeletonBase::respond_on(ServerRequestDescriptor& req, const Error& err)
    assert(req);
    //assert(req.requestor_->hasResponse());
 
-   message_ptr_t rmsg = err.make_reply_for(*req.msg_);
+   message_ptr_t rmsg = req.requestor_->_throw(*req.msg_, err);
    dbus_connection_send(disp_->conn_, rmsg.get(), nullptr);
 
    req.clear();
@@ -303,14 +303,14 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
                       {
                          p->eval(response.get());
                       }
-                      catch(simppl::dbus::Error& err)
+                      catch(const simppl::dbus::Error& err)
                       {
-                         response = err.make_reply_for(*msg);
+                         response = detail::ErrorFactory<Error>::reply(*msg, err);
                       }
                       catch(...)
                       {
                          simppl::dbus::Error e("simppl.dbus.UnhandledException");
-                         response = e.make_reply_for(*msg);
+                         response = detail::ErrorFactory<Error>::reply(*msg, e);
                       }
 
                       dbus_connection_send(disp_->conn_, response.get(), nullptr);
@@ -325,14 +325,14 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 
                          response = make_message(dbus_message_new_method_return(msg));
                       }
-                      catch(simppl::dbus::Error& err)
+                      catch(const simppl::dbus::Error& err)
                       {
-                         response = err.make_reply_for(*msg);
+                         response = detail::ErrorFactory<Error>::reply(*msg, err);
                       }
                       catch(...)
                       {
                          simppl::dbus::Error e("simppl.dbus.UnhandledException");
-                         response = e.make_reply_for(*msg);
+                         response = detail::ErrorFactory<Error>::reply(*msg, e);
                       }
 
                       dbus_connection_send(disp_->conn_, response.get(), nullptr);
@@ -349,7 +349,7 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
           catch(DecoderError&)
           {
              simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
-             auto r = err.make_reply_for(*msg);
+             auto r = detail::ErrorFactory<Error>::reply(*msg, err);
              dbus_connection_send(disp_->conn_, r.get(), nullptr);
 
              return DBUS_HANDLER_RESULT_HANDLED;
@@ -372,13 +372,13 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
             catch(DecoderError&)
             {
                simppl::dbus::Error err(DBUS_ERROR_INVALID_ARGS);
-               auto r = err.make_reply_for(*msg);
+               auto r = detail::ErrorFactory<Error>::reply(*msg, err);
                dbus_connection_send(disp_->conn_, r.get(), nullptr);
             }
             catch(...)
             {
                simppl::dbus::Error e("simppl.dbus.UnhandledException");
-               auto r = e.make_reply_for(*msg);
+               auto r = detail::ErrorFactory<Error>::reply(*msg, e);
                dbus_connection_send(disp_->conn_, r.get(), nullptr);
             }
 

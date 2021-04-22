@@ -88,9 +88,9 @@ Dispatcher& StubBase::disp()
 }
 
 
-PendingCall StubBase::send_request(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
+PendingCall StubBase::send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
 {
-    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method->method_name_));
     DBusPendingCall* pending = nullptr;
 
     DBusMessageIter iter;
@@ -122,9 +122,9 @@ PendingCall StubBase::send_request(const char* method_name, std::function<void(D
 }
 
 
-message_ptr_t StubBase::send_request_and_block(const char* method_name, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
+message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
 {
-    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method_name));
+    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method->method_name_));
     DBusPendingCall* pending = nullptr;
     message_ptr_t rc(nullptr, &dbus_message_unref);
 
@@ -149,10 +149,8 @@ message_ptr_t StubBase::send_request_and_block(const char* method_name, std::fun
         rc = make_message(dbus_pending_call_steal_reply(pending));
         dbus_pending_call_unref(pending);
 
-        CallState cs(*rc);
-
-        if (!cs)
-           cs.throw_exception();
+        if (dbus_message_get_type(rc.get()) == DBUS_MESSAGE_TYPE_ERROR)
+            method->_throw(*rc);
     }
     else
     {

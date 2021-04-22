@@ -6,6 +6,8 @@
 
 #include "simppl/error.h"
 
+#include "simppl/detail/error.h"
+
 
 struct DBusMessage;
 
@@ -16,41 +18,28 @@ namespace simppl
 namespace dbus
 {
 
-struct CallState
+// forward decl
+namespace detail {
+    template<typename, typename, typename> struct CallbackHolder;
+    template<typename, typename> struct PropertyCallbackHolder;
+}
+
+
+template<typename ErrorT>
+struct TCallState
 {
-   explicit inline
-   CallState(uint32_t serial)
-    : ex_()
-    , serial_(serial)
-   {
-      // NOOP
-   }
+    template<typename, typename, typename> friend struct detail::CallbackHolder;
+    template<typename, typename> friend struct detail::PropertyCallbackHolder;
+    template<typename, int> friend struct ClientProperty;
 
-   /// @param ex The function takes ownership of the exception.
-   explicit inline
-   CallState(Error* ex)
-    : ex_(ex)
-    , serial_(SIMPPL_INVALID_SERIAL)
-   {
-      // NOOP
-   }
 
-   CallState(CallState&& st)
+   TCallState(TCallState&& st)
     : ex_(st.ex_.release())
     , serial_(st.serial_)
    {
       // NOOP
    }
 
-   CallState(DBusMessage&);
-
-   // FIXME why is this necessary, we are not copyable by design?!
-   CallState(const CallState& st)
-    : ex_()
-    , serial_(st.serial_)
-   {
-      ex_.reset(const_cast<CallState&>(st).ex_.release());
-   }
 
    explicit inline
    operator bool() const
@@ -72,19 +61,54 @@ struct CallState
    }
 
    inline
-   const Error& exception() const
+   const ErrorT& exception() const
    {
       return *ex_;
    }
 
-   void throw_exception() const;
-
 
 private:
 
-   std::unique_ptr<Error> ex_;
+   explicit inline
+   TCallState(uint32_t serial)
+    : ex_()
+    , serial_(serial)
+   {
+      // NOOP
+   }
+
+
+   /// @param ex The function takes ownership of the exception.
+   explicit inline
+   TCallState(ErrorT* ex)
+    : ex_(ex)
+    , serial_(SIMPPL_INVALID_SERIAL)
+   {
+      // NOOP
+   }
+
+
+   TCallState(DBusMessage& msg)
+    : ex_()
+    , serial_(SIMPPL_INVALID_SERIAL)
+   {
+      if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
+      {
+         ex_.reset(new ErrorT);
+         detail::ErrorFactory<ErrorT>::init(*ex_, msg);
+      }
+      else
+         serial_ = dbus_message_get_reply_serial(&msg);
+   }
+
+
+   std::unique_ptr<ErrorT> ex_;
    uint32_t serial_;
 };
+
+
+typedef TCallState<Error> CallState;
+
 
 }   // namespace dbus
 
