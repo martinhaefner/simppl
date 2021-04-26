@@ -99,9 +99,14 @@ if(NOT GTEST_ROOT)
 endif()
 
 
-if(BOOST_INCLUDE_DIR AND GTEST_ROOT)
-   message("Building fusion tests")
+if(BOOST_INCLUDE_DIR)
+   message("Have boost fusion")
    add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=1)
+
+   if (GTEST_ROOT)
+      message("Building fusion tests")
+   endif()
+
 else()
    add_definitions(-DSIMPPL_HAVE_BOOST_FUSION=0)
 endif()
