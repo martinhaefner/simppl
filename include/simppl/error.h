@@ -56,7 +56,7 @@ struct Error : public std::exception
     }
 
 
-private:
+protected:
 
     message_ptr_t make_reply_for(DBusMessage& req) const;
 

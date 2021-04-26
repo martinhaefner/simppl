@@ -27,10 +27,13 @@ namespace test
 struct MyException : simppl::dbus::Error
 {
     /// class needs a default constructor
-    MyException()
+    MyException() = default;
+
+    MyException(int return_code)
      : simppl::dbus::Error("My.Exception")
+     , rc(return_code)
     {
-        rc = 42;
+        // NOOP
     }
 
     int rc;
