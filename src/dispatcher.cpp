@@ -489,10 +489,10 @@ Dispatcher::~Dispatcher()
 
 void Dispatcher::notify_clients(const std::string& busname, ConnectionState state)
 {
-   auto range = d->stubs_.equal_range(busname);
+   std::for_each(d->stubs_.begin(), d->stubs_.end(), [busname, state](auto& entry){
 
-   std::for_each(range.first, range.second, [state](auto& entry){
-      entry.second->connection_state_changed(state);
+       if (busname == entry.second->busname())
+           entry.second->connection_state_changed(state);
    });
 }
 
@@ -590,6 +590,8 @@ void Dispatcher::unregister_signal_match(const std::string& match_string)
          DBusError err;
          dbus_error_init(&err);
 
+         d->signal_matches_.erase(iter);
+
          dbus_bus_remove_match(conn_, match_string.c_str(), &err);
          assert(!dbus_error_is_set(&err));
 
@@ -652,27 +654,18 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         // ordinary signals...
 
-        // here we expect that pathname is the same as busname, just with / instead of .
-        char originator[256];
-        strncpy(originator, dbus_message_get_path(msg)+1, sizeof(originator));
-        originator[sizeof(originator)-1] = '\0';
+        bool handled = false;
+        auto range = d->stubs_.equal_range(dbus_message_get_path(msg));
 
-        char* p = originator;
-        while(*++p)
+        for (auto iter = range.first; iter != range.second; ++iter)
         {
-           if (*p == '/')
-              *p = '.';
+            iter->second->try_handle_signal(msg);
+            handled = true;
         }
 
-        auto range = d->stubs_.equal_range(originator);
-        if (range.first != range.second)
-        {
-            std::for_each(range.first, range.second, [msg](auto& entry){
-                entry.second->try_handle_signal(msg);
-            });
-
+        if (handled)
             return DBUS_HANDLER_RESULT_HANDLED;
-        }
+
         // else
         //     nobody interested in signal - go on with other filters
     }
@@ -697,8 +690,7 @@ void Dispatcher::add_client(StubBase& clnt)
 {
    clnt.disp_ = this;
 
-   //std::cout << "Adding stub: " << clnt.busname() << std::endl;
-   d->stubs_.insert(std::make_pair(clnt.busname(), &clnt));
+   d->stubs_.insert(std::make_pair(clnt.objectpath(), &clnt));
 
    // send connected request from event loop
    auto iter = d->busnames_.find(clnt.busname());
