@@ -12,7 +12,6 @@ namespace simppl
 namespace dbus
 {
 
-
 Error::Error(const char* name, const char* msg, uint32_t serial)
  : name_and_message_(nullptr)
  , message_(nullptr)
@@ -81,9 +80,9 @@ void Error::set_members(const char* name, const char* msg, uint32_t serial)
 }
 
 
-message_ptr_t Error::make_reply_for(DBusMessage& req) const
+message_ptr_t Error::make_reply_for(DBusMessage& req, const char* class_name) const
 {
-    return make_message(dbus_message_new_error(&req, name(), message()));
+    return make_message(dbus_message_new_error(&req, class_name ? class_name : name(), message()));
 }
 
 
@@ -101,7 +100,7 @@ const char* Error::name() const
 
 const char* Error::message() const
 {
-    return message_;
+    return message_ ? message_ : "";
 }
 
 

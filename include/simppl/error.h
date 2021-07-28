@@ -58,7 +58,7 @@ struct Error : public std::exception
 
 protected:
 
-    message_ptr_t make_reply_for(DBusMessage& req) const;
+    message_ptr_t make_reply_for(DBusMessage& req, const char* classname = nullptr) const;
 
     void set_members(const char* name, const char* msg, uint32_t serial);
 

@@ -5,6 +5,10 @@
 #include "simppl/types.h"
 #include "simppl/string.h"
 
+#include "util.h"
+
+#include <cxxabi.h>
+
 
 namespace simppl
 {
@@ -16,6 +20,15 @@ namespace detail
 {
 
 
+// FIXME get rid of redefinion
+struct FreeDeleter {
+    template<typename T>
+    void operator()(T* o) {
+        ::free(o);
+    }
+};
+
+
 template<typename ExceptionT>
 struct ErrorFactory
 {
@@ -23,7 +36,12 @@ struct ErrorFactory
     static
     message_ptr_t reply(DBusMessage& msg, const Error& e)
     {
-        message_ptr_t rmsg = e.make_reply_for(msg);
+        std::unique_ptr<char, FreeDeleter> name;
+
+        if (!e.name())
+            name.reset(make_error_name(abi::__cxa_demangle(typeid(ExceptionT).name(), nullptr, 0, nullptr)));
+
+        message_ptr_t rmsg = e.make_reply_for(msg, name.get());
 
         // encode arguments
         DBusMessageIter iter;
@@ -51,7 +69,7 @@ struct ErrorFactory
         err.set_members(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg));
 
         // any other unexpected dbus error, e.g. exception during method body
-        if (dbus_message_iter_has_next(&iter))
+        if (dbus_message_iter_get_arg_type(&iter) != 0)
         {
             // and now the rest
             decode(iter, err);

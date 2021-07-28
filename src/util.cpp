@@ -120,6 +120,29 @@ const char* find_next_interface(const char* s) {
    }
 }
 
+
+char* make_error_name(char* str)
+{
+    char* to = str;
+    char* from = str;
+
+    while(*from)
+    {
+        if (*from == ':')
+        {
+            *to++ = '.';
+            from += 2;
+        }
+        else
+            *to++ = *from++;
+    }
+
+    *to = '\0';
+
+    return str;
+}
+
+
 }   // namespace detail
 
 }   // namespace dbus

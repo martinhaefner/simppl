@@ -28,13 +28,6 @@ namespace dbus
 namespace detail
 {
 
-struct FreeDeleter {
-    template<typename T>
-    void operator()(T* o) {
-        ::free(o);
-    }
-};
-
 using DemangledNamePtr = std::unique_ptr<char, FreeDeleter>;
 
 } // namespace detail

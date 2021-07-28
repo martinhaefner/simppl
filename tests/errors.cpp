@@ -23,12 +23,20 @@ namespace test
  * is it not possible to use the make_serializer here.
  *
  * But with boost::fusion everything works ok.
+ *
+ * @note that if mixing simppl code with raw DBus calls you must make sure
+ * that when using the exceptions feature, the dbus message must contain
+ * a message in addition to the error name, otherwise deserialization would
+ * yield an error.
  */
 struct MyException : simppl::dbus::Error
 {
-    /// class needs a default constructor
+    /// class needs a default constructor which is used during deserialization.
+    /// If such an exception instance is returned on the server, the name
+    /// will be set via C++ RTTI.
     MyException() = default;
 
+    /// This is the instance that can be thrown in user code.
     MyException(int return_code)
      : simppl::dbus::Error("My.Exception")
      , rc(return_code)
@@ -50,6 +58,7 @@ INTERFACE(Errors)
 #if SIMPPL_HAVE_BOOST_FUSION
    Method<_throw<MyException>> hello2;
    Method<_throw<MyException>> hello3;
+   Method<_throw<MyException>> hello4;
 #endif
 
    inline
@@ -60,6 +69,7 @@ INTERFACE(Errors)
 #if SIMPPL_HAVE_BOOST_FUSION
     , INIT(hello2)
     , INIT(hello3)
+    , INIT(hello4)
 #endif
    {
       // NOOP
@@ -141,11 +151,15 @@ struct Server : simppl::dbus::Skeleton<Errors>
 
 #if SIMPPL_HAVE_BOOST_FUSION
       hello2 >> [this](){
-         respond_with(MyException());
+         respond_with(MyException(42));
       };
 
       hello3 >> [this](){
          throw std::runtime_error("Ooops");
+      };
+
+      hello4 >> [this](){
+         respond_with(MyException());   // will produce an DBus error test.MyException
       };
 #endif
    }
@@ -260,6 +274,32 @@ TEST(Errors, blocking)
    catch(...)
    {
       ASSERT_FALSE(true);
+   }
+
+   try
+   {
+      stub.hello4();
+
+      // never reach
+      ASSERT_FALSE(true);
+   }
+   catch(const test::MyException& e)
+   {
+       EXPECT_STREQ(e.name(), "test.MyException");
+       EXPECT_EQ(0, e.rc);
+   }
+   catch(const simppl::dbus::RuntimeError& e)
+   {
+       ASSERT_FALSE(true);
+   }
+   catch(const simppl::dbus::Error& e)
+   {
+       // does not reach the default exception handler
+       ASSERT_FALSE(true);
+   }
+   catch(...)
+   {
+       ASSERT_FALSE(true);
    }
 #endif
 
