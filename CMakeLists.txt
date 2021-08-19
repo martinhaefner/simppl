@@ -9,8 +9,6 @@ project(simppl VERSION 0.3.0)
 if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
     set(CMAKE_VERBOSE_MAKEFILE ON)
     set(SIMPPL_NOT_SUBPROJECT ON)
-
-    include(CTest)
 endif()
 
 # Reference the FindDBus module until an upstream one is available
@@ -24,12 +22,18 @@ endif()
 # enable introspection by default
 option(HAVE_INTROSPECTION "Have introspection" ON)
 include(CMakeDependentOption)
+
 cmake_dependent_option(SIMPPL_BUILD_TESTS "Build tests"
     ON "SIMPPL_NOT_SUBPROJECT" OFF
 )
+
 cmake_dependent_option(SIMPPL_BUILD_EXAMPLES "Build examples"
     ON "SIMPPL_NOT_SUBPROJECT" OFF
 )
+
+if(SIMPPL_BUILD_TESTS)
+    include(CTest)
+endif()
 
 # enable threading
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
@@ -38,6 +42,7 @@ find_package(Threads REQUIRED)
 
 find_package(DBus REQUIRED)
 find_package(Boost)
+
 
 add_library(simppl SHARED
     src/dispatcher.cpp
@@ -82,7 +87,9 @@ target_link_libraries(simppl PUBLIC
 )
 
 # Build a set of examples
-add_subdirectory(examples)
+if(SIMPPL_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 if(SIMPPL_BUILD_TESTS AND BUILD_TESTING)
     add_subdirectory(tests)
@@ -106,6 +113,9 @@ if(SIMPPL_NOT_SUBPROJECT)
         FILE SimpplTargets.cmake
         NAMESPACE Simppl::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/simppl
+    )
+    install(DIRECTORY include/simppl
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
     configure_package_config_file(cmake/SimpplConfig.cmake.in
