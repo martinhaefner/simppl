@@ -4,6 +4,9 @@
 
 #include "simppl/serialization.h"
 
+#include <unistd.h>
+#include <functional>
+
 
 namespace simppl
 {
@@ -21,8 +24,17 @@ public:
 
    FileDescriptor();
 
+   /**
+    * RAII behaviour: destroys the fd by calling close on object destruction.
+    */
    explicit
    FileDescriptor(int fd);
+
+   /**
+    * Non-RAII behaviour: keeps fd open on object destruction.
+    */
+   explicit
+   FileDescriptor(std::reference_wrapper<int> fd);
 
    ~FileDescriptor();
 
@@ -38,6 +50,7 @@ public:
 
 private:
    int fd_;
+   int (*destructor_)(int);
 };
 
 
