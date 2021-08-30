@@ -193,7 +193,7 @@ simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage
         }
     }
 
-    return std::move(cs);
+    return cs;
 }
 
 

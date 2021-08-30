@@ -51,7 +51,7 @@ struct ErrorFactory
         if (exp)
             encode(iter, *exp);
 
-        return std::move(rmsg);
+        return rmsg;
     }
 
 
@@ -84,7 +84,7 @@ struct ErrorFactory<Error>
     message_ptr_t reply(DBusMessage& msg, const Error& e)
     {
         message_ptr_t rmsg = e.make_reply_for(msg);
-        return std::move(rmsg);
+        return rmsg;
     }
 
 
