@@ -270,9 +270,7 @@ struct BaseProperty : ServerPropertyBase
 
    const DataT& value() const
    {
-       const DataT* t = t_.template get<DataT>();
-       assert(t);
-       return *t;
+       return std::get<DataT>(t_);
    }
 
    static
@@ -283,7 +281,7 @@ struct BaseProperty : ServerPropertyBase
        // missing initialization?
        assert(!that->t_.empty());
 
-       detail::PropertyCodec<DataT>::encode(*iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
+       detail::PropertyCodec<DataT>::encode(*iter, std::get_if<cb_type>(&that->t_) ? (std::get<cb_type>(that->t_))() : std::get<DataT>(that->t_));
    }
 
    /**
@@ -314,7 +312,7 @@ struct BaseProperty : ServerPropertyBase
 
 protected:
 
-   Variant<DataT, cb_type> t_;
+   std::variant<DataT, cb_type> t_;
 };
 
 
@@ -377,7 +375,7 @@ namespace detail
         static
         void eval(BaseProperty<DataT>& p, const DataT& d)
         {
-            if (!p.t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
+            if (!std::get_if<DataT>(&p.t_) || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
             {
                 p.t_ = d;
                 p.notify(d);

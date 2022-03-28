@@ -28,7 +28,7 @@ namespace test
 
       INTERFACE(VServer)
       {
-         Method<out<std::map<std::string, simppl::Variant<int,double,std::string>>>> getData;
+         Method<out<std::map<std::string, std::variant<int,double,std::string>>>> getData;
 
          VServer()
           : INIT(getData)
@@ -70,7 +70,7 @@ namespace {
        : simppl::dbus::Stub<test::variant::VServer>(d, "role")
       {
          connected >> [this](simppl::dbus::ConnectionState s){
-            getData.async() >> [this](const simppl::dbus::CallState& state, const std::map<std::string, simppl::Variant<int,double,std::string>>& mapping){
+            getData.async() >> [this](const simppl::dbus::CallState& state, const std::map<std::string, std::variant<int,double,std::string>>& mapping){
                EXPECT_EQ(3u, mapping.size());
 
                auto hello = mapping.find("Hello");
@@ -81,9 +81,9 @@ namespace {
                EXPECT_NE(mapping.end(), world);
                EXPECT_NE(mapping.end(), toll);
 
-               EXPECT_EQ(42, *hello->second.get<int>());
-               EXPECT_EQ(4711, *world->second.get<int>());
-               EXPECT_EQ(std::string("Show"), *toll->second.get<std::string>());
+               EXPECT_EQ(42, std::get<int>(hello->second));
+               EXPECT_EQ(4711, std::get<int>(world->second));
+               EXPECT_EQ(std::string("Show"), std::get<std::string>(toll->second));
 
                disp().stop();
             };
@@ -97,7 +97,7 @@ namespace {
        : simppl::dbus::Skeleton<test::variant::VServer>(d, "role")
       {
          getData >> [this](){
-            std::map<std::string, simppl::Variant<int,double,std::string>> mapping;
+            std::map<std::string, std::variant<int,double,std::string>> mapping;
             mapping["Hello"] = 42;
             mapping["World"] = 4711;
             mapping["Tolle"] = std::string("Show");
@@ -106,62 +106,6 @@ namespace {
          };
       }
    };
-}
-
-
-TEST(Variant, basic)
-{
-   constructs = 0;
-   destructs = 0;
-
-   simppl::Variant<int, double, std::string, TestHelper> v;
-
-   v = 42;
-   EXPECT_EQ(42, *v.get<int>());
-
-   v = std::string("Hallo Welt");
-   EXPECT_EQ(std::string("Hallo Welt"), *v.get<std::string>());
-
-   v = TestHelper();
-
-   v = 43;
-   EXPECT_EQ(43, *v.get<int>());
-
-   EXPECT_EQ(2, constructs);
-   EXPECT_EQ(2, destructs);
-}
-
-
-TEST(Variant, map)
-{
-   simppl::Variant<std::map<int, std::string> > v;
-
-   std::map<int, std::string> m {
-      { 1, "Hallo" },
-      { 2, "Welt" }
-   };
-
-   v = m;
-   EXPECT_EQ(2u, (v.get<std::map<int, std::string>>()->size()));
-
-   int i=0;
-   for(auto& e : *v.get<std::map<int, std::string>>())
-   {
-      if (i == 0)
-      {
-         EXPECT_EQ(1, e.first);
-         EXPECT_EQ(std::string("Hallo"), e.second);
-      }
-      else if (i == 1)
-      {
-         EXPECT_EQ(2, e.first);
-         EXPECT_EQ(std::string("Welt"), e.second);
-      }
-
-      ++i;
-   }
-
-   EXPECT_EQ(2, i);
 }
 
 

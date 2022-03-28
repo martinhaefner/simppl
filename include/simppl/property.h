@@ -8,7 +8,7 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
 
@@ -67,9 +67,9 @@ struct PropertyCodec
    {
       detail::VariantSerializer(iter).operator()(t);
    }
-   
-   
-   static 
+
+
+   static
    void decode(DBusMessageIter& iter, T& t)
    {
       DBusMessageIter _iter;
@@ -78,7 +78,7 @@ struct PropertyCodec
       Codec<T>::decode(_iter, t);
 
       dbus_message_iter_next(&iter);
-   } 
+   }
 };
 
 

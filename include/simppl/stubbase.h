@@ -10,7 +10,6 @@
 
 #include "simppl/callstate.h"
 #include "simppl/pendingcall.h"
-#include "simppl/variant.h"
 
 #include "simppl/detail/constants.h"
 #include "simppl/detail/holders.h"

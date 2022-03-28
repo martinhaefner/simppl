@@ -2,6 +2,8 @@
 #define SIMPPL_DETAIL_HOLDERS_H
 
 
+#include <variant>
+
 #include "callinterface.h"
 
 
@@ -128,10 +130,10 @@ struct PropertyCallbackHolder
           DBusMessageIter iter;
           dbus_message_iter_init(msg.get(), &iter);
 
-          simppl::Variant<DataT> v;
+          std::variant<DataT> v;
           decode(iter, v);
 
-          that->f_(cs, *v.template get<DataT>());
+          that->f_(cs, std::get<DataT>(v));
        }
        else
           that->f_(cs, DataT());

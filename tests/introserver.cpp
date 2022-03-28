@@ -72,7 +72,7 @@ struct ComboEntry
 
 struct Menu
 {
-   typedef simppl::Variant<NumericEntry, StringEntry, ComboEntry, Menu> entry_type;
+   typedef std::variant<NumericEntry, StringEntry, ComboEntry, Menu> entry_type;
 
    typedef std::map<std::string,
                     std::tuple<int/*=id*/, entry_type>> menu_entries_type;

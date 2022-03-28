@@ -1,5 +1,4 @@
 #include "simppl/pendingcall.h"
-#include "simppl/variant.h"
 #include "simppl/stub.h"
 
 #include "simppl/detail/holders.h"
