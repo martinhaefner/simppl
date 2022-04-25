@@ -278,9 +278,6 @@ struct BaseProperty : ServerPropertyBase
    {
        auto that = ((BaseProperty*)obj);
 
-       // missing initialization?
-       assert(!that->t_.empty());
-
        detail::PropertyCodec<DataT>::encode(*iter, std::get_if<cb_type>(&that->t_) ? (std::get<cb_type>(that->t_))() : std::get<DataT>(that->t_));
    }
 
