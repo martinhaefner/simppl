@@ -34,9 +34,8 @@ find_package(PkgConfig)
 pkg_check_modules(PC_DBUS QUIET dbus-1)
 
 find_library(DBUS_LIBRARY
-    NAMES dbus-1    
+    NAMES dbus-1
     PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
-    HINTS ${PC_DBUS_LIBDIR} ${PC_DBUS_LIBRARY_DIRS}
 )
 
 find_path(DBUS_INCLUDE_DIR
