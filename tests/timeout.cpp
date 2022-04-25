@@ -51,8 +51,8 @@ struct Client : simppl::dbus::Stub<Timeout>
          if (s == simppl::dbus::ConnectionState::Connected)
          {
             start_ = std::chrono::steady_clock::now();
-            
-            eval.async(42) >> [this](simppl::dbus::CallState state, double){
+
+            eval.async(42) >> [this](const simppl::dbus::CallState& state, double){
                EXPECT_FALSE((bool)state);
 
                EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.NoReply");
@@ -86,7 +86,7 @@ struct DisconnectClient : simppl::dbus::Stub<Timeout>
 
          if (s == simppl::dbus::ConnectionState::Connected)
          {
-            eval.async(777) >> [this](simppl::dbus::CallState state, double){
+            eval.async(777) >> [this](const simppl::dbus::CallState& state, double){
                EXPECT_FALSE((bool)state);
                EXPECT_STREQ(state.exception().name(), "org.freedesktop.DBus.Error.Timeout");
 
@@ -156,7 +156,7 @@ struct Server : simppl::dbus::Skeleton<Timeout>
          else
             (void)defer_response();
       };
-      
+
       oneway >> [this](int i){
          // generate timeout on client side
          std::this_thread::sleep_for(1s);
@@ -201,7 +201,7 @@ void runServer()
 TEST(Timeout, method)
 {
    simppl::dbus::enable_threads();
-   
+
    std::thread serverthread(&runServer);
 
    simppl::dbus::Dispatcher d;
@@ -255,7 +255,7 @@ TEST(Timeout, request_specific)
 
    // default timeout
    d.set_request_timeout(500ms);
-   
+
    auto start = std::chrono::steady_clock::now();
 
    try

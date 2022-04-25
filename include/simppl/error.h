@@ -17,23 +17,32 @@ namespace simppl
 namespace dbus
 {
 
+// forward decl
+namespace detail {
+    template<typename> struct ErrorFactory;
+}
+
 
 struct Error : public std::exception
 {
-    friend struct CallState;
-    friend struct SkeletonBase;
-   
-   
+    template<typename> friend struct detail::ErrorFactory;
+    template<typename> friend struct TCallState;
+    template<typename...> friend struct ClientMethod;
+    friend struct StubBase;
+
+    // no copies
+    Error(const Error&) = delete;
     Error& operator=(const Error&) = delete;
 
+    /**
+     * @param name must be a valid dbus name, i.e. <atom>.<atom>
+     */
     Error(const char* name, const char* msg = nullptr, uint32_t serial = SIMPPL_INVALID_SERIAL);
 
-    Error(const Error& rhs);
+    // allow move
+    Error(Error&& rhs);
 
     ~Error();
-
-    message_ptr_t make_reply_for(DBusMessage& req) const;
-    void _throw();
 
     const char* what() const throw();
 
@@ -46,15 +55,22 @@ struct Error : public std::exception
         return serial_;
     }
 
-private:
 
-    static std::unique_ptr<Error> from_message(DBusMessage& msg);
+protected:
+
+    message_ptr_t make_reply_for(DBusMessage& req, const char* classname = nullptr) const;
+
+    void set_members(const char* name, const char* msg, uint32_t serial);
+
+    Error();
+
 
     char* name_and_message_;
     char* message_;
 
     uint32_t serial_;
 };
+
 
 class RuntimeError : public std::runtime_error
 {
@@ -81,7 +97,9 @@ public:
         return error_.message;
     }
 
+
 private:
+
     static std::string format_what(const char* action, const ::DBusError& error)
     {
         std::ostringstream ss;
@@ -90,6 +108,7 @@ private:
     }
 
 private:
+
     ::DBusError error_;
 };
 

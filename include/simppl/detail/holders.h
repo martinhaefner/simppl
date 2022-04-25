@@ -2,6 +2,8 @@
 #define SIMPPL_DETAIL_HOLDERS_H
 
 
+#include <variant>
+
 #include "callinterface.h"
 
 
@@ -11,6 +13,10 @@ namespace simppl
 namespace dbus
 {
 
+// forward decl
+struct StubBase;
+
+
 namespace detail
 {
 
@@ -19,12 +25,6 @@ struct InterimCallbackHolder
 {
    typedef HolderT holder_type;
 
-   InterimCallbackHolder(const InterimCallbackHolder& rhs)
-   : pc_(std::move(rhs.pc_))
-   {
-      // NOOP
-   }
-   
    InterimCallbackHolder& operator=(const InterimCallbackHolder&) = delete;
 
    explicit inline
@@ -33,12 +33,28 @@ struct InterimCallbackHolder
    {
       // NOOP
    }
-   
+
    PendingCall pc_;
 };
 
 
-template<typename FuncT, typename ReturnT>
+struct InterimGetAllPropertiesCallbackHolder
+{
+   InterimGetAllPropertiesCallbackHolder& operator=(const InterimGetAllPropertiesCallbackHolder&) = delete;
+
+   InterimGetAllPropertiesCallbackHolder(const PendingCall& pc, StubBase& stub)
+    : pc_(std::move(pc))
+    , stub_(stub)
+   {
+      // NOOP
+   }
+
+   PendingCall pc_;
+   StubBase& stub_;
+};
+
+
+template<typename FuncT, typename ReturnT, typename ErrorT>
 struct CallbackHolder
 {
    CallbackHolder(const CallbackHolder&) = delete;
@@ -51,7 +67,7 @@ struct CallbackHolder
    {
       // NOOP
    }
-   
+
    static inline
    void _delete(void* p)
    {
@@ -67,11 +83,11 @@ struct CallbackHolder
        auto that = (CallbackHolder*)data;
        assert(that->f_);
 
-       CallState cs(*msg);
-       
+       TCallState<ErrorT> cs(*msg);
+
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
-       
+
        GetCaller<ReturnT>::type::template evalResponse(iter, that->f_, cs);
    }
 
@@ -114,10 +130,10 @@ struct PropertyCallbackHolder
           DBusMessageIter iter;
           dbus_message_iter_init(msg.get(), &iter);
 
-          simppl::Variant<DataT> v;
+          std::variant<DataT> v;
           decode(iter, v);
 
-          that->f_(cs, *v.template get<DataT>());
+          that->f_(cs, std::get<DataT>(v));
        }
        else
           that->f_(cs, DataT());
@@ -125,6 +141,26 @@ struct PropertyCallbackHolder
 
    FuncT f_;
 };
+
+
+struct GetAllPropertiesHolder
+{
+   GetAllPropertiesHolder(const GetAllPropertiesHolder&) = delete;
+   GetAllPropertiesHolder& operator=(const GetAllPropertiesHolder&) = delete;
+
+
+   GetAllPropertiesHolder(std::function<void(const CallState&)> f, StubBase& stub);
+
+   static
+   void _delete(void* p);
+
+   static
+   void pending_notify(DBusPendingCall* pc, void* data);
+
+   std::function<void(const CallState&)> f_;
+   StubBase& stub_;
+};
+
 
 }   // detail
 

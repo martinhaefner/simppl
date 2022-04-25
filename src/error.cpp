@@ -11,26 +11,55 @@ namespace simppl
 
 namespace dbus
 {
-   
 
-/*static*/
-std::unique_ptr<Error> Error::from_message(DBusMessage& msg)
+Error::Error(const char* name, const char* msg, uint32_t serial)
+ : name_and_message_(nullptr)
+ , message_(nullptr)
+ , serial_(SIMPPL_INVALID_SERIAL)
 {
-    DBusMessageIter iter;
-    dbus_message_iter_init(&msg, &iter);
- 
-    std::string text;
-    decode(iter, text);
-    
-    return std::unique_ptr<Error>(new Error(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg)));
+    assert(name);
+
+    // TODO check name for valid dbus name (<atom>.<atom>)
+    set_members(name, msg, serial);
 }
 
 
-Error::Error(const char* name, const char* msg, uint32_t serial)
- : serial_(serial)
+Error::Error()
+ : name_and_message_(nullptr)
+ , message_(nullptr)
+ , serial_(SIMPPL_INVALID_SERIAL)
 {
-    assert(name);
-    // TODO check name for valid dbus name (<atom>.<atom>)
+    // NOOP
+}
+
+
+Error::Error(Error&& rhs)
+{
+    name_and_message_ = rhs.name_and_message_;
+    message_ = rhs.message_;
+    serial_ = rhs.serial_;
+
+    rhs.name_and_message_ = nullptr;
+    rhs.message_ = nullptr;
+    rhs.serial_ = 0;  // FIXME INVALID
+}
+
+
+Error::~Error()
+{
+    delete[] name_and_message_;
+
+    name_and_message_ = nullptr;
+    message_ = nullptr;
+}
+
+
+void Error::set_members(const char* name, const char* msg, uint32_t serial)
+{
+    if (name_and_message_)
+        delete[] name_and_message_;
+
+    serial_ = serial;
 
     size_t capacity = strlen(name) + 1;
 
@@ -51,48 +80,9 @@ Error::Error(const char* name, const char* msg, uint32_t serial)
 }
 
 
-Error::Error(const Error& rhs)
- : serial_(rhs.serial_)
+message_ptr_t Error::make_reply_for(DBusMessage& req, const char* class_name) const
 {
-    size_t capacity = strlen(rhs.name_and_message_) + strlen(rhs.message_) + 2;
-
-    name_and_message_ = new char[capacity];
-    memset(name_and_message_, 0, capacity);
-
-    message_ = name_and_message_ + (rhs.message_ - rhs.name_and_message_);
-
-    char* p_to = name_and_message_;
-    char* p_from = rhs.name_and_message_;
-
-    while(*p_from)
-        *p_to++ = *p_from++;
-
-    p_to = message_;
-    p_from = rhs.message_;
-
-    while(*p_from)
-        *p_to++ = *p_from++;
-}
-
-
-Error::~Error()
-{
-    delete[] name_and_message_;
-
-    name_and_message_ = nullptr;
-    message_ = nullptr;
-}
-
-
-message_ptr_t Error::make_reply_for(DBusMessage& req) const
-{
-    return make_message(dbus_message_new_error(&req, name(), message()));
-}
-
-
-void Error::_throw()
-{
-    throw Error(*this);
+    return make_message(dbus_message_new_error(&req, class_name ? class_name : name(), message()));
 }
 
 
@@ -110,7 +100,7 @@ const char* Error::name() const
 
 const char* Error::message() const
 {
-    return message_;
+    return message_ ? message_ : "";
 }
 
 

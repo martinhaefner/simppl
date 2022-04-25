@@ -14,7 +14,7 @@ Development libraries of libdbus-1 are also needed for a successful build.
 
 ## Compilers
 
-I only developed on GCC >=4.9. The code uses features of upto C++14 and 
+I only developed on GCC >=4.9. The code uses features of upto C++14 and
 g++ specific demangling functions for class symbols. Therefore, I do not
 expect the code to work on any other compiler family without appropriate
 code adaptions.
@@ -122,7 +122,7 @@ provided under
 
 This mapping is done automatically by simppl, for servers this is currently
 fix. But clients may connect to any bus/objectpath layout in order to connect
-any DBus service. This also means that only one interface can be provided 
+any DBus service. This also means that only one interface can be provided
 by a distinct objectpath, at least other than the properties interface needed for
 providing service properties. But we will ignore signals and
 properties for now and continue with our EchoService. Let's instantiate the
@@ -160,7 +160,7 @@ Let's provide an implementation for the echo method:
 ```
 
 Now, simppl will receive the echo request, unmarshall the argument and
-forward the request to the provided lambda function (of course, you may 
+forward the request to the provided lambda function (of course, you may
 also bind any other function via std::bind). But there is still
 no response yet. Let's send a response back to the client:
 
@@ -188,7 +188,7 @@ That's simppl, isn't it? Setup the eventloop and the server is finished:
    {
       simppl::dbus::Dispatcher disp("bus::session");
       MyEcho instance(disp);
-      
+
       disp.run();
 
       return EXIT_SUCCESS;
@@ -259,7 +259,7 @@ Event loop driven clients always get callbacks called from the dbus runtime
 when any event occurs. The initial event for a client is the connected event
 which will be emitted when the server registers itself on the bus (remember
 the busname). After being connected, the client may start an
-asynchronous method like in the example above. The method response callbacks 
+asynchronous method like in the example above. The method response callbacks
 can be any function object fullfilling the response signature, the preferred
 way nowadays in a C++ lambda. The main program is as simple as in the
 blocking example:
@@ -271,7 +271,7 @@ blocking example:
       simppl::dbus::Dispatcher disp("bus:session");
 
       MyEchoClient client(disp);
-      
+
       disp.run();
 
       return EXIT_SUCCESS;
@@ -327,7 +327,7 @@ the structure, i.e. the structure can be used as any simple data type:
       simppl::dbus::Dispatcher disp("bus:session");
 
       simppl::dbus::Stub<ComplexTest> teststub(disp, "test");
-      
+
       Data d({ 42, "Hallo", ... });
 
       int i_ret;
@@ -346,9 +346,9 @@ this blocking call? Isn't that cool?
 The signal in the example above is only sensefully usable
 in an event loop driven client. There is a slight difference between
 the properties concepts of simppl and dbus for now: the changed notification
-will not be part of the Properties interface so only get and set may 
-currently be used to access properties of non-simppl services. But this is 
-nothing that cannot be changed in future. See how a client will typically 
+will not be part of the Properties interface so only get and set may
+currently be used to access properties of non-simppl services. But this is
+nothing that cannot be changed in future. See how a client will typically
 register for update notifications in order to receive changes on the properties
 on server side. See the clients connected callback:
 
@@ -367,7 +367,7 @@ on server side. See the clients connected callback:
                {
                   ...
                };
-               
+
                data.attach() >> [](const Data& d)
                {
                   // first callback is due to the attach!
@@ -385,9 +385,9 @@ on server side. See the clients connected callback:
 ```
 
 Properties on server side can be either implemented by providing a
-callback function to be called whenever the property is requested by a 
+callback function to be called whenever the property is requested by a
 client or the property value can be stored within the server instance.
-Therefore, you have to decide and initialize the property within the 
+Therefore, you have to decide and initialize the property within the
 server's constructor. Let's see the difference:
 
 ```c++
@@ -396,22 +396,97 @@ server's constructor. Let's see the difference:
       MyComplexServer(simppl::dbus::Dispatcher& disp)
        : simppl::dbus::Skeleton<ComplexTest>(disp, "test")
       {
-         // either using the callback version... 
+         // either using the callback version...
          data.on_read([](){
             return Data({ 42, "Hallo", ... });
          });
-         
+
          // ... or keep a copy in the server instance
          data = Data({ 42, "Hallo", ... });
       }
    };
 ```
- 
+
 The notification of property changes is either done by calling the properties
-notify(...) method in case the property is initialized for callback access 
-or by just assigning a new value to the stored property instance. 
+notify(...) method in case the property is initialized for callback access
+or by just assigning a new value to the stored property instance.
 The version of property access to be used in your server is completely
-transparent for the client and depends on your use-case. 
+transparent for the client and depends on your use-case.
+
+Simppl properties also support the GetAll interface. See unittest for an example.
+
+User-defined exceptions may also be transferred. This feature is currently
+restricted to method calls. To define an error you have to use the boost
+fusion binding:
+
+```c++
+   namespace test
+   {
+
+   class MyError : simppl::dbus::Error
+   {
+   public:
+
+      // needed for client side code generation
+      MyError() = default;
+
+      // used to throw error on server side
+      MyError(int rc)
+       : simppl::dbus::Error("My.Error")   // make a DBus appropriate error name
+       , result(rc)
+      {
+         // NOOP
+      }
+
+      int result;
+   };
+
+   }   // namespace
+
+   BOOST_FUSION_ADAPT_STRUCT(
+      test::MyError,
+      (int, result)
+   )
+```
+
+In the interface definition the exception class has to be added:
+
+```c++
+   namespace test
+   {
+
+   INTERFACE(HelloService)
+   {
+      Method<in<std::string>, _throw<MyError>> hello;
+
+      // constructor
+      HelloService()
+       : INIT(hello)
+      {
+      }
+   };
+
+   }   // namespace
+```
+
+You may now throw the error in a server's method callback:
+
+```c++
+   class MyHello : simppl::dbus::Skeleton<HelloService>
+   {
+      MyHello(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Skeleton<HelloService>(disp, "myHello")
+      {
+         hello >> [](const std::string& hello_string)
+         {
+            if (hello_string == "idiot")
+                respond_with(MyError(EINVAL));
+
+            respond_with(hello());
+         };
+      }
+   };
+```
 
 This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without

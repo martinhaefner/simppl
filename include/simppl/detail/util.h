@@ -42,6 +42,10 @@ std::string make_interface_name(const char* begin, const char* end);
  */
 const char* find_next_interface(const char* template_args);
 
+/**
+ * Make dbus compatible name from Exception type.
+ */
+char* make_error_name(char*);
 
 
 }   // namespace detail

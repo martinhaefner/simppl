@@ -43,11 +43,17 @@ namespace detail
 struct ServerMethodBase
 {
    typedef void(*eval_type)(ServerMethodBase*, DBusMessage*);
+   typedef message_ptr_t(*throw_type)(ServerMethodBase*, DBusMessage&, const Error&);
    typedef void(*sig_type)(std::ostream&);
 
    void eval(DBusMessage* msg)
    {
       eval_(this, msg);
+   }
+
+   message_ptr_t _throw(DBusMessage& msg, const Error& err)
+   {
+       return throw_(this, msg, err);
    }
 
 
@@ -65,6 +71,7 @@ protected:
    ~ServerMethodBase();
 
    eval_type eval_;
+   throw_type throw_;
 };
 
 
@@ -127,15 +134,17 @@ struct ServerMethod : ServerMethodBase
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
     enum {
-        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
-        is_oneway = detail::is_oneway_request<ArgsT...>::value
+        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutThrowOrOneway>::value,
+        is_oneway = detail::is_oneway_request<ArgsT...>::value,
     };
 
-    typedef typename detail::canonify<typename args_type_generator::type>::type    args_type;
-    typedef typename detail::canonify<typename return_type_generator::type>::type  return_type;
+    typedef typename detail::canonify<typename args_type_generator::type>::type                   args_type;
+    typedef typename detail::canonify<typename return_type_generator::type>::type                 return_type;
 
-    typedef typename detail::generate_server_callback_function<ArgsT...>::type                     callback_type;
+    typedef typename detail::generate_server_callback_function<ArgsT...>::type                    callback_type;
     typedef typename detail::generate_serializer<typename return_type_generator::list_type>::type serializer_type;
+
+    typedef typename detail::get_exception_type<ArgsT...>::type                                   exception_type;
 
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
@@ -145,6 +154,7 @@ struct ServerMethod : ServerMethodBase
     : ServerMethodBase(name, iface, iface_id)
     {
         eval_ = __eval;
+        throw_ = __throw<exception_type>;
     }
 
 
@@ -182,6 +192,14 @@ private:
    }
 
 
+   template<typename T>
+   static
+   message_ptr_t __throw(ServerMethodBase* obj, DBusMessage& req, const Error& err)
+   {
+       return detail::ErrorFactory<T>::reply(req, err);
+   }
+
+
    template<typename... T>
    detail::ServerResponseHolder __impl(std::true_type, const T&... t)
    {
@@ -203,14 +221,14 @@ private:
 
 struct ServerPropertyBase
 {
-   typedef void (*eval_type)(ServerPropertyBase*, DBusMessage*);
+   typedef void (*eval_type)(ServerPropertyBase*, DBusMessageIter*);
    typedef void (*eval_set_type)(ServerPropertyBase*, DBusMessageIter&);
 
    ServerPropertyBase(const char* name, SkeletonBase* iface, int iface_id);
 
-   void eval(DBusMessage* msg)
+   void eval(DBusMessageIter* iter)
    {
-      eval_(this, msg);
+      return eval_(this, iter);
    }
 
    void evalSet(DBusMessageIter& iter)
@@ -252,29 +270,38 @@ struct BaseProperty : ServerPropertyBase
 
    const DataT& value() const
    {
-       const DataT* t = t_.template get<DataT>();
-       assert(t);
-       return *t;
+       return std::get<DataT>(t_);
    }
 
    static
-   void __eval(ServerPropertyBase* obj, DBusMessage* response)
+   void __eval(ServerPropertyBase* obj, DBusMessageIter* iter)
    {
-       DBusMessageIter iter;
-       dbus_message_iter_init_append(response, &iter);
-
        auto that = ((BaseProperty*)obj);
-       
+
        // missing initialization?
        assert(!that->t_.empty());
-       detail::PropertyCodec<DataT>::encode(iter, that->t_.template get<cb_type>() ? (*that->t_.template get<cb_type>())() : *that->t_.template get<DataT>());
+
+       detail::PropertyCodec<DataT>::encode(*iter, std::get_if<cb_type>(&that->t_) ? (std::get<cb_type>(that->t_))() : std::get<DataT>(that->t_));
    }
 
+   /**
+    * Shall be used with properties implementing on_read callback in order
+    * to send property changes. Not suitable with value holding properties.
+    */
    void notify(const DataT& data)
    {
       this->parent_->send_property_change(this->name_, this->iface_id_, [this, data](DBusMessageIter& iter){
          detail::PropertyCodec<DataT>::encode(iter, data);
       });
+   }
+
+   /**
+    * Send an invalidation message, shall only be used in conjunction with the notify message and
+    * the on_read callback. Currently, value holding properties cannot be invalidated.
+    */
+   void invalidate()
+   {
+      this->parent_->send_property_invalidate(this->name_, this->iface_id_);
    }
 
    /// set callback for each read
@@ -285,7 +312,7 @@ struct BaseProperty : ServerPropertyBase
 
 protected:
 
-   Variant<DataT, cb_type> t_;
+   std::variant<DataT, cb_type> t_;
 };
 
 
@@ -348,7 +375,7 @@ namespace detail
         static
         void eval(BaseProperty<DataT>& p, const DataT& d)
         {
-            if (!p.t_.template get<DataT>() || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
+            if (!std::get_if<DataT>(&p.t_) || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
             {
                 p.t_ = d;
                 p.notify(d);

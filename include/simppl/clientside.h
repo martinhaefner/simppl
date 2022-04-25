@@ -120,12 +120,12 @@ struct ClientPropertyBase
 {
    friend struct StubBase;
 
-   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter&);
+   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter*);
 
 
    ClientPropertyBase(const char* name, StubBase* iface, int iface_id);
 
-   void eval(DBusMessageIter& iter)
+   void eval(DBusMessageIter* iter)
    {
       eval_(this, iter);
    }
@@ -142,8 +142,6 @@ protected:
    StubBase* stub_;
 
    eval_type eval_;
-
-   ClientPropertyBase* next_;
 };
 
 
@@ -152,8 +150,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
 {
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   typedef std::function<void(CallState)> function_type;
-   typedef detail::CallbackHolder<function_type, void> holder_type;
+   typedef std::function<void(const CallState&)> function_type;
+   typedef detail::CallbackHolder<function_type, void, Error> holder_type;
 
 
    ClientPropertyWritableMixin(const char* name, StubBase* iface, int iface_id)
@@ -192,9 +190,9 @@ struct ClientProperty
    typedef typename std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, ClientPropertyBase>::type base_type;
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
-   typedef std::function<void(CallState, arg_type)> function_type;
+   typedef std::function<void(const CallState&, arg_type)> function_type;
    typedef ClientSignal<DataT> signal_type;
-   typedef detail::PropertyCallbackHolder<std::function<void(CallState, arg_type)>, data_type> holder_type;
+   typedef detail::PropertyCallbackHolder<std::function<void(const CallState&, arg_type)>, data_type> holder_type;
 
 
    ClientProperty(const char* name, StubBase* iface, int iface_id)
@@ -212,7 +210,6 @@ struct ClientProperty
    /// only call this after the server is connected.
    ClientProperty& attach();
 
-   // TODO implement GetAll
    DataT get();
 
    detail::InterimCallbackHolder<holder_type> get_async()
@@ -232,15 +229,21 @@ struct ClientProperty
 private:
 
    static
-   void __eval(ClientPropertyBase* obj, DBusMessageIter& iter)
+   void __eval(ClientPropertyBase* obj, DBusMessageIter* iter)
    {
       ClientProperty* that = (ClientProperty*)obj;
 
-      data_type d;
-      detail::PropertyCodec<data_type>::decode(iter, d);
-
       if (that->f_)
-         that->f_(CallState(42), d);
+      {
+          if (iter)
+          {
+              data_type d;
+              detail::PropertyCodec<data_type>::decode(*iter, d);
+              that->f_(CallState(42), d);
+          }
+          else
+              that->f_(CallState(new Error("simppl.dbus.Invalid")), data_type());
+      }
    }
 
 
@@ -267,11 +270,11 @@ DataT ClientProperty<DataT, Flags>::get()
 template<typename DataT, int Flags>
 ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
-  this->stub_->attach_property(*this);
+  this->stub_->attach_property(this);
 
   dbus_pending_call_set_notify(this->stub_->get_property_async(this->name_).pending(),
      &holder_type::pending_notify,
-     new holder_type([this](CallState cs, const arg_type& val){
+     new holder_type([this](const CallState& cs, const arg_type& val){
         if (f_)
            f_(cs, val);
      }),
@@ -284,22 +287,48 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 // --------------------------------------------------------------------------------
 
 
+struct ClientMethodBase
+{
+    typedef void(*throw_func_type)(DBusMessage&);
+
+    ClientMethodBase(const char* method_name, StubBase* parent)
+     : method_name_(method_name)
+     , parent_(parent)
+    {
+        // NOOP
+    }
+
+    void _throw(DBusMessage& msg)
+    {
+        return throw_(msg);
+    }
+
+// FIXME friend or public protected:
+
+   throw_func_type throw_;
+
+   const char* method_name_;
+   StubBase* parent_;
+};
+
+
 template<typename... ArgsT>
-struct ClientMethod
+struct ClientMethod : ClientMethodBase
 {
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
     enum {
-        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutOrOneway>::value,
+        valid     = AllOf<typename make_typelist<ArgsT...>::type, detail::InOutThrowOrOneway>::value,
         is_oneway = detail::is_oneway_request<ArgsT...>::value
     };
 
     typedef typename detail::canonify<typename args_type_generator::const_type>::type    args_type;
     typedef typename detail::canonify<typename return_type_generator::type>::type        return_type;
 
-    typedef typename detail::generate_callback_function<ArgsT...>::type                  callback_type;
-    typedef detail::CallbackHolder<callback_type, return_type>                           holder_type;
+    typedef typename detail::get_exception_type<ArgsT...>::type                          exception_type;
+    typedef typename detail::generate_callback_function<exception_type, ArgsT...>::type  callback_type;
+    typedef detail::CallbackHolder<callback_type, return_type, exception_type>           holder_type;
 
     // correct typesafe serializer
     typedef typename detail::generate_serializer<typename args_type_generator::const_list_type>::type serializer_type;
@@ -308,10 +337,9 @@ struct ClientMethod
 
 
     ClientMethod(const char* method_name, StubBase* parent, int iface_id)
-     : method_name_(method_name)
-     , parent_(parent)
+     : ClientMethodBase(method_name, parent)
     {
-      // NOOP
+        throw_ = __throw;
     }
 
 
@@ -325,7 +353,7 @@ struct ClientMethod
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<T...>>::type,
                     args_type>::value, "args mismatch");
 
-      auto msg = parent_->send_request_and_block(method_name_, [&](DBusMessageIter& s){
+      auto msg = parent_->send_request_and_block(this, [&](DBusMessageIter& s){
          serializer_type::eval(s, t...);
       }, is_oneway);
 
@@ -341,7 +369,7 @@ struct ClientMethod
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
                     args_type>::value, "args mismatch");
 
-      return detail::InterimCallbackHolder<holder_type>(parent_->send_request(method_name_, [&](DBusMessageIter& s){
+      return detail::InterimCallbackHolder<holder_type>(parent_->send_request(this, [&](DBusMessageIter& s){
          serializer_type::eval(s, t...);
       }, false));
    }
@@ -357,11 +385,16 @@ struct ClientMethod
       return *this;
    }
 
-
 private:
 
-   const char* method_name_;
-   StubBase* parent_;
+   static
+   void __throw(DBusMessage& msg)
+   {
+       exception_type err;
+       detail::ErrorFactory<exception_type>::init(err, msg);
+
+       throw err;
+   }
 };
 
 
