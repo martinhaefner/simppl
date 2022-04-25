@@ -34,25 +34,25 @@ find_package(PkgConfig)
 pkg_check_modules(PC_DBUS QUIET dbus-1)
 
 find_library(DBUS_LIBRARY
-    NAMES dbus-1
-    HINTS ${PC_DBUS_LIBDIR}
-          ${PC_DBUS_LIBRARY_DIRS}
+    NAMES dbus-1    
+    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
+    HINTS ${PC_DBUS_LIBDIR} ${PC_DBUS_LIBRARY_DIRS}
 )
 
 find_path(DBUS_INCLUDE_DIR
-    NAMES dbus/dbus.h
-    HINTS ${PC_DBUS_INCLUDEDIR}
-          ${PC_DBUS_INCLUDE_DIRS}
+    dbus/dbus-bus.h
+    PATHS /usr/include /usr/local/include
+    PATH_SUFFIXES dbus-1.0
+    ONLY_CMAKE_FIND_ROOT_PATH
+    NO_DEFAULT_PATH
 )
 
-get_filename_component(_DBUS_LIBRARY_DIR ${DBUS_LIBRARY} PATH)
 find_path(DBUS_ARCH_INCLUDE_DIR
-    NAMES dbus/dbus-arch-deps.h
-    HINTS ${PC_DBUS_INCLUDEDIR}
-          ${PC_DBUS_INCLUDE_DIRS}
-          ${_DBUS_LIBRARY_DIR}
-          ${DBUS_INCLUDE_DIR}
-    PATH_SUFFIXES include dbus-1.0/include
+    dbus/dbus-arch-deps.h
+    PATHS /usr/lib /usr/lib/* /usr/local/lib /usr/local/lib/*
+    PATH_SUFFIXES dbus-1.0/include
+    ONLY_CMAKE_FIND_ROOT_PATH
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)
