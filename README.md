@@ -221,6 +221,12 @@ with the request and therefore a blocking client can never be running on the
 same connection as the server (ok, that's only a test setup, in real world
 client and server typically reside in different applications.
 
+Important notice: simppl always
+adds a signal filter to the message bus. Therefore, connections instantiated
+for blocking clients and therfore never running any kind of event loop, will cause
+the bus daemon to grow in size, as these bus clients will never read these signal
+notifications from the bus.
+
 But have a look on the message loop driven client. The best way to implement
 such a client is to derive from the stub base template and delegate the
 callbacks to member functions. Note that the method is called via the async(...)
