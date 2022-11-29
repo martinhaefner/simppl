@@ -12,19 +12,30 @@ namespace detail
 {
 
 template<typename ReturnT>
+struct deserialize_and_return_from_iter
+{
+   static
+   ReturnT eval(DBusMessageIter* iter)
+   {
+      ReturnT rc;
+
+      decode(*iter, rc);
+
+      return rc;
+   }
+};
+
+
+template<typename ReturnT>
 struct deserialize_and_return
 {
    static
    ReturnT eval(DBusMessage* msg)
    {
-      ReturnT rc;
-
       DBusMessageIter iter;
       dbus_message_iter_init(msg, &iter);
 
-      decode(iter, rc);
-
-      return rc;
+      return deserialize_and_return_from_iter<ReturnT>::eval(&iter);
    }
 };
 

@@ -33,6 +33,7 @@ add_executable(unittests
    multi_interface.cpp
    no_interface.cpp
    utils.cpp
+   any.cpp
 )
 if(Boost_FOUND)
    target_compile_definitions(unittests PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)
