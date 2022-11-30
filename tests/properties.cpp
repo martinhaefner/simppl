@@ -37,6 +37,8 @@ INTERFACE(Properties)
    Property<std::map<ident_t, std::string>> props;
    Property<std::string> str_prop;
 
+   Property<int> parallel;
+
    Signal<int> mayShutdown;
 
    inline
@@ -46,6 +48,7 @@ INTERFACE(Properties)
     , INIT(data)
     , INIT(props)
     , INIT(str_prop)
+    , INIT(parallel)
     , INIT(mayShutdown)
    {
       // NOOP
@@ -291,6 +294,11 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mayShutdown.notify(42);
       };
 
+      parallel.on_read([](){
+          static int i=0;
+          return ++i;
+      });
+
       // initialize properties
       data = 4711;
       props = { { One, "One" }, { Two, "Two" } };
@@ -407,6 +415,39 @@ struct GetAllClient : simppl::dbus::Stub<Properties>
    }
 
    int count_ = 0;
+};
+
+
+struct ParallelClient : simppl::dbus::Stub<Properties>
+{
+    ParallelClient(simppl::dbus::Dispatcher& d)
+     : simppl::dbus::Stub<Properties>(d, "s")
+    {
+        connected >> [this](simppl::dbus::ConnectionState s){
+            EXPECT_EQ(simppl::dbus::ConnectionState::Connected, s);
+
+            parallel.get_async() >> [](const simppl::dbus::CallState& cs, int val){
+                EXPECT_EQ(1, val);
+            };
+
+            parallel.get_async() >> [](const simppl::dbus::CallState& cs, int val){
+                EXPECT_EQ(2, val);
+            };
+
+            parallel.get_async() >> [](const simppl::dbus::CallState& cs, int val){
+                EXPECT_EQ(3, val);
+            };
+
+            parallel.get_async() >> [](const simppl::dbus::CallState& cs, int val){
+                EXPECT_EQ(4, val);
+            };
+
+            parallel.get_async() >> [this](const simppl::dbus::CallState& cs, int val){
+                EXPECT_EQ(5, val);
+                shutdown();
+            };
+        };
+    }
 };
 
 
@@ -764,4 +805,15 @@ TEST(Properties, invalidate)
 
    d.run();
    EXPECT_EQ(c.calls_, 3);
+}
+
+
+TEST(Properties, parallel_async)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   Server s(d, "s");
+   ParallelClient c(d);
+
+   d.run();
 }
