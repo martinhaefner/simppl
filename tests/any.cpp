@@ -79,10 +79,24 @@ namespace {
 
                 EXPECT_EQ(42, a.as<int>());
 
-                get.async() >> [this](const simppl::dbus::CallState& state, const simppl::dbus::Any& a){
+                set.async(simppl::dbus::Any(42)) >> [this](const simppl::dbus::CallState& state){
 
-                    EXPECT_THROW(a.as<double>(), std::runtime_error);
-                    disp().stop();
+                    std::vector<std::string> sv;
+                    sv.push_back("Hello");
+                    sv.push_back("World");
+
+                    complex.async(sv) >> [this](const simppl::dbus::CallState& state, const std::vector<simppl::dbus::Any>& result){
+
+                        EXPECT_EQ(3, result.size());
+                        EXPECT_STREQ("Hello", result[0].as<std::string>().c_str());
+                        EXPECT_EQ(42, result[1].as<int>());
+
+                        // calling twice possible?
+                        EXPECT_EQ(42, result[2].as<test::any::complex>().re);
+                        EXPECT_EQ(4711, result[2].as<test::any::complex>().im);
+
+                        disp().stop();
+                    };
                 };
             };
          };
@@ -262,15 +276,17 @@ TEST(Any, blocking_in_the_middle)
 
     try
     {
+        i=21;
         std::tie(i, result, str) = stub.in_the_middle(42, iv, "Hallo Welt");
     }
     catch(std::exception& ex)
     {
-        std::cerr << "SHIT" << std::endl;
+        EXPECT_TRUE(false);
     }
 
     EXPECT_EQ(42, i);
 
+    // calling as<...> multiple times is ok?
     EXPECT_EQ(2, result.as<std::vector<int>>().size());
     EXPECT_EQ(7777, result.as<std::vector<int>>()[0]);
     EXPECT_EQ(4711, result.as<std::vector<int>>()[1]);
