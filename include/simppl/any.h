@@ -313,7 +313,7 @@ public:
     template<typename T>
     Any& operator=(const T& t)
     {
-        AnyImpl p(&encoder<T>, t);
+        AnyImpl p(&any_encoder<T>, t);
         value_ = p;
 
         return *this;
