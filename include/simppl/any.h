@@ -17,7 +17,7 @@ namespace dbus
 {
 
 /**
- * A true D-Bus variant that can hold anything.
+ * A true D-Bus variant that can really hold *anything*.
  */
 class Any
 {
@@ -27,61 +27,56 @@ class Any
     typedef void(*destructor_func_t)(void*);
     typedef void*(*copy_func_t)(void*);
 
-    // XXX this is a hack and should be removed by redesign of the Codec functions
-    struct DBusMessageIterReal
-    {
-        DBusMessage* msg;
-    };
 
-
-    struct Iter
+    struct Iterator
     {
-        Iter()
+        Iterator()
          : iter_(DBUS_MESSAGE_ITER_INIT_CLOSED)
+         , msg_(nullptr)
         {
             // NOOP
         }
 
-        Iter(const DBusMessageIter& iter)
+        Iterator(DBusMessage* msg, const DBusMessageIter& iter)
          : iter_(iter)
+         , msg_(msg)
         {
-            DBusMessageIterReal* it = const_cast<DBusMessageIterReal*>((const DBusMessageIterReal*)&iter);
-            dbus_message_ref(it->msg);
+            dbus_message_ref(msg_);
         }
 
-        ~Iter()
+        ~Iterator()
         {
-            DBusMessageIterReal* it = (DBusMessageIterReal*)&iter_;
-
-            if (it->msg)
-                dbus_message_unref(it->msg);
+            if (msg_)
+                dbus_message_unref(msg_);
         }
 
-        Iter(const Iter& rhs)
+        Iterator(const Iterator& rhs)
          : iter_(rhs.iter_)
+         , msg_(rhs.msg_)
         {
-            DBusMessageIterReal* it = const_cast<DBusMessageIterReal*>((const DBusMessageIterReal*)&iter_);
-            dbus_message_ref(it->msg);
+            if (msg_)
+                dbus_message_ref(msg_);
         }
 
-        Iter& operator=(const Iter& rhs)
+        Iterator& operator=(const Iterator& rhs)
         {
             if (&rhs != this)
             {
-                DBusMessageIterReal* it = (DBusMessageIterReal*)&iter_;
-                if (it->msg)
-                    dbus_message_unref(it->msg);
+                if (msg_)
+                    dbus_message_unref(msg_);
 
                 iter_ = rhs.iter_;
+                msg_ = rhs.msg_;
 
-                if (it->msg)
-                    dbus_message_ref(it->msg);
+                if (msg_)
+                    dbus_message_ref(msg_);
             }
 
             return *this;
         }
 
         DBusMessageIter iter_;
+        DBusMessage* msg_;
     };
 
 
@@ -168,7 +163,7 @@ class Any
             // NOOP
         }
 
-        void operator()(const Iter&) const
+        void operator()(const Iterator&) const
         {
             // never called?!
             assert(false);
@@ -189,6 +184,84 @@ class Any
     private:
 
         DBusMessageIter& iter_;
+    };
+
+
+    template<typename T>
+    struct TypeVisitor
+    {
+        TypeVisitor()
+        {
+            // NOOP
+        }
+
+        bool operator()(const Iterator& iter) const
+        {
+            if (iter.msg_)
+            {
+                std::ostringstream oss;
+                Codec<T>::make_type_signature(oss);
+
+                std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
+                return !strcmp(sig.get(), oss.str().c_str());
+            }
+
+            return false;
+        }
+
+        template<typename U>
+        bool operator()(const U&) const
+        {
+            return std::is_same<T, U>::value;
+        }
+
+        bool operator()(const Private& p) const
+        {
+            assert("Not yet implemented");
+            return false;
+        }
+    };
+
+
+    template<typename T>
+    struct ExtractionVisitor
+    {
+        T operator()(const Iterator& iter) const
+        {
+            if (iter.msg_)
+            {
+                std::ostringstream oss;
+                Codec<T>::make_type_signature(oss);
+
+                std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
+
+                // TODO some better exception message: expected ..., provided ...
+                if (strcmp(sig.get(), oss.str().c_str()))
+                    throw std::runtime_error("Invalid type");
+
+                // make a copy, so the method may be called multiple times
+                DBusMessageIter __iter = iter.iter_;
+                return detail::deserialize_and_return_from_iter<T>::eval(const_cast<DBusMessageIter*>(&__iter));
+            }
+
+            throw std::runtime_error("No type");
+        }
+
+        template<typename U>
+        T operator()(const U& u) const
+        {
+            // would be nicer to use a switching template
+            if (std::is_same_v<T, U>)
+                return *(T*)&u;
+
+            throw std::runtime_error("Invalid type");
+        }
+
+        T operator()(const Private& p) const
+        {
+            assert("Not yet implemented");
+            return T();
+        }
     };
 
 
@@ -224,9 +297,9 @@ class Any
     }
 
 
-    void set_message_iterator(DBusMessageIter& iter)
+    void set_message_iterator(DBusMessage* msg, const DBusMessageIter& iter)
     {
-        value_ = iter;
+        value_ = std::move(Iterator(msg, iter));
     }
 
 
@@ -311,50 +384,26 @@ public:
 
 
     /**
-     * extraction
+     * Extraction by value, not reference since the normal use case is to
+     * extract the data from a DBus message and not from a preset type.
      */
     template<typename T>
     T as() const
     {
-        const Iter* p = std::get_if<Iter>(&value_);
-        if (!p)
-            throw std::runtime_error("no message");
-
-        std::ostringstream oss;
-        Codec<T>::make_type_signature(oss);
-
-        std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&p->iter_)), &dbus_free);
-
-        // FIXME some better exception message: expected ..., provided ...
-        if (strcmp(sig.get(), oss.str().c_str()))
-            throw std::runtime_error("Invalid type");
-
-        // make a copy, so the method may be called multiple times
-        DBusMessageIter iter = p->iter_;
-        return detail::deserialize_and_return_from_iter<T>::eval(const_cast<DBusMessageIter*>(&iter));
+        return std::visit(ExtractionVisitor<T>(), value_);
     }
 
 
     template<typename T>
     bool is() const
     {
-        // FIXME visitor here!
-        const Iter* p = std::get_if<Iter>(&value_);
-        if (!p)
-            throw std::runtime_error("no message");
-
-        std::ostringstream oss;
-        Codec<T>::make_type_signature(oss);
-
-        std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&p->iter_)), &dbus_free);
-
-        return !strcmp(sig.get(), oss.str().c_str());
+        return std::visit(TypeVisitor<T>(), value_);
     }
 
 
 private:
 
-    std::variant<Iter, int, double, std::string, Private> value_;
+    std::variant<Iterator, int, double, std::string, Private> value_;
 };
 
 
@@ -374,7 +423,7 @@ struct Codec<Any>
         DBusMessageIter iter;
         simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
 
-        v.set_message_iterator(iter);
+        v.set_message_iterator((DBusMessage*)iter.dummy1, iter);
 
         dbus_message_iter_next(&orig);
     }

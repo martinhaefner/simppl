@@ -297,3 +297,29 @@ TEST(Any, blocking_in_the_middle)
     t.join();
 }
 
+
+TEST(Any, types)
+{
+    simppl::dbus::Any a(42);
+    EXPECT_TRUE(a.is<int>());
+    EXPECT_FALSE(a.is<double>());
+    EXPECT_FALSE(a.is<std::string>());
+    EXPECT_EQ(42, a.as<int>());
+
+    simppl::dbus::Any b(42.42);
+    EXPECT_TRUE(b.is<double>());
+    EXPECT_FALSE(b.is<int>());
+    EXPECT_FALSE(b.is<std::string>());
+    EXPECT_EQ(42.42, b.as<double>());
+
+    simppl::dbus::Any c(std::string("Hello"));
+    EXPECT_FALSE(c.is<double>());
+    EXPECT_FALSE(c.is<int>());
+    EXPECT_TRUE(c.is<std::string>());
+    EXPECT_STREQ("Hello", c.as<std::string>().c_str());
+
+    simppl::dbus::Any d;
+    EXPECT_FALSE(d.is<int>());
+    EXPECT_FALSE(d.is<double>());
+    EXPECT_FALSE(d.is<std::string>());
+}
