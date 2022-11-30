@@ -2,6 +2,7 @@
 #define SIMPPL_ANY_H
 
 
+#include <any>
 #include <sstream>
 
 #include <dbus/dbus.h>
@@ -17,15 +18,14 @@ namespace dbus
 {
 
 /**
- * A true D-Bus variant that can really hold *anything*.
+ * A true D-Bus variant that can really hold *anything*, as a replacement
+ * for variants.
  */
 class Any
 {
     friend class Codec<Any>;
 
-    typedef void(*encoder_func_t)(DBusMessageIter&, const void*);
-    typedef void(*destructor_func_t)(void*);
-    typedef void*(*copy_func_t)(void*);
+    typedef void(*encoder_func_t)(DBusMessageIter&, const std::any& a);
 
 
     struct Iterator
@@ -80,78 +80,46 @@ class Any
     };
 
 
-    struct Private
+    struct AnyImpl
     {
-        Private()
+        AnyImpl()
          : enc_(nullptr)
-         , destr_(nullptr)
-         , copy_(nullptr)
-         , p_(nullptr)
         {
             //  NOOP
         }
 
 
-        Private(const Private& rhs)
+        AnyImpl(const AnyImpl& rhs)
          : enc_(rhs.enc_)
-         , destr_(rhs.destr_)
-         , copy_(rhs.copy_)
-         , p_(nullptr)
-        {
-            if (rhs.p_)
-            {
-                p_ = (*copy_)(rhs.p_);
-            }
-        }
-
-
-        template<typename T>
-        Private(encoder_func_t e, destructor_func_t d, copy_func_t c, const T& t)
-         : enc_(e)
-         , destr_(d)
-         , copy_(c)
-         , p_(new T(t))
+         , value_(rhs.value_)
         {
             // NOOP
         }
 
 
-        Private& operator=(const Private& rhs)
+        template<typename T>
+        AnyImpl(encoder_func_t e, const T& t)
+         : enc_(e)
+         , value_(t)
+        {
+            // NOOP
+        }
+
+
+        AnyImpl& operator=(const AnyImpl& rhs)
         {
             if (&rhs != this)
             {
-                if (p_)
-                {
-                    (*destr_)(p_);
-                    p_ = nullptr;
-                }
-
-                if (rhs.p_)
-                {
-                    enc_ = rhs.enc_;
-                    destr_ = rhs.destr_;
-                    copy_ = rhs.copy_;
-                    p_ = (*copy_)(rhs.p_);
-                }
+                enc_ = rhs.enc_;
+                value_ = rhs.value_;
             }
 
             return *this;
         }
 
-        ~Private()
-        {
-            if (p_)
-            {
-                (*destr_)(p_);
-                p_ = nullptr;
-            }
-        }
-
         encoder_func_t enc_;
-        destructor_func_t destr_;
-        copy_func_t copy_;
 
-        void* p_;
+        std::any value_;
     };
 
 
@@ -172,13 +140,13 @@ class Any
         template<typename T>
         void operator()(const T& t) const
         {
-            encoder<T>(iter_, &t);
+            encoder<T>(iter_, t);
         }
 
-        void operator()(const Private& p) const
+        void operator()(const AnyImpl& p) const
         {
-            if (p.p_)
-                (*p.enc_)(iter_, p.p_);
+            if (p.value_.has_value())
+                (*p.enc_)(iter_, p.value_);
         }
 
     private:
@@ -215,10 +183,9 @@ class Any
             return std::is_same<T, U>::value;
         }
 
-        bool operator()(const Private& p) const
+        bool operator()(const AnyImpl& p) const
         {
-            assert("Not yet implemented");
-            return false;
+            return std::any_cast<T>(&p.value_) != 0;
         }
     };
 
@@ -257,17 +224,23 @@ class Any
             throw std::runtime_error("Invalid type");
         }
 
-        T operator()(const Private& p) const
+        T operator()(const AnyImpl& p) const
         {
-            assert("Not yet implemented");
-            return T();
+            return std::any_cast<T>(p.value_);
         }
     };
 
 
     template<typename T>
     static
-    void encoder(DBusMessageIter& iter, const void* data)
+    void any_encoder(DBusMessageIter& iter, const std::any& data)
+    {
+        encoder<T>(iter, *std::any_cast<T>(&data));
+    }
+
+    template<typename T>
+    static
+    void encoder(DBusMessageIter& iter, const T& data)
     {
         std::ostringstream buf;
         Codec<T>::make_type_signature(buf);
@@ -275,33 +248,15 @@ class Any
         DBusMessageIter iter2;
         dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter2);
 
-        Codec<T>::encode(iter2, *(const T*)data);
+        Codec<T>::encode(iter2, data);
 
         dbus_message_iter_close_container(&iter, &iter2);
     }
-
-
-    template<typename T>
-    static
-    void destructor(void* data)
-    {
-        delete (T*)data;
-    }
-
-
-    template<typename T>
-    static
-    void* copy(void* data)
-    {
-        return new T(*(T*)data);
-    }
-
 
     void set_message_iterator(DBusMessage* msg, const DBusMessageIter& iter)
     {
         value_ = std::move(Iterator(msg, iter));
     }
-
 
     void encode(DBusMessageIter& iter) const
     {
@@ -339,7 +294,7 @@ public:
 
     template<typename T>
     Any(const T& t)
-     : value_(Private(&encoder<T>, &destructor<T>, &copy<T>, t))
+     : value_(AnyImpl(&any_encoder<T>, t))
     {
         // NOOP
     }
@@ -358,7 +313,7 @@ public:
     template<typename T>
     Any& operator=(const T& t)
     {
-        Private p(&encoder<T>, &destructor<T>, &copy<T>, t);
+        AnyImpl p(&encoder<T>, t);
         value_ = p;
 
         return *this;
@@ -403,7 +358,7 @@ public:
 
 private:
 
-    std::variant<Iterator, int, double, std::string, Private> value_;
+    std::variant<Iterator, int, double, std::string, AnyImpl> value_;
 };
 
 
@@ -423,6 +378,8 @@ struct Codec<Any>
         DBusMessageIter iter;
         simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
 
+        // FIXME TODO XXX take the message from the codec calls since this is
+        // highly implementation dependent
         v.set_message_iterator((DBusMessage*)iter.dummy1, iter);
 
         dbus_message_iter_next(&orig);

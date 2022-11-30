@@ -322,4 +322,17 @@ TEST(Any, types)
     EXPECT_FALSE(d.is<int>());
     EXPECT_FALSE(d.is<double>());
     EXPECT_FALSE(d.is<std::string>());
+    EXPECT_FALSE(d.is<std::vector<int>>());
+
+    simppl::dbus::Any e(std::vector<int>{ 1, 2, 3 });
+    EXPECT_FALSE(e.is<int>());
+    EXPECT_FALSE(e.is<double>());
+    EXPECT_FALSE(e.is<std::string>());
+    EXPECT_TRUE(e.is<std::vector<int>>());
+
+    auto v = e.as<std::vector<int>>();
+    EXPECT_EQ(3, v.size());
+    EXPECT_EQ(1, v[0]);
+    EXPECT_EQ(2, v[1]);
+    EXPECT_EQ(3, v[2]);
 }
