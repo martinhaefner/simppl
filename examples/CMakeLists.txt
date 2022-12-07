@@ -10,3 +10,10 @@ add_executable(mixed
 )
 
 target_link_libraries(mixed simppl)
+
+
+add_executable(networkmgr
+       networkmanager/networkmanager.cpp
+)
+
+target_link_libraries(networkmgr simppl)
