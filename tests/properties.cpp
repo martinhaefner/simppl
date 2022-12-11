@@ -4,9 +4,12 @@
 #include "simppl/skeleton.h"
 #include "simppl/dispatcher.h"
 #include "simppl/interface.h"
+
+// get serializers for used data types
 #include "simppl/objectpath.h"
 #include "simppl/map.h"
 #include "simppl/string.h"
+#include "simppl/any.h"
 
 #include <thread>
 
@@ -15,6 +18,40 @@ using namespace std::literals::chrono_literals;
 
 using simppl::dbus::in;
 using simppl::dbus::out;
+
+
+namespace org
+{
+	
+namespace freedesktop
+{
+	
+namespace DBus
+{
+	
+INTERFACE(Properties)	 
+{
+	Method<in<std::string /*interface name*/>, in<std::string /*property name*/>, out<simppl::dbus::Any>> Get;
+	Method<in<std::string /*interface name*/>, out<std::map<std::string, simppl::dbus::Any>>> 			  GetAll;
+	Method<in<std::string /*interface name*/>, in<std::string /*property name*/>, in<simppl::dbus::Any>>  Set;
+	
+	Properties()
+	 : INIT(Get)
+	 , INIT(GetAll)
+	 , INIT(Set)
+	{
+		// NOOP
+	}
+};
+
+}
+
+}
+
+}
+
+
+// ---------------------------------------------------------------------
 
 
 namespace test
@@ -817,3 +854,37 @@ TEST(Properties, parallel_async)
 
    d.run();
 }
+
+
+TEST(Properties, via_properties_interface)
+{
+	simppl::dbus::Dispatcher d("bus:session");
+
+   std::thread t(blockrunner);
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   simppl::dbus::Stub<org::freedesktop::DBus::Properties> c(d, "test.Properties.s", "/test/Properties/s");
+   EXPECT_EQ(4711, c.Get("test.Properties", "data").as<int>());
+   
+   auto result = c.GetAll("test.Properties");
+   
+   EXPECT_EQ(4, result.size());
+   
+   EXPECT_EQ(1, result["parallel"].as<int>());
+   EXPECT_EQ(4711, result["data"].as<int>());
+   EXPECT_STREQ("Hallo Welt", result["str_prop"].as<std::string>().c_str());   
+   
+   auto map = result["props"].as<std::map<ident_t, std::string>>();
+   EXPECT_EQ(2, map.size());
+   EXPECT_STREQ("One", map[test::One].c_str());
+   EXPECT_STREQ("Two", map[test::Two].c_str());
+   
+   // stop server
+   simppl::dbus::Stub<Properties> c1(d, "s");
+   c1.shutdown();   
+   
+   t.join();
+}
+
