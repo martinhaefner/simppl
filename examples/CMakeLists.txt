@@ -17,3 +17,9 @@ add_executable(networkmgr
 )
 
 target_link_libraries(networkmgr simppl)
+
+add_executable(wpa
+       wpa_supplicant/wpa.cpp
+)
+
+target_link_libraries(wpa simppl)
