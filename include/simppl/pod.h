@@ -5,6 +5,7 @@
 #   error "Do not include this file manually. Use serialization.h instead."
 #endif
 
+#include <cstdint>
 
 namespace simppl
 {
