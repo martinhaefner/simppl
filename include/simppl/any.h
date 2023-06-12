@@ -3,7 +3,11 @@
 
 
 #include <any>
+#include <cassert>
+#include <cstring>
+#include <memory>
 #include <sstream>
+#include <variant>
 
 #include <dbus/dbus.h>
 
