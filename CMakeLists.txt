@@ -81,7 +81,7 @@ target_include_directories(simppl
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-# target_compile_options(simppl PRIVATE -Werror -Wall -Wno-error=deprecated-declarations)
+target_compile_options(simppl PRIVATE -Werror -Wall -Wno-error=deprecated-declarations -Werror=unused-parameter)
 target_link_libraries(simppl PUBLIC
     DBUS::DBUS
     ${CMAKE_THREAD_LIBS_INIT}
