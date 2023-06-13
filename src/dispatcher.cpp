@@ -187,7 +187,7 @@ struct Dispatcher::Private
     dbus_bool_t add_watch(DBusWatch* w)
     {
        //std::cout << "add_watch" << std::endl;
-        pollfd fd = { 0 };
+        pollfd fd = {};
 
         fd.fd = dbus_watch_get_unix_fd(w);
 
