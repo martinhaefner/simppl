@@ -408,7 +408,7 @@ struct IntrospectionHelper
 template<>
 struct IntrospectionHelper<::simppl::dbus::oneway>
 {
-   static inline void eval(std::ostream& os, int i)
+   static inline void eval(std::ostream& /*os*/, int /*i*/)
    {
       // NOOP
    }
@@ -417,7 +417,7 @@ struct IntrospectionHelper<::simppl::dbus::oneway>
 template<typename T>
 struct IntrospectionHelper<::simppl::dbus::_throw<T>>
 {
-   static inline void eval(std::ostream& os, int i)
+   static inline void eval(std::ostream& /*os*/, int /*i*/)
    {
       // NOOP
    }

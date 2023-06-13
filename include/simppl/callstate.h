@@ -56,7 +56,7 @@ struct TCallState
    }
 
    inline
-   const char* const what() const
+   const char* what() const
    {
       return ex_->what();
    }
