@@ -231,7 +231,7 @@ struct Dispatcher::Private
     }
 
 
-    void toggle_watch(DBusWatch* w)
+    void toggle_watch(DBusWatch* /*w*/)
     {
        assert(false);   // not implemented
         /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
