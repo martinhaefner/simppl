@@ -398,6 +398,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // compile check if stubs or skeletons are compiled with the settings
    // used for building the library
    assert(SIMPPL_HAVE_INTROSPECTION == have_introspection);
+   (void)have_introspection; // Ensure compilation will also work on Release
 
    d = new Dispatcher::Private;
 
