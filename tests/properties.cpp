@@ -331,9 +331,8 @@ struct Server : simppl::dbus::Skeleton<Properties>
          mayShutdown.notify(42);
       };
 
-      parallel.on_read([](){
-          static int i=0;
-          return ++i;
+      parallel.on_read([this](){
+          return ++i_;
       });
 
       // initialize properties
@@ -343,6 +342,7 @@ struct Server : simppl::dbus::Skeleton<Properties>
    }
 
    int calls_ = 0;
+   int i_ = 0;
 };
 
 
