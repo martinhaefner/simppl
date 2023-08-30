@@ -2,6 +2,7 @@
 #define SIMPPL_SERIALIZATION_H
 
 
+#include <cstdint>
 #include <sstream>
 
 #include <dbus/dbus.h>
@@ -40,17 +41,14 @@ template<typename T>
 struct isPod
 {
    typedef make_typelist<
-      char,
-      signed char,
-      unsigned char,
-      short,
-      unsigned short,
-      int,
-      unsigned int,
-      long,
-      unsigned long,
-      long long,
-      unsigned long long,
+      int8_t,
+      uint8_t,
+      int16_t,
+      uint16_t,
+      int32_t,
+      uint32_t,
+      int64_t,
+      uint64_t,
       float,
       double>::type pod_types;
 
