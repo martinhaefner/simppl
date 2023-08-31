@@ -393,7 +393,7 @@ void enable_threads()
 }
 
 
-void Dispatcher::init(int have_introspection, const char* busname)
+void Dispatcher::init(int have_introspection, const char* busname, bool skipRegistration, bool skipEnumeration)
 {
    // compile check if stubs or skeletons are compiled with the settings
    // used for building the library
@@ -432,7 +432,9 @@ void Dispatcher::init(int have_introspection, const char* busname)
           {
              dbus_error_init(&err);
              action = "dbus_bus_register";
-             dbus_bus_register(conn_, &err);
+             if(!skipRegistration) {
+                dbus_bus_register(conn_, &err);
+             }
           }
        }
    }
@@ -443,46 +445,46 @@ void Dispatcher::init(int have_introspection, const char* busname)
 
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 
-   // register for busname change notifications
-   // response is (name, old, new)
-   dbus_error_init(&err);
-   dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
-   if (dbus_error_is_set(&err))
-      throw RuntimeError("dbus_bus_add_match", std::move(err));
-   dbus_error_free(&err);
+   if(!skipRegistration) {
+      // register for busname change notifications
+      // response is (name, old, new)
+      dbus_error_init(&err);
+      dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
+      if (dbus_error_is_set(&err))
+         throw RuntimeError("dbus_bus_add_match", std::move(err));
+      dbus_error_free(&err);
 
-   dbus_error_init(&err);
-   std::ostringstream match_string;
-   match_string
-       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
+      dbus_error_init(&err);
+      std::ostringstream match_string;
+      match_string
+          << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
 
-   dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
-   if (dbus_error_is_set(&err))
-      throw RuntimeError("dbus_bus_add_match", std::move(err));
-   dbus_error_free(&err);
-
-   // call ListNames to get list of available services on the bus
-   DBusMessage* msg = dbus_message_new_method_call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames");
-
-   dbus_error_init(&err);
-   DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn_, msg, 1000, &err);
-   assert(reply);
-   dbus_error_free(&err);
-
-   std::vector<std::string> busnames;
-
-   DBusMessageIter iter;
-   dbus_message_iter_init(reply, &iter);
-   decode(iter, busnames);
-
-   for(auto& busname : busnames)
-   {
-      if (busname[0] != ':')
-         d->busnames_.insert(busname);
+      dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
+      if (dbus_error_is_set(&err))
+         throw RuntimeError("dbus_bus_add_match", std::move(err));
+      dbus_error_free(&err);
    }
 
-   dbus_message_unref(msg);
-   dbus_message_unref(reply);
+   if(!skipEnumeration) {
+      // call ListNames to get list of available services on the bus
+      DBusMessage* msg = dbus_message_new_method_call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames"); 
+      dbus_error_init(&err);
+      DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn_, msg, 1000, &err);
+      assert(reply);
+      dbus_error_free(&err);  
+      std::vector<std::string> busnames;  
+      DBusMessageIter iter;
+      dbus_message_iter_init(reply, &iter);
+      decode(iter, busnames); 
+      for(auto& busname : busnames)
+      {
+         if (busname[0] != ':')
+            d->busnames_.insert(busname);
+      }
+
+      dbus_message_unref(msg);
+      dbus_message_unref(reply);
+   }
 }
 
 
