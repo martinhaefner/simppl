@@ -408,7 +408,7 @@ void Dispatcher::init(int have_introspection, const char* busname, bool skipRegi
    DBusError err;
    dbus_error_init(&err);
 
-   assert(!busname || !strncmp(busname, "bus:", 4));
+   assert(!busname || !strncmp(busname, "bus:", 4) || !strncmp(busname, "unix:path=", 10));
 
    const char* action = "connect";
    if (!busname || !strcmp(busname, "bus:session"))
