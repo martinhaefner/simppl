@@ -488,7 +488,6 @@ void Dispatcher::init(int have_introspection, const char* busname, bool skipRegi
 
 Dispatcher::~Dispatcher()
 {
-   dbus_connection_remove_filter(conn_, signal_filter, nullptr);
    dbus_connection_close(conn_);
    dbus_connection_unref(conn_);
 
