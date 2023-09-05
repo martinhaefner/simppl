@@ -50,9 +50,10 @@ struct Dispatcher
     * @param busname the busname to use, e.g. "bus:session" or "bus:system. nullptr means session.
     * @param skipRegistration if true skips the initial registration with 'NameOwnerChanged' inside 'org.freedesktop.DBus'. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon). 
     * @param skipEnumeration if true skips the initial enumeration with 'ListNames' inside 'org.freedesktop.DBus'. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon).
+    * @param hasStandardOrgFreedesktopDBus if false the implementation will not rely on `/org/freedesktop/DBus` for filtering signals. Instead we do our own filtering. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon).
     */
    inline
-   Dispatcher(const char* busname = nullptr, bool skipRegistration = false, bool skipEnumeration = false)
+   Dispatcher(const char* busname = nullptr, bool skipRegistration = false, bool skipEnumeration = false, bool hasStandardOrgFreedesktopDBus = true) : hasStandardOrgFreedesktopDBus(hasStandardOrgFreedesktopDBus)
    {
       init(SIMPPL_HAVE_INTROSPECTION, busname, skipRegistration, skipEnumeration);
    }
@@ -160,6 +161,7 @@ private:
 
    struct Private;
    Private* d;
+   bool hasStandardOrgFreedesktopDBus;
 };
 
 

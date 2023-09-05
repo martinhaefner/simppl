@@ -20,6 +20,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+option(SIMPPL_USE_POLL "On to enable poll for dbus events. This requires a dbus implementation with a proper `/org/freedesktop/DBus` for filtering signals." ON)
+if(SIMPPL_USE_POLL)
+    add_compile_definitions(SIMPPL_USE_POLL)
+endif()
+
 # enable introspection by default
 option(HAVE_INTROSPECTION "Have introspection" ON)
 include(CMakeDependentOption)

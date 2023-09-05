@@ -21,8 +21,6 @@
 #include "simppl/clientside.h"
 #undef SIMPPL_DISPATCHER_CPP
 
-#define SIMPPL_USE_POLL
-
 using namespace std::placeholders;
 using namespace std::literals::chrono_literals;
 
@@ -443,7 +441,7 @@ void Dispatcher::init(int have_introspection, const char* busname, bool skipRegi
       throw RuntimeError(action, std::move(err));
    dbus_error_free(&err);
 
-   dbus_connection_add_filter(conn_, &signal_filter, this, 0);
+   dbus_connection_add_filter(conn_, &signal_filter, this, nullptr);
 
    if(!skipRegistration) {
       // register for busname change notifications
@@ -490,11 +488,12 @@ void Dispatcher::init(int have_introspection, const char* busname, bool skipRegi
 
 Dispatcher::~Dispatcher()
 {
+   dbus_connection_remove_filter(conn_, signal_filter, nullptr);
    dbus_connection_close(conn_);
    dbus_connection_unref(conn_);
 
    delete d;
-   d = 0;
+   d = nullptr;
 }
 
 
@@ -572,14 +571,15 @@ void Dispatcher::register_signal_match(const std::string& match_string)
 
    if (iter == d->signal_matches_.end())
    {
-      DBusError err;
-      dbus_error_init(&err);
+      if(hasStandardOrgFreedesktopDBus) {
+         DBusError err;
+         dbus_error_init(&err);
 
-      dbus_bus_add_match(conn_, match_string.c_str(), &err);
-      if (dbus_error_is_set(&err))
-         throw RuntimeError("dbus_bus_add_match", std::move(err));
-      dbus_error_free(&err);
-
+         dbus_bus_add_match(conn_, match_string.c_str(), &err);
+         if (dbus_error_is_set(&err))
+            throw RuntimeError("dbus_bus_add_match", std::move(err));
+         dbus_error_free(&err);
+      }
       d->signal_matches_[match_string] = 1;
    }
    else
@@ -595,16 +595,16 @@ void Dispatcher::unregister_signal_match(const std::string& match_string)
    {
       if (--iter->second == 0)
       {
-         DBusError err;
-         dbus_error_init(&err);
+         if(hasStandardOrgFreedesktopDBus) {
+            DBusError err;
+            dbus_error_init(&err);
 
+            dbus_bus_remove_match(conn_, match_string.c_str(), &err);
+            if (dbus_error_is_set(&err))
+               throw RuntimeError("dbus_bus_remove_match", std::move(err));
+            dbus_error_free(&err);
+         }
          d->signal_matches_.erase(iter);
-
-         dbus_bus_remove_match(conn_, match_string.c_str(), &err);
-         if (dbus_error_is_set(&err))
-            throw RuntimeError("dbus_bus_remove_match", std::move(err));
-
-         dbus_error_free(&err);
       }
    }
 }
@@ -664,7 +664,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         // ordinary signals...
 
         bool handled = false;
-        auto range = d->stubs_.equal_range(dbus_message_get_path(msg));
+        auto range = d->stubs_.equal_range(std::string(dbus_message_get_path(msg)));
 
         for (auto iter = range.first; iter != range.second; ++iter)
         {
