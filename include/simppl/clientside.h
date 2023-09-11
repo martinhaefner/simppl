@@ -336,7 +336,7 @@ struct ClientMethod : ClientMethodBase
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
-    ClientMethod(const char* method_name, StubBase* parent, int iface_id)
+    ClientMethod(const char* method_name, StubBase* parent, int /*iface_id*/)
      : ClientMethodBase(method_name, parent)
     {
         throw_ = __throw;
