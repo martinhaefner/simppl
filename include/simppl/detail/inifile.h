@@ -3,6 +3,8 @@
 
 #include <limits>
 #include <type_traits>
+#include <cstdint>
+#include <cstdlib>
 
 #include "simppl/tribool.h"
 
@@ -206,7 +208,7 @@ struct Converter<char*>
 
 // TODO maybe we could use int for all smaller datatypes, but that's an optimization only
 static
-long long convert(const char* ptr, bool& success)
+int64_t convert(const char* ptr, bool& success)
 {
    int base = 10;
 
@@ -219,7 +221,7 @@ long long convert(const char* ptr, bool& success)
    }
 
    char* end;
-   long long rc = strtoll(ptr, &end, base);
+   int64_t rc = static_cast<int64_t>(std::strtoll(ptr, &end, base));
    success = (*end == '\0');
 
    return rc;
@@ -232,8 +234,8 @@ struct IntConverterBase
    static inline
    T eval(const char* ptr, bool& success)
    {
-      long long rc = convert(ptr, success);
-      success &= (rc >= (long long)std::numeric_limits<T>::min() && rc <= (long long)std::numeric_limits<T>::max());
+      int64_t rc = convert(ptr, success);
+      success &= (rc >= static_cast<int64_t>(std::numeric_limits<T>::min()) && rc <= static_cast<int64_t>(std::numeric_limits<T>::max()));
       return rc;
    }
 };
