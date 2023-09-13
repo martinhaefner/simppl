@@ -68,6 +68,7 @@ add_library(simppl SHARED
     src/clientside.cpp
     src/serialization.cpp
     src/bool.cpp
+    src/allDecoder.cpp
     src/holders.cpp
     src/properties.cpp
 )
