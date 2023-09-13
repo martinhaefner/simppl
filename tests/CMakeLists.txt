@@ -33,6 +33,7 @@ add_executable(unittests
    multi_interface.cpp
    no_interface.cpp
    utils.cpp
+   type_mapper.cpp
    any.cpp
 )
 if(Boost_FOUND)

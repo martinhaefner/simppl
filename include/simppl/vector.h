@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "simppl/serialization.h"
+#include "simppl/type_mapper.h"
 
 
 namespace simppl
@@ -14,11 +15,11 @@ namespace dbus
 {
     
    
-template<typename T>
-struct Codec<std::vector<T>>
+template<typename T, typename Alloc>
+struct Codec<std::vector<T, Alloc>>
 {
    static 
-   void encode(DBusMessageIter& s, const std::vector<T>& v)
+   void encode(DBusMessageIter& s, const std::vector<T, Alloc>& v)
    {
       DBusMessageIter iter;
       
@@ -37,7 +38,7 @@ struct Codec<std::vector<T>>
    
    
    static 
-   void decode(DBusMessageIter& s, std::vector<T>& v)
+   void decode(DBusMessageIter& s, std::vector<T, Alloc>& v)
    {
       v.clear();
 
@@ -62,9 +63,7 @@ struct Codec<std::vector<T>>
       return Codec<T>::make_type_signature(os << DBUS_TYPE_ARRAY_AS_STRING);
    }
 
-};
-
-   
+}; 
 }   // namespace dbus
 
 }   // namespace simppl
