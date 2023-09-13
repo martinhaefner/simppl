@@ -24,6 +24,15 @@ namespace dbus
 /**
  * A true D-Bus variant that can really hold *anything*, as a replacement
  * for variants.
+ *
+ * Note, that the actual internal data representation of an Any is
+ * dependent whether it was created from an actual data or if it was
+ * received by a D-Bus method call. A received Any holds a reference on the
+ * actual D-Bus stream iterator and cannot be serialized any more into
+ * a subsequent D-Bus function call. In order to achieve this, the any
+ * has to be deserialized into a variable and this variable can be
+ * once again sent as an Any over a D-Bus interface. An example can be seen
+ * in the any unittests.
  */
 class Any
 {

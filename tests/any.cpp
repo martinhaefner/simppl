@@ -52,12 +52,18 @@ namespace test
 
          Method<oneway> stop;
 
+         Method<out<simppl::dbus::Any>> getVecEmpty;
+         Method<in<simppl::dbus::Any>, out<simppl::dbus::Any>> setGet;
+
+
          AServer()
           : INIT(set)
           , INIT(get)
           , INIT(complex)
           , INIT(in_the_middle)
           , INIT(stop)
+          , INIT(getVecEmpty)
+          , INIT(setGet)
          {
             // NOOP
          }
@@ -147,6 +153,8 @@ namespace {
 
          in_the_middle >> [this](int i, const simppl::dbus::Any& a, const std::string& str){
 
+             // do never try to send a received any again,
+             // create a new one from the received data
              simppl::dbus::Any ret = a.as<std::vector<int>>();
 
              respond_with(in_the_middle(i, ret, str));
@@ -156,6 +164,23 @@ namespace {
          stop >> [this](){
 
             this->disp().stop();
+         };
+
+
+         setGet >> [this](const simppl::dbus::Any& a){
+
+            simppl::dbus::Any ret = a.as<std::vector<std::string>>();
+
+            respond_with(setGet(ret));
+         };
+
+
+         getVecEmpty >> [this](){
+
+            std::vector<std::string> vec;
+            simppl::dbus::Any a(vec);
+
+            respond_with(getVecEmpty(a));
          };
       }
    };
@@ -335,4 +360,36 @@ TEST(Any, types)
     EXPECT_EQ(1, v[0]);
     EXPECT_EQ(2, v[1]);
     EXPECT_EQ(3, v[2]);
+}
+
+
+TEST(Any, empty)
+{
+    simppl::dbus::Dispatcher d("bus:session");
+
+    std::thread t([](){
+        simppl::dbus::Dispatcher d("bus:session");
+        Server s(d);
+        d.run();
+    });
+
+    simppl::dbus::Stub<test::any::AServer> stub(d, "role");
+
+    // wait for server to get ready
+    std::this_thread::sleep_for(200ms);
+
+    simppl::dbus::Any a = stub.getVecEmpty();
+
+    EXPECT_TRUE(a.is<std::vector<std::string>>());
+
+    for (size_t i = 0; i < 10; i++)
+    {
+        auto arg = a.as<std::vector<std::string>>();
+        a = stub.setGet(arg);
+
+        EXPECT_TRUE(a.is<std::vector<std::string>>());
+    }
+
+    stub.stop();   // stop server
+    t.join();
 }
