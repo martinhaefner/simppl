@@ -8,7 +8,6 @@
 #include "simppl/string.h"
 
 
-using simppl::dbus::in;
 using simppl::dbus::out;
 
 

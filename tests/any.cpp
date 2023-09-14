@@ -138,6 +138,7 @@ struct Server : simppl::dbus::Skeleton<test::any::AServer> {
       av.push_back(std::string("Hello"));
       av.push_back(int(42));
       // av.push_back(test::any::complex(42, 4711));
+      EXPECT_TRUE(false); // TODO: Implement struct support
 
       respond_with(complex(av));
     };

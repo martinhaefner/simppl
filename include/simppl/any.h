@@ -23,34 +23,22 @@ namespace simppl {
 
 namespace dbus {
 struct Any;
-struct AnyVec;
+struct IntermediateAnyVec;
 
 template <typename T> T decode2(DBusMessageIter &iter);
-template <> AnyVec decode2(DBusMessageIter &iter);
+template <> IntermediateAnyVec decode2(DBusMessageIter &iter);
 template <> Any decode2(DBusMessageIter &iter);
 template <> std::string decode2(DBusMessageIter &iter);
 
 template <typename T> void encode2(DBusMessageIter &iter, const T &val);
-template <> void encode2(DBusMessageIter &iter, const AnyVec &val);
+template <> void encode2(DBusMessageIter &iter, const IntermediateAnyVec &val);
 template <> void encode2(DBusMessageIter &iter, const Any &val);
 template <> void encode2(DBusMessageIter &iter, const std::string &val);
-
-template <typename T> std::string get_signature_func(const T &t);
-template <typename T> std::any to_intermediate(const T &t);
 
 /**
  * A true D-Bus variant that can really hold *anything*, as a replacement
  * for variants.
- *
- * Note, that the actual internal data representation of an Any is
- * dependent whether it was created from an actual data or if it was
- * received by a D-Bus method call. A received Any holds a reference on the
- * actual D-Bus stream iterator and cannot be serialized any more into
- * a subsequent D-Bus function call. In order to achieve this, the any
- * has to be deserialized into a variable and this variable can be
- * once again sent as an Any over a D-Bus interface. An example can be seen
- * in the any unittests.
- */
+ **/
 struct Any {
   // DBUS_TYPE_...
   int containedType{DBUS_TYPE_INVALID};
@@ -93,19 +81,59 @@ struct Any {
   template <typename T> bool is() const;
 };
 
-struct AnyVec {
+/**
+ * A vector that contain anything and acts as an intermediate representation for data stored inside simppl::dbus::Any.
+ **/
+struct IntermediateAnyVec {
   // DBUS_TYPE_...
   int elementType{DBUS_TYPE_INVALID};
   std::string elementSignature;
   std::vector<std::any> vec;
 };
 
+// ---------------------------------------DBUS-TYPE----------------------------------------
+
+template <> int get_debus_type<Any>();
+
+// ---------------------------------------CODEC-IMPL---------------------------------------
+
+template <> struct Codec<Any> {
+  static void encode(DBusMessageIter &iter, const Any &v) { encode2(iter, v); }
+
+  static void decode(DBusMessageIter &orig, Any &v) {
+    v = decode2<Any>(orig);
+    dbus_message_iter_next(&orig);
+  }
+
+  static inline std::ostream &make_type_signature(std::ostream &os) {
+    return os << DBUS_TYPE_VARIANT_AS_STRING;
+  }
+};
+
+template <> struct Codec<IntermediateAnyVec> {
+  static void encode(DBusMessageIter &iter, const IntermediateAnyVec &v) {
+    encode2(iter, v);
+  }
+
+  static void decode(DBusMessageIter &orig, IntermediateAnyVec &v) {
+    v = decode2<IntermediateAnyVec>(orig);
+    dbus_message_iter_next(&orig);
+  }
+
+  static inline std::ostream &make_type_signature(std::ostream &os) {
+    assert(false);
+    return os << DBUS_TYPE_ARRAY_AS_STRING;
+  }
+};
+
+// ---------------------------------------TYPE-CHECK---------------------------------------
+
 template <typename T> struct is_type {
   static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
       return is_type<T>::check(std::any_cast<Any>(any).value_);
     }
-    if (any.type() == typeid(AnyVec)) {
+    if (any.type() == typeid(IntermediateAnyVec)) {
       return false;
     }
     return any.type() == typeid(T);
@@ -124,11 +152,11 @@ template<> struct is_type<Any> {
 
 template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
   static bool check(const std::any &any) {
-    if (any.type() != typeid(AnyVec)) {
+    if (any.type() != typeid(IntermediateAnyVec)) {
       return false;
     }
 
-    for (const std::any &elem : std::any_cast<AnyVec>(any).vec) {
+    for (const std::any &elem : std::any_cast<IntermediateAnyVec>(any).vec) {
       if (!is_type<T>::check(elem)) {
         return false;
       }
@@ -137,12 +165,18 @@ template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
   }
 };
 
+template <typename T> bool Any::is() const {
+  return is_type<T>::check(value_);
+}
+
+// --------------------------------------TYPE-CONVERT--------------------------------------
+
 template <typename T> struct as_type {
   static T convert(const std::any &any) {
     if (any.type() == typeid(Any)) {
       return as_type<T>::convert(std::any_cast<Any>(any).value_);
     }
-    if (any.type() == typeid(AnyVec)) {
+    if (any.type() == typeid(IntermediateAnyVec)) {
       assert(false);
     }
     return std::any_cast<T>(any);
@@ -158,53 +192,21 @@ template <> struct as_type<Any> {
 
 template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
   static std::vector<T, Alloc> convert(const std::any &any) {
-    if (any.type() != typeid(AnyVec)) {
+    if (any.type() != typeid(IntermediateAnyVec)) {
       assert(false);
     }
 
     std::vector<T, Alloc> result;
-    for (const std::any &elem : std::any_cast<AnyVec>(any).vec) {
+    for (const std::any &elem : std::any_cast<IntermediateAnyVec>(any).vec) {
       result.emplace_back(as_type<T>::convert(elem));
     }
     return result;
   }
 };
 
-// Needs to be implemented inside the header file.
-template <typename T> bool Any::is() const {
-  return is_type<T>::check(value_);
-}
-
 template <typename T> T Any::as() const { return as_type<T>::convert(value_); }
 
-template <> struct Codec<Any> {
-  static void encode(DBusMessageIter &iter, const Any &v) { encode2(iter, v); }
-
-  static void decode(DBusMessageIter &orig, Any &v) {
-    v = decode2<Any>(orig);
-    dbus_message_iter_next(&orig);
-  }
-
-  static inline std::ostream &make_type_signature(std::ostream &os) {
-    return os << DBUS_TYPE_VARIANT_AS_STRING;
-  }
-};
-
-template <> struct Codec<AnyVec> {
-  static void encode(DBusMessageIter &iter, const AnyVec &v) {
-    encode2(iter, v);
-  }
-
-  static void decode(DBusMessageIter &orig, AnyVec &v) {
-    v = decode2<AnyVec>(orig);
-    dbus_message_iter_next(&orig);
-  }
-
-  static inline std::ostream &make_type_signature(std::ostream &os) {
-    assert(false);
-    return os << DBUS_TYPE_ARRAY_AS_STRING;
-  }
-};
+// -------------------------------------DBUS-SIGNATURE-------------------------------------
 
 template <typename T> struct get_signature {
   static void value(std::ostream &os, const T & /*t*/) {
@@ -212,8 +214,8 @@ template <typename T> struct get_signature {
   }
 };
 
-template <> struct get_signature<AnyVec> {
-  static void value(std::ostream &os, const AnyVec &vec) {
+template <> struct get_signature<IntermediateAnyVec> {
+  static void value(std::ostream &os, const IntermediateAnyVec &vec) {
     os << DBUS_TYPE_ARRAY_AS_STRING << vec.elementSignature;
   }
 };
@@ -231,7 +233,7 @@ template <typename T> std::string get_signature_func(const T &t) {
   return os.str();
 }
 
-template <> int get_debus_type<Any>();
+// --------------------------------INTERMEDIATE-CONVERSION---------------------------------
 
 template <typename T> std::any to_intermediate(const T &t) { return t; }
 
@@ -247,8 +249,10 @@ std::any to_intermediate(const std::vector<T, Alloc> &vec) {
     resultVec.emplace_back(to_intermediate(t));
   }
 
-  return AnyVec{elementType, std::move(elementSignature), std::move(resultVec)};
+  return IntermediateAnyVec{elementType, std::move(elementSignature), std::move(resultVec)};
 }
+
+// -----------------------------------ANY-IMPLEMENTATIONS----------------------------------
 
 template <typename T>
 Any::Any(T &&value)

@@ -1,7 +1,7 @@
 #ifndef SIMPPL_DBUS_POD_H
 #define SIMPPL_DBUS_POD_H
 
-#include <dbus/dbus-protocol.h>
+#include <dbus/dbus.h>
 #ifndef SIMPPL_SERIALIZATION_H
 #   error "Do not include this file manually. Use serialization.h instead."
 #endif
@@ -20,8 +20,7 @@ namespace dbus
 namespace detail
 {
 
-template<typename T>
-struct typecode_switch;
+template<typename T, typename Enable = void> struct typecode_switch;
 
 template<> struct typecode_switch<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
 template<> struct typecode_switch<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
