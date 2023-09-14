@@ -101,9 +101,9 @@ struct AnyVec {
 };
 
 template <typename T> struct is_type {
-  bool check(const std::any &any) {
+  static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
-      return is_type<T>().check(std::any_cast<Any>(any).value_);
+      return is_type<T>::check(std::any_cast<Any>(any).value_);
     }
     if (any.type() == typeid(AnyVec)) {
       return false;
@@ -112,14 +112,24 @@ template <typename T> struct is_type {
   }
 };
 
+template<> struct is_type<Any> {
+  static bool check(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return true;
+    }
+    return false;
+  }
+};
+
+
 template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
-  bool check(const std::any &any) {
+  static bool check(const std::any &any) {
     if (any.type() != typeid(AnyVec)) {
       return false;
     }
 
     for (const std::any &elem : std::any_cast<AnyVec>(any).vec) {
-      if (!is_type<T>().check(elem)) {
+      if (!is_type<T>::check(elem)) {
         return false;
       }
     }
@@ -128,9 +138,9 @@ template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
 };
 
 template <typename T> struct as_type {
-  T convert(const std::any &any) {
+  static T convert(const std::any &any) {
     if (any.type() == typeid(Any)) {
-      return as_type<T>().convert(std::any_cast<Any>(any).value_);
+      return as_type<T>::convert(std::any_cast<Any>(any).value_);
     }
     if (any.type() == typeid(AnyVec)) {
       assert(false);
@@ -139,16 +149,22 @@ template <typename T> struct as_type {
   }
 };
 
+template <> struct as_type<Any> {
+  static Any convert(const std::any &any) {
+    assert(any.type() == typeid(Any));
+    return std::any_cast<Any>(any);
+  }
+};
+
 template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
-  std::vector<T, Alloc> convert(const std::any &any) {
+  static std::vector<T, Alloc> convert(const std::any &any) {
     if (any.type() != typeid(AnyVec)) {
       assert(false);
     }
 
     std::vector<T, Alloc> result;
     for (const std::any &elem : std::any_cast<AnyVec>(any).vec) {
-      assert(elem.type() == typeid(T));
-      result.emplace_back(std::any_cast<T>(elem));
+      result.emplace_back(as_type<T>::convert(elem));
     }
     return result;
   }
@@ -156,10 +172,10 @@ template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
 
 // Needs to be implemented inside the header file.
 template <typename T> bool Any::is() const {
-  return is_type<T>().check(value_);
+  return is_type<T>::check(value_);
 }
 
-template <typename T> T Any::as() const { return as_type<T>().convert(value_); }
+template <typename T> T Any::as() const { return as_type<T>::convert(value_); }
 
 template <> struct Codec<Any> {
   static void encode(DBusMessageIter &iter, const Any &v) { encode2(iter, v); }
@@ -215,6 +231,8 @@ template <typename T> std::string get_signature_func(const T &t) {
   return os.str();
 }
 
+template <> int get_debus_type<Any>();
+
 template <typename T> std::any to_intermediate(const T &t) { return t; }
 
 template <typename T, typename Alloc>
@@ -226,7 +244,7 @@ std::any to_intermediate(const std::vector<T, Alloc> &vec) {
   std::string elementSignature = os.str();
 
   for (const T &t : vec) {
-    resultVec.emplace_back(to_intermediate<T>(t));
+    resultVec.emplace_back(to_intermediate(t));
   }
 
   return AnyVec{elementType, std::move(elementSignature), std::move(resultVec)};

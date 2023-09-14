@@ -16,16 +16,36 @@
 
 namespace simppl {
 namespace dbus {
-std::any decodeAsAny(DBusMessageIter &varIter, int type) {
+template <typename T> T decodeAsAny(DBusMessageIter &iter) {
+  T val{};
+  Codec<T>::decode(iter, val);
+  return val;
+}
+
+std::any decodeAsAny(DBusMessageIter &iter, int type) {
   switch (type) {
+  case DBUS_TYPE_BYTE:
+    return decodeAsAny<uint8_t>(iter);
+  case DBUS_TYPE_UINT16:
+    return decodeAsAny<uint16_t>(iter);
+  case DBUS_TYPE_INT16:
+    return decodeAsAny<int16_t>(iter);
+  case DBUS_TYPE_UINT32:
+    return decodeAsAny<uint32_t>(iter);
   case DBUS_TYPE_INT32:
-    return decode2<int32_t>(varIter);
+    return decodeAsAny<int32_t>(iter);
+  case DBUS_TYPE_UINT64:
+    return decodeAsAny<uint64_t>(iter);
+  case DBUS_TYPE_INT64:
+    return decodeAsAny<int64_t>(iter);
+  case DBUS_TYPE_DOUBLE:
+    return decodeAsAny<double>(iter);
   case DBUS_TYPE_STRING:
-    return decode2<std::string>(varIter);
+    return decodeAsAny<std::string>(iter);
   case DBUS_TYPE_VARIANT:
-    return decode2<Any>(varIter);
+    return decode2<Any>(iter);
   case DBUS_TYPE_ARRAY:
-    return decode2<AnyVec>(varIter);
+    return decode2<AnyVec>(iter);
   default:
     assert(false);
   }
@@ -33,11 +53,32 @@ std::any decodeAsAny(DBusMessageIter &varIter, int type) {
 
 void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
   switch (anyType) {
+  case DBUS_TYPE_BYTE:
+    Codec<uint8_t>::encode(iter, std::any_cast<uint8_t>(any));
+    break;
+  case DBUS_TYPE_UINT16:
+    Codec<uint16_t>::encode(iter, std::any_cast<uint16_t>(any));
+    break;
+  case DBUS_TYPE_INT16:
+    Codec<int16_t>::encode(iter, std::any_cast<int16_t>(any));
+    break;
+  case DBUS_TYPE_UINT32:
+    Codec<uint32_t>::encode(iter, std::any_cast<uint32_t>(any));
+    break;
   case DBUS_TYPE_INT32:
-    encode2(iter, std::any_cast<int32_t>(any));
+    Codec<int32_t>::encode(iter, std::any_cast<int32_t>(any));
+    break;
+  case DBUS_TYPE_UINT64:
+    Codec<uint64_t>::encode(iter, std::any_cast<uint64_t>(any));
+    break;
+  case DBUS_TYPE_INT64:
+    Codec<int64_t>::encode(iter, std::any_cast<int64_t>(any));
+    break;
+  case DBUS_TYPE_DOUBLE:
+    Codec<double>::encode(iter, std::any_cast<double>(any));
     break;
   case DBUS_TYPE_STRING:
-    encode2(iter, std::any_cast<std::string>(any));
+    Codec<std::string>::encode(iter, std::any_cast<std::string>(any));
     break;
   case DBUS_TYPE_VARIANT:
     encode2(iter, std::any_cast<Any>(any));
@@ -46,7 +87,8 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
     if (any.type() == typeid(AnyVec)) {
       encode2(iter, std::any_cast<AnyVec>(any));
     } else {
-      assert(false); // Should not happen since we convert all vectors that get passed to Any to an intermediate representation
+      assert(false); // Should not happen since we convert all vectors that get
+                     // passed to Any to an intermediate representation
     }
     break;
   default:
@@ -72,21 +114,27 @@ void getSignatureFromBasicType(std::ostream &os, int type) {
 }
 
 template <> AnyVec decode2(DBusMessageIter &iter) {
+  int arrayElementType = dbus_message_iter_get_element_type(&iter);
+  assert(
+      arrayElementType !=
+      DBUS_TYPE_INVALID); // If there is no element/type, the array is invalid.
+
   DBusMessageIter arrayIter;
   dbus_message_iter_recurse(&iter, &arrayIter);
 
   std::vector<std::any> array;
-  int elementType = dbus_message_iter_get_arg_type(&arrayIter);
   std::string elementSignature = dbus_message_iter_get_signature(&arrayIter);
-  assert(elementType !=
-         DBUS_TYPE_INVALID); // Else the message is invalid. Every empty array
-                             // has to include the contained type
-  if (elementType != DBUS_TYPE_INVALID) {
-    do {
-      array.emplace_back(decodeAsAny(arrayIter, elementType));
-    } while (dbus_message_iter_next(&arrayIter));
+  for (int elementType = dbus_message_iter_get_arg_type(&arrayIter);
+       elementType != DBUS_TYPE_INVALID;
+       elementType = dbus_message_iter_get_arg_type(&arrayIter)) {
+    array.emplace_back(decodeAsAny(arrayIter, elementType));
   }
-  return AnyVec{elementType, std::move(elementSignature), std::move(array)};
+
+  // Advance to next element
+  dbus_message_iter_next(&iter);
+
+  return AnyVec{arrayElementType, std::move(elementSignature),
+                std::move(array)};
 }
 
 template <> Any decode2(DBusMessageIter &iter) {
@@ -95,7 +143,12 @@ template <> Any decode2(DBusMessageIter &iter) {
   std::string elementSignature = dbus_message_iter_get_signature(&varIter);
 
   int type = dbus_message_iter_get_arg_type(&varIter);
-  return Any(type, std::move(elementSignature), decodeAsAny(varIter, type));
+  std::any any = decodeAsAny(varIter, type);
+
+  // Advance to next element
+  dbus_message_iter_next(&iter);
+
+  return Any(type, std::move(elementSignature), std::move(any));
 }
 
 template <> std::string decode2(DBusMessageIter &iter) {
@@ -115,7 +168,7 @@ template <typename T> void encode2(DBusMessageIter &iter, const T &val) {
 }
 
 template <> void encode2(DBusMessageIter &iter, const std::string &val) {
-    const char* s = val.c_str();
+  const char *s = val.c_str();
   dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &s);
 }
 
@@ -130,8 +183,10 @@ template <> void encode2(DBusMessageIter &iter, const AnyVec &val) {
 }
 
 template <> void encode2(DBusMessageIter &iter, const Any &val) {
+  if(val.containedType == DBUS_TYPE_INVALID) { throw std::invalid_argument("simppl::dbus::Any can not be empty!"); }
   DBusMessageIter variantIter;
-  dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, val.containedTypeSignature.c_str(),
+  dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT,
+                                   val.containedTypeSignature.c_str(),
                                    &variantIter);
   encodeAny(variantIter, val.value_, val.containedType);
   dbus_message_iter_close_container(&iter, &variantIter);
@@ -148,5 +203,7 @@ Any::Any(const Any &other) {
   containedTypeSignature = other.containedTypeSignature;
   value_ = other.value_;
 }
+
+template <> int get_debus_type<Any>() { return DBUS_TYPE_VARIANT; }
 } // namespace dbus
 } // namespace simppl
