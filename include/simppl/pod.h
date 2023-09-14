@@ -7,6 +7,8 @@
 #endif
 
 #include <cstdint>
+#include <vector>
+#include <string>
 
 namespace simppl
 {
@@ -30,6 +32,9 @@ template<> struct typecode_switch<int16_t>            { enum { value = DBUS_TYPE
 template<> struct typecode_switch<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
 template<> struct typecode_switch<int64_t>            { enum { value = DBUS_TYPE_INT64   }; };
 template<> struct typecode_switch<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
+template<> struct typecode_switch<std::string>        { enum { value = DBUS_TYPE_STRING  }; };
+template<typename T, typename Alloc>
+struct typecode_switch<std::vector<T, Alloc>>         { enum { value = DBUS_TYPE_ARRAY  }; };
 
 
 template<typename T, bool>

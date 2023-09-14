@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "simppl/detail/deserialize_and_return.h"
+#include "simppl/pod.h"
 #include "simppl/serialization.h"
 #include "simppl/type_mapper.h"
 
@@ -35,6 +36,7 @@ template <> void encode2(DBusMessageIter &iter, const Any &val);
 template <> void encode2(DBusMessageIter &iter, const std::string &val);
 
 template <typename T> std::string get_signature_func(const T &t);
+template <typename T> std::any to_intermediate(const T &t);
 
 /**
  * A true D-Bus variant that can really hold *anything*, as a replacement
@@ -62,28 +64,26 @@ struct Any {
         containedTypeSignature(std::move(containedTypeSignature)),
         value_(std::move(any)) {}
 
-  template <typename T>
-  Any(T &&value)
-      : value_(std::move(value)), containedType(get_debus_type<T>()) {
-    containedTypeSignature = get_signature_func<T>(std::any_cast<T>(value_));
-  }
+  Any(Any &&old);
+  Any(const Any &other);
 
-  template <typename T>
-  Any(const T &value) : value_(value), containedType(get_debus_type<T>()) {
-    containedTypeSignature = get_signature_func<T>(value);
-  }
+  template <typename T> Any(T &&value);
+  template <typename T> Any(const T &value);
 
-  template <typename T> Any &operator=(T &&val) {
-   containedTypeSignature = get_signature_func<T>(val);
-    value_ = std::move(val);
-    containedType = get_debus_type<T>();
+  template <typename T> Any &operator=(T &&val);
+  template <typename T> Any &operator=(const T &val);
+
+  Any &operator=(Any &&old) {
+    containedType = old.containedType;
+    containedTypeSignature = std::move(old.containedTypeSignature);
+    value_ = std::move(old.value_);
     return *this;
   }
 
-  template <typename T> Any &operator=(T &val) {
-   containedTypeSignature = get_signature_func<T>(val);
-    value_ = val;
-    containedType = get_debus_type<T>();
+  Any &operator=(const Any &other) {
+    containedType = other.containedType;
+    containedTypeSignature = other.containedTypeSignature;
+    value_ = other.value_;
     return *this;
   }
 
@@ -215,8 +215,49 @@ template <typename T> std::string get_signature_func(const T &t) {
   return os.str();
 }
 
-} // namespace dbus
+template <typename T> std::any to_intermediate(const T &t) { return t; }
 
+template <typename T, typename Alloc>
+std::any to_intermediate(const std::vector<T, Alloc> &vec) {
+  std::vector<std::any> resultVec;
+  int elementType = get_debus_type<T>();
+  std::ostringstream os;
+  Codec<T>::make_type_signature(os);
+  std::string elementSignature = os.str();
+
+  for (const T &t : vec) {
+    resultVec.emplace_back(to_intermediate<T>(t));
+  }
+
+  return AnyVec{elementType, std::move(elementSignature), std::move(resultVec)};
+}
+
+template <typename T>
+Any::Any(T &&value)
+    : containedType(get_debus_type<T>()),
+      containedTypeSignature(get_signature_func(value)),
+      value_(to_intermediate(value)) {}
+
+template <typename T>
+Any::Any(const T &value)
+    : containedType(get_debus_type<T>()),
+      containedTypeSignature(get_signature_func(value)),
+      value_(to_intermediate(value)) {}
+
+template <typename T> Any &Any::operator=(T &&val) {
+  containedType = get_debus_type<T>();
+  containedTypeSignature = get_signature_func(val);
+  value_ = to_intermediate(val);
+  return *this;
+}
+
+template <typename T> Any &Any::operator=(const T &val) {
+  containedType = get_debus_type<T>();
+  containedTypeSignature = get_signature_func<T>(val);
+  value_ = to_intermediate(val);
+  return *this;
+}
+} // namespace dbus
 } // namespace simppl
 
 #endif // SIMPPL_ANY_H
