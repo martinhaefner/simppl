@@ -48,6 +48,8 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
     return decode2<Any>(iter);
   case DBUS_TYPE_ARRAY:
     return decode2<IntermediateAnyVec>(iter);
+  case DBUS_TYPE_STRUCT:
+    return decode2<IntermediateAnyTuple>(iter);
   default:
     assert(false);
   }
@@ -75,6 +77,27 @@ template <> IntermediateAnyVec decode2(DBusMessageIter &iter) {
 
   return IntermediateAnyVec{arrayElementType, std::move(elementSignature),
                             std::move(array)};
+}
+
+template <> IntermediateAnyTuple decode2(DBusMessageIter &iter) {
+  DBusMessageIter arrayIter;
+  dbus_message_iter_recurse(&iter, &arrayIter);
+
+  std::vector<std::any> tupleVec;
+  std::vector<int> tupleTypes;
+  std::string elementSignature = dbus_message_iter_get_signature(&arrayIter);
+  for (int elementType = dbus_message_iter_get_arg_type(&arrayIter);
+       elementType != DBUS_TYPE_INVALID;
+       elementType = dbus_message_iter_get_arg_type(&arrayIter)) {
+    tupleVec.emplace_back(decodeAsAny(arrayIter, elementType));
+    tupleTypes.emplace_back(elementType);
+  }
+
+  // Advance to next element
+  dbus_message_iter_next(&iter);
+
+  return IntermediateAnyTuple{std::move(tupleTypes),
+                              std::move(elementSignature), std::move(tupleVec)};
 }
 
 template <> Any decode2(DBusMessageIter &iter) {
@@ -147,7 +170,15 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
       encode2(iter, std::any_cast<IntermediateAnyVec>(any));
     } else {
       assert(false); // Should not happen since we convert all vectors that get
-                     // passed to Any to an intermediate representation
+                     // passed to Any to an intermediate representation.
+    }
+    break;
+  case DBUS_TYPE_STRUCT:
+    if (any.type() == typeid(IntermediateAnyTuple)) {
+      encode2(iter, std::any_cast<IntermediateAnyTuple>(any));
+    } else {
+      assert(false); // Should not happen since we convert all tuples (structs) that get
+                     // passed to Any to an intermediate representation.
     }
     break;
   default:
@@ -173,6 +204,16 @@ template <> void encode2(DBusMessageIter &iter, const IntermediateAnyVec &val) {
     encodeAny(arrayIter, elem, val.elementType);
   }
   dbus_message_iter_close_container(&iter, &arrayIter);
+}
+
+template <> void encode2(DBusMessageIter &iter, const IntermediateAnyTuple &val) {
+  DBusMessageIter structIter;
+  dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT,
+                                   nullptr, &structIter);
+  for (size_t i = 0; i < val.elements.size(); i++) {
+    encodeAny(structIter, val.elements[i], val.elementTypes[i]);
+  }
+  dbus_message_iter_close_container(&iter, &structIter);
 }
 
 template <> void encode2(DBusMessageIter &iter, const Any &val) {
@@ -206,3 +247,10 @@ Any::Any(const Any &other) {
 template <> int get_debus_type<Any>() { return DBUS_TYPE_VARIANT; }
 } // namespace dbus
 } // namespace simppl
+
+/**
+ * 
+  std::tuple<std::vector<uint16_t>,
+             std::vector<std::tuple<uint64_t, std::string>>>
+ * 
+ */

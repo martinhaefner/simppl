@@ -7,9 +7,11 @@
 #include <limits>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "simppl/interface.h"
+#include "simppl/objectpath.h"
 #include "simppl/serialization.h"
 #include "simppl/skeleton.h"
 #include "simppl/stub.h"
@@ -363,7 +365,8 @@ template <typename T> void test_enc_dec_number() {
 TEST(Any, empty) {
   test_enc_dec_f([](DBusMessageIter &iter, DBusMessage *message) {
     simppl::dbus::Any any;
-    EXPECT_THROW(simppl::dbus::Codec<simppl::dbus::Any>::encode(iter, any), std::invalid_argument);
+    EXPECT_THROW(simppl::dbus::Codec<simppl::dbus::Any>::encode(iter, any),
+                 std::invalid_argument);
   });
 }
 
@@ -492,7 +495,7 @@ TEST(Any, encode_decode_vector_full) {
   t.join();
 }
 
-TEST(Any, get_vec) {
+TEST(Any, get_vector) {
   std::vector<std::string> vec{"https://http.cat/status/200",
                                "https://http.cat/status/400",
                                "https://http.cat/status/510"};
@@ -503,13 +506,70 @@ TEST(Any, get_vec) {
   EXPECT_EQ(vec, resultVec);
 }
 
-TEST(Any, get_vec_two_level) {
+TEST(Any, get_vector_two_level) {
   std::vector<std::vector<std::string>> vec{
       {"https://http.cat/status/200"},
       {"https://http.cat/status/400", "https://http.cat/status/510"}};
   simppl::dbus::Any any = vec;
   EXPECT_TRUE(any.is<std::vector<std::vector<std::string>>>());
-  std::vector<std::vector<std::string>> resultVec = any.as<std::vector<std::vector<std::string>>>();
+  std::vector<std::vector<std::string>> resultVec =
+      any.as<std::vector<std::vector<std::string>>>();
   EXPECT_EQ(vec.size(), resultVec.size());
   EXPECT_EQ(vec, resultVec);
 }
+
+/*TEST(Any, encode_decode_map_empty) {
+  std::map<std::string, std::string> map{};
+  test_enc_dec(map);
+}*/
+
+TEST(Any, encode_decode_tuple_empty) {
+  std::tuple<std::string, std::string> tuple{};
+  test_enc_dec(tuple);
+}
+
+TEST(Any, encode_decode_tuple) {
+  std::tuple<std::string, std::string> tuple = std::make_tuple(
+      "https://http.cat/status/200", "https://http.cat/status/400");
+  test_enc_dec(tuple);
+}
+
+TEST(Any, get_tuple) {
+  std::tuple<std::string, std::string, std::string> tuple = std::make_tuple(
+      "https://http.cat/status/200", "https://http.cat/status/400",
+      "https://http.cat/status/510");
+  simppl::dbus::Any any = tuple;
+  bool b = any.is<std::tuple<std::string, std::string, std::string>>();
+  EXPECT_TRUE(b);
+  std::tuple<std::string, std::string, std::string> resultTuple =
+      any.as<std::tuple<std::string, std::string, std::string>>();
+  EXPECT_EQ(tuple, resultTuple);
+}
+
+TEST(Any, get_tuple_two_level) {
+  using tType_t = std::tuple<std::tuple<std::string, std::string>,
+                             std::tuple<std::string, std::string>>;
+  tType_t tuple = std::make_tuple<std::tuple<std::string, std::string>>(
+      std::make_tuple<std::string, std::string>("https://http.cat/status/200",
+                                                "https://http.cat/status/400"),
+      std::make_tuple<std::string, std::string>("https://http.cat/status/404",
+                                                "https://http.cat/status/500"));
+  simppl::dbus::Any any = tuple;
+  EXPECT_TRUE(any.is<tType_t>());
+  tType_t resultTuple = any.as<tType_t>();
+  EXPECT_EQ(tuple, resultTuple);
+}
+
+TEST(Any, encode_decode_tuple_vector) {
+  std::tuple<std::vector<uint16_t>,
+             std::vector<std::tuple<uint64_t, std::string>>>
+      tuple = std::make_tuple<std::vector<uint16_t>,
+             std::vector<std::tuple<uint64_t, std::string>>>({1, 2, 656}, {std::make_tuple<uint64_t, std::string>(4545, "Hallo"),
+                                            std::make_tuple<uint64_t, std::string>(7777, "Welt")});
+  test_enc_dec(tuple);
+}
+
+/*TEST(Any, encode_decode_object_path) {
+  simppl::dbus::ObjectPath objPath("some_path");
+  test_enc_dec(objPath);
+}*/
