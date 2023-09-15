@@ -7,38 +7,45 @@
 #include <cstdint>
 #include <cstring>
 #include <dbus/dbus-protocol.h>
+#include <iostream>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
+#include <sys/types.h>
+#include <tuple>
 #include <utility>
 #include <variant>
-#include <iostream>
 
 #include <dbus/dbus.h>
 #include <vector>
 
 #include "simppl/detail/deserialize_and_return.h"
+#include "simppl/map.h"
 #include "simppl/pod.h"
 #include "simppl/serialization.h"
+#include "simppl/tuple.h"
 #include "simppl/type_mapper.h"
+#include "simppl/vector.h"
 
 namespace simppl {
 
 namespace dbus {
 struct Any;
 struct IntermediateAnyVec;
-struct IntermediateAnyMap;
+struct IntermediateAnyMapElement;
 struct IntermediateAnyTuple;
 
 template <typename T> T decode2(DBusMessageIter &iter);
 template <> IntermediateAnyVec decode2(DBusMessageIter &iter);
-template <> IntermediateAnyMap decode2(DBusMessageIter &iter);
+template <> IntermediateAnyMapElement decode2(DBusMessageIter &iter);
 template <> IntermediateAnyTuple decode2(DBusMessageIter &iter);
 template <> Any decode2(DBusMessageIter &iter);
 template <> std::string decode2(DBusMessageIter &iter);
 
 template <typename T> void encode2(DBusMessageIter &iter, const T &val);
 template <> void encode2(DBusMessageIter &iter, const IntermediateAnyVec &val);
-template <> void encode2(DBusMessageIter &iter, const IntermediateAnyMap &val);
+template <>
+void encode2(DBusMessageIter &iter, const IntermediateAnyMapElement &val);
 template <>
 void encode2(DBusMessageIter &iter, const IntermediateAnyTuple &val);
 template <> void encode2(DBusMessageIter &iter, const Any &val);
@@ -91,8 +98,8 @@ struct Any {
 };
 
 /**
- * A vector that contain anything and acts as an intermediate representation for
- *data stored inside simppl::dbus::Any.
+ * A vector that can contain anything and acts as an intermediate representation
+ *for data stored inside simppl::dbus::Any.
  **/
 struct IntermediateAnyVec {
   // DBUS_TYPE_...
@@ -101,15 +108,24 @@ struct IntermediateAnyVec {
   std::vector<std::any> vec;
 };
 
-struct IntermediateAnyMap {
+/**
+ * A map element that can contain anything and acts as an intermediate
+ *representation for data stored inside simppl::dbus::Any.
+ **/
+struct IntermediateAnyMapElement {
   // DBUS_TYPE_...
   int keyType{DBUS_TYPE_INVALID};
   // DBUS_TYPE_...
-  int elementType{DBUS_TYPE_INVALID};
-  std::string elementSignature;
-  std::vector<std::tuple<std::any, std::any>> map;
+  int valueType{DBUS_TYPE_INVALID};
+  std::string keyValueSignature;
+  std::any key;
+  std::any value;
 };
 
+/**
+ * A tuple that can contain anything and acts as an intermediate representation
+ *for data stored inside simppl::dbus::Any.
+ **/
 struct IntermediateAnyTuple {
   // DBUS_TYPE_...
   std::vector<int> elementTypes;
@@ -147,24 +163,29 @@ template <> struct Codec<IntermediateAnyVec> {
   }
 
   static inline std::ostream &make_type_signature(std::ostream &os) {
-    assert(false);
+    throw std::logic_error(
+        "Do not use this function. Use IntermediateAnyVec::elementSignature or "
+        "get_signature<T>::value() instead.");
     return os << DBUS_TYPE_ARRAY_AS_STRING;
   }
 };
 
-template <> struct Codec<IntermediateAnyMap> {
-  static void encode(DBusMessageIter &iter, const IntermediateAnyMap &v) {
+template <> struct Codec<IntermediateAnyMapElement> {
+  static void encode(DBusMessageIter &iter,
+                     const IntermediateAnyMapElement &v) {
     encode2(iter, v);
   }
 
-  static void decode(DBusMessageIter &orig, IntermediateAnyMap &v) {
-    v = decode2<IntermediateAnyMap>(orig);
+  static void decode(DBusMessageIter &orig, IntermediateAnyMapElement &v) {
+    v = decode2<IntermediateAnyMapElement>(orig);
     dbus_message_iter_next(&orig);
   }
 
   static inline std::ostream &make_type_signature(std::ostream &os) {
-    assert(false);
-    return os << DBUS_TYPE_ARRAY_AS_STRING;
+    throw std::logic_error("Do not use this function. Use "
+                           "IntermediateAnyMapElement::elementSignature or "
+                           "get_signature<T>::value() instead.");
+    return os << DBUS_TYPE_DICT_ENTRY_AS_STRING;
   }
 };
 
@@ -179,7 +200,9 @@ template <> struct Codec<IntermediateAnyTuple> {
   }
 
   static inline std::ostream &make_type_signature(std::ostream &os) {
-    assert(false);
+    throw std::logic_error(
+        "Do not use this function. Use IntermediateAnyTuple::elementsSignature "
+        "or get_signature<T>::value() instead.");
     return os << DBUS_TYPE_STRUCT_AS_STRING;
   }
 };
@@ -231,14 +254,15 @@ check_tuple_rec(const std::vector<std::any> &elements) {
 
 // Recursive case
 template <size_t I = 0, typename... Types>
-inline std::enable_if_t<I < sizeof...(Types), bool>
-check_tuple_rec(const std::vector<std::any> &elements) {
+    inline std::enable_if_t <
+    I<sizeof...(Types), bool>
+    check_tuple_rec(const std::vector<std::any> &elements) {
   if (I >= elements.size()) {
     return false;
   }
 
   using T = std::tuple_element_t<I, std::tuple<Types...>>;
-  if(!is_type<T>::check(elements[I])) {
+  if (!is_type<T>::check(elements[I])) {
     return false;
   }
   return check_tuple_rec<I + 1, Types...>(elements);
@@ -255,6 +279,36 @@ template <typename... Types> struct is_type<std::tuple<Types...>> {
   }
 };
 
+template <typename Key, typename T, typename Compare, typename Allocator>
+struct is_type<std::map<Key, T, Compare, Allocator>> {
+  static bool check(const std::any &any) {
+    if (any.type() != typeid(IntermediateAnyVec)) {
+      return false;
+    }
+
+    const IntermediateAnyVec &mapVec = std::any_cast<IntermediateAnyVec>(any);
+    if (mapVec.elementType != DBUS_TYPE_DICT_ENTRY) {
+      return false;
+    }
+
+    for (const std::any &elem : mapVec.vec) {
+      if (elem.type() != typeid(IntermediateAnyMapElement)) {
+        return false;
+      }
+
+      const IntermediateAnyMapElement &mapElem =
+          std::any_cast<IntermediateAnyMapElement>(elem);
+      if (!is_type<Key>::check(mapElem.key)) {
+        return false;
+      }
+      if (!is_type<T>::check(mapElem.value)) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
 template <typename T> bool Any::is() const { return is_type<T>::check(value_); }
 
 // --------------------------------------TYPE-CONVERT--------------------------------------
@@ -263,7 +317,7 @@ template <typename T> struct as_type {
   static T convert(const std::any &any) {
     assert(any.type() != typeid(IntermediateAnyVec));
     assert(any.type() != typeid(IntermediateAnyTuple));
-    assert(any.type() != typeid(IntermediateAnyMap));
+    assert(any.type() != typeid(IntermediateAnyMapElement));
 
     if (any.type() == typeid(Any)) {
       return as_type<T>::convert(std::any_cast<Any>(any).value_);
@@ -322,6 +376,24 @@ template <typename... Types> struct as_type<std::tuple<Types...>> {
   }
 };
 
+template <typename Key, typename T, typename Compare, typename Allocator>
+struct as_type<std::map<Key, T, Compare, Allocator>> {
+  static std::map<Key, T, Compare, Allocator> convert(const std::any &any) {
+    assert(any.type() == typeid(IntermediateAnyVec));
+
+    std::map<Key, T, Compare, Allocator> result;
+    for (const std::any &elem : std::any_cast<IntermediateAnyVec>(any).vec) {
+      assert(elem.type() == typeid(IntermediateAnyMapElement));
+      const IntermediateAnyMapElement &mapElem =
+          std::any_cast<IntermediateAnyMapElement>(elem);
+      const Key key = as_type<Key>::convert(mapElem.key);
+      assert(result.find(key) == result.end());
+      result[std::move(key)] = as_type<T>::convert(mapElem.value);
+    }
+    return result;
+  }
+};
+
 template <typename T> T Any::as() const {
   assert(is<T>()); // Ensure the type matches before we convert.
   return as_type<T>::convert(value_);
@@ -348,6 +420,14 @@ template <> struct get_signature<IntermediateAnyTuple> {
   }
 };
 
+template <> struct get_signature<IntermediateAnyMapElement> {
+  static void value(std::ostream &os,
+                    const IntermediateAnyMapElement &mapElem) {
+    os << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING << mapElem.keyValueSignature
+       << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
+  }
+};
+
 template <> struct get_signature<Any> {
   static void value(std::ostream &os, const Any & /*any*/) {
     os << DBUS_TYPE_VARIANT;
@@ -366,8 +446,12 @@ template <typename T> std::string get_signature_func(const T &t) {
 template <typename T> std::any to_intermediate(const T &t) { return t; }
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec);
+
 template <typename... Types>
 std::any to_intermediate(const std::tuple<Types...> &tuple);
+
+template <typename Key, typename T, typename Compare, typename Allocator>
+std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map);
 
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec) {
@@ -424,6 +508,28 @@ std::any to_intermediate(const std::tuple<Types...> &tuple) {
 
   return IntermediateAnyTuple{std::move(tupleTypes), elementSignature,
                               std::move(tupleVec)};
+}
+
+template <typename Key, typename T, typename Compare, typename Allocator>
+std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map) {
+  std::ostringstream os;
+  os << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING;
+  Codec<Key>::make_type_signature(os);
+  Codec<T>::make_type_signature(os);
+  os << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
+  std::string elementSignature = os.str();
+
+  std::vector<std::any> mapVec;
+  for (const std::pair<const Key, T> &pair : map) {
+    std::any keyAny = to_intermediate(pair.first);
+    std::any valueAny = to_intermediate(pair.second);
+    mapVec.emplace_back(IntermediateAnyMapElement{
+        get_debus_type<Key>(), get_debus_type<T>(), elementSignature,
+        std::move(keyAny), std::move(valueAny)});
+  }
+
+  return IntermediateAnyVec{DBUS_TYPE_DICT_ENTRY, std::move(elementSignature),
+                            std::move(mapVec)};
 }
 
 // -----------------------------------ANY-IMPLEMENTATIONS----------------------------------

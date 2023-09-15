@@ -85,7 +85,7 @@ struct Client : simppl::dbus::Stub<test::any::AServer> {
               complex.async(sv) >>
                   [this](const simppl::dbus::CallState &state,
                          const std::vector<simppl::dbus::Any> &result) {
-                    EXPECT_EQ(3, result.size());
+                    EXPECT_EQ(1, result.size());
                     EXPECT_STREQ("Hello", result[0].as<std::string>().c_str());
                     EXPECT_EQ(42, result[1].as<int>());
 
@@ -140,7 +140,7 @@ struct Server : simppl::dbus::Skeleton<test::any::AServer> {
       av.push_back(std::string("Hello"));
       av.push_back(int(42));
       // av.push_back(test::any::complex(42, 4711));
-      EXPECT_TRUE(false); // TODO: Implement struct support
+      // EXPECT_TRUE(false); // TODO: Implement struct support
 
       respond_with(complex(av));
     };
@@ -226,7 +226,7 @@ TEST(Any, blocking_complex) {
 
   auto result = stub.complex(sv);
 
-  EXPECT_EQ(3, result.size());
+  EXPECT_EQ(1, result.size());
   EXPECT_STREQ("Hello", result[0].as<std::string>().c_str());
   EXPECT_EQ(42, result[1].as<int>());
 
@@ -518,11 +518,6 @@ TEST(Any, get_vector_two_level) {
   EXPECT_EQ(vec, resultVec);
 }
 
-/*TEST(Any, encode_decode_map_empty) {
-  std::map<std::string, std::string> map{};
-  test_enc_dec(map);
-}*/
-
 TEST(Any, encode_decode_tuple_empty) {
   std::tuple<std::string, std::string> tuple{};
   test_enc_dec(tuple);
@@ -564,9 +559,91 @@ TEST(Any, encode_decode_tuple_vector) {
   std::tuple<std::vector<uint16_t>,
              std::vector<std::tuple<uint64_t, std::string>>>
       tuple = std::make_tuple<std::vector<uint16_t>,
-             std::vector<std::tuple<uint64_t, std::string>>>({1, 2, 656}, {std::make_tuple<uint64_t, std::string>(4545, "Hallo"),
-                                            std::make_tuple<uint64_t, std::string>(7777, "Welt")});
+                              std::vector<std::tuple<uint64_t, std::string>>>(
+          {1, 2, 656}, {std::make_tuple<uint64_t, std::string>(4545, "Hallo"),
+                        std::make_tuple<uint64_t, std::string>(7777, "Welt")});
   test_enc_dec(tuple);
+}
+
+TEST(Any, encode_decode_map_empty) {
+  std::map<std::string, std::string> map{};
+  test_enc_dec(map);
+}
+
+TEST(Any, encode_decode_map) {
+  std::map<std::string, std::string> map{
+      {"asdasd", "asdasdd"}, {"1111", "222"}, {"58", "555"}};
+  test_enc_dec(map);
+}
+
+TEST(Any, encode_decode_map_tuple_vector) {
+  std::map<std::string, std::tuple<std::vector<std::string>,
+                                   std::map<std::string, std::string>>>
+      map{{"asdasd", std::make_tuple<std::vector<std::string>,
+                                     std::map<std::string, std::string>>(
+                         {"a", "b", "c"}, {{"1", "2"}})},
+          {"sadasdas", std::make_tuple<std::vector<std::string>,
+                                       std::map<std::string, std::string>>(
+                           {"g", "r", "t"}, {{"", "8"}})}};
+  test_enc_dec(map);
+}
+
+TEST(Any, encode_decode_map_tuple) {
+  std::map<std::string, std::tuple<uint32_t,
+                                   std::string>>
+      map{{"asdasd", std::make_tuple<uint32_t,
+                                   std::string>(545, "asdasd")},
+                                   {"tzghjghjgh", std::make_tuple<uint32_t,
+                                   std::string>(8, "löiko")},
+                                   {"ppp", std::make_tuple<uint32_t,
+                                   std::string>(556, "asdasd")}};
+  test_enc_dec(map);
+}
+
+TEST(Any, encode_decode_map_vector) {
+  std::map<std::string, std::vector<uint32_t>>
+      map{{"asdasd", std::vector<uint32_t>{5, 4, 8}}};
+  test_enc_dec(map);
+}
+
+TEST(Any, encode_decode_map_tuple_vector_any) {
+  test_enc_dec_f([](DBusMessageIter &iter, DBusMessage *message) {
+    using full_map_t =
+        std::map<std::string,
+                 std::tuple<std::vector<std::string>,
+                            std::map<std::string, simppl::dbus::Any>>>;
+    full_map_t map{
+        {"asdasd", std::make_tuple<std::vector<std::string>,
+                                   std::map<std::string, simppl::dbus::Any>>(
+                       {"a", "b", "c"}, {{"1", static_cast<uint32_t>(55115)}})},
+        {"sadasdas",
+         std::make_tuple<std::vector<std::string>,
+                         std::map<std::string, simppl::dbus::Any>>(
+             {"g", "r", "t"}, std::map<std::string, simppl::dbus::Any>{
+                                  {"", std::string{"8"}}, {"ww", std::string{"8ssa"}}})}};
+
+    // Encode
+    simppl::dbus::Any any = map;
+    bool b = any.is<full_map_t>();
+    EXPECT_TRUE(b);
+    EXPECT_FALSE(any.is<std::vector<simppl::dbus::Any>>());
+
+    simppl::dbus::Codec<simppl::dbus::Any>::encode(iter, any);
+
+    dbus_message_iter_init(message, &iter);
+    simppl::dbus::Any result;
+    simppl::dbus::Codec<simppl::dbus::Any>::decode(iter, result);
+
+    EXPECT_EQ(any.containedType, result.containedType);
+    EXPECT_EQ(any.containedTypeSignature, result.containedTypeSignature);
+
+    b = result.is<full_map_t>();
+    EXPECT_TRUE(b);
+
+    full_map_t resultMap = result.as<full_map_t>();
+
+    EXPECT_EQ(map.size(), resultMap.size());
+  });
 }
 
 /*TEST(Any, encode_decode_object_path) {

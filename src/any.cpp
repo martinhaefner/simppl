@@ -4,6 +4,7 @@
 #include "simppl/string.h"
 #include "simppl/type_mapper.h"
 #include "simppl/vector.h"
+#include "simppl/map.h"
 #include <any>
 #include <cassert>
 #include <cstdint>
@@ -50,6 +51,8 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
     return decode2<IntermediateAnyVec>(iter);
   case DBUS_TYPE_STRUCT:
     return decode2<IntermediateAnyTuple>(iter);
+  case DBUS_TYPE_DICT_ENTRY:
+    return decode2<IntermediateAnyMapElement>(iter);
   default:
     assert(false);
   }
@@ -98,6 +101,26 @@ template <> IntermediateAnyTuple decode2(DBusMessageIter &iter) {
 
   return IntermediateAnyTuple{std::move(tupleTypes),
                               std::move(elementSignature), std::move(tupleVec)};
+}
+
+template <> IntermediateAnyMapElement decode2(DBusMessageIter &iter) {
+  DBusMessageIter mapElemIter;
+  dbus_message_iter_recurse(&iter, &mapElemIter);
+
+  std::string keySignature = dbus_message_iter_get_signature(&mapElemIter);
+  int keyType = dbus_message_iter_get_arg_type(&mapElemIter);
+  std::any key = decodeAsAny(mapElemIter, keyType);
+
+  std::string valueSignature = dbus_message_iter_get_signature(&mapElemIter);
+  int valueType = dbus_message_iter_get_arg_type(&mapElemIter);
+  std::any value = decodeAsAny(mapElemIter, valueType);
+
+  // Advance to next element
+  dbus_message_iter_next(&iter);
+
+  return IntermediateAnyMapElement{keyType, valueType,
+                                   keySignature + valueSignature,
+                                   std::move(key), std::move(value)};
 }
 
 template <> Any decode2(DBusMessageIter &iter) {
@@ -177,13 +200,23 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
     if (any.type() == typeid(IntermediateAnyTuple)) {
       encode2(iter, std::any_cast<IntermediateAnyTuple>(any));
     } else {
-      assert(false); // Should not happen since we convert all tuples (structs) that get
-                     // passed to Any to an intermediate representation.
+      assert(
+          false); // Should not happen since we convert all tuples (structs)
+                  // that get passed to Any to an intermediate representation.
+    }
+    break;
+  case DBUS_TYPE_DICT_ENTRY:
+    if (any.type() == typeid(IntermediateAnyMapElement)) {
+      encode2(iter, std::any_cast<IntermediateAnyMapElement>(any));
+    } else {
+      assert(false); // Should not happen since we convert all map pairs that
+                     // get passed to Any to an intermediate representation.
     }
     break;
   default:
     assert(false); // In case we fail here, we forgot an implementation for a
                    // dbus type. This is a bug then.
+    break;
   }
 }
 
@@ -206,14 +239,25 @@ template <> void encode2(DBusMessageIter &iter, const IntermediateAnyVec &val) {
   dbus_message_iter_close_container(&iter, &arrayIter);
 }
 
-template <> void encode2(DBusMessageIter &iter, const IntermediateAnyTuple &val) {
+template <>
+void encode2(DBusMessageIter &iter, const IntermediateAnyTuple &val) {
   DBusMessageIter structIter;
-  dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT,
-                                   nullptr, &structIter);
+  dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr,
+                                   &structIter);
   for (size_t i = 0; i < val.elements.size(); i++) {
     encodeAny(structIter, val.elements[i], val.elementTypes[i]);
   }
   dbus_message_iter_close_container(&iter, &structIter);
+}
+
+template <>
+void encode2(DBusMessageIter &iter, const IntermediateAnyMapElement &val) {
+  DBusMessageIter mapElemIter;
+  dbus_message_iter_open_container(&iter, DBUS_TYPE_DICT_ENTRY, nullptr,
+                                   &mapElemIter);
+  encodeAny(mapElemIter, val.key, val.keyType);
+  encodeAny(mapElemIter, val.value, val.valueType);
+  dbus_message_iter_close_container(&iter, &mapElemIter);
 }
 
 template <> void encode2(DBusMessageIter &iter, const Any &val) {
@@ -249,8 +293,8 @@ template <> int get_debus_type<Any>() { return DBUS_TYPE_VARIANT; }
 } // namespace simppl
 
 /**
- * 
+ *
   std::tuple<std::vector<uint16_t>,
              std::vector<std::tuple<uint64_t, std::string>>>
- * 
+ *
  */
