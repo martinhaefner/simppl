@@ -593,7 +593,7 @@ std::any to_intermediate(const std::tuple<Types...> &tuple) {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), Any>
-to_intermediate_variant_rec(const std::variant<Types...> &variant) {
+to_intermediate_variant_rec(const std::variant<Types...> &/*variant*/) {
   throw std::invalid_argument(
       "std::variant does not contain the required type. This is an exception "
       "that should not happen since the std::variant obviously contains it. If "
