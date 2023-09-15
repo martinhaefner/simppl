@@ -1,4 +1,5 @@
 #include "simppl/any.h"
+#include "simppl/objectpath.h"
 #include "simppl/pod.h"
 #include "simppl/serialization.h"
 #include "simppl/string.h"
@@ -45,6 +46,8 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
     return decodeAsAny<double>(iter);
   case DBUS_TYPE_STRING:
     return decodeAsAny<std::string>(iter);
+  case DBUS_TYPE_OBJECT_PATH:
+    return decodeAsAny<simppl::dbus::ObjectPath>(iter);
   case DBUS_TYPE_VARIANT:
     return decode2<Any>(iter);
   case DBUS_TYPE_ARRAY:
@@ -184,6 +187,9 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
     break;
   case DBUS_TYPE_STRING:
     encodeAny<std::string>(iter, any);
+    break;
+  case DBUS_TYPE_OBJECT_PATH:
+    encodeAny<simppl::dbus::ObjectPath>(iter, any);
     break;
   case DBUS_TYPE_VARIANT:
     encode2(iter, std::any_cast<Any>(any));

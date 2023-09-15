@@ -646,7 +646,7 @@ TEST(Any, encode_decode_map_tuple_vector_any) {
   });
 }
 
-/*TEST(Any, encode_decode_object_path) {
-  simppl::dbus::ObjectPath objPath("some_path");
+TEST(Any, encode_decode_object_path) {
+  simppl::dbus::ObjectPath objPath("/org/example/TargetObject");
   test_enc_dec(objPath);
-}*/
+}
