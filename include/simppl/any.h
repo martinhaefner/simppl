@@ -309,8 +309,9 @@ template <typename... Types> struct is_type<std::variant<Types...>> {
 
     // Unwrap any in any in any in ...
     std::any anyInner = std::any_cast<Any>(any).value_;
-    if(anyInner.type() == typeid(Any)) {
-      return is_type<std::variant<Types...>>::check(std::any_cast<Any>(any).value_);
+    if (anyInner.type() == typeid(Any)) {
+      return is_type<std::variant<Types...>>::check(
+          std::any_cast<Any>(any).value_);
     }
 
     return check_variant_rec<0, Types...>(anyInner);
@@ -417,18 +418,18 @@ template <typename... Types> struct as_type<std::tuple<Types...>> {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), void>
-convert_variant_rec(const Any &any,
-                  std::variant<Types...>& result) {
-  throw std::invalid_argument("std::variant does not contain the required type '" + any.containedTypeSignature + "'.");
+convert_variant_rec(const Any &any, std::variant<Types...> & /*result*/) {
+  throw std::invalid_argument(
+      "std::variant does not contain the required type '" +
+      any.containedTypeSignature + "'.");
 }
 
 // Recursive case
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I < sizeof...(Types)), void>
-convert_variant_rec(const Any &any,
-                  std::variant<Types...>& result) {
+convert_variant_rec(const Any &any, std::variant<Types...> &result) {
   using T = std::tuple_element_t<I, std::tuple<Types...>>;
-  if(is_type<T>::check(any.value_)) {
+  if (is_type<T>::check(any.value_)) {
     result = as_type<T>::convert(any.value_);
     return;
   }
@@ -441,13 +442,13 @@ template <typename... Types> struct as_type<std::variant<Types...>> {
 
     // Unwrap any in any in any in ...
     std::any anyInner = std::any_cast<Any>(any).value_;
-    if(anyInner.type() == typeid(Any)) {
-      return is_type<std::variant<Types...>>::check(std::any_cast<Any>(any).value_);
+    if (anyInner.type() == typeid(Any)) {
+      return is_type<std::variant<Types...>>::check(
+          std::any_cast<Any>(any).value_);
     }
 
     std::variant<Types...> result;
-    convert_variant_rec<0, Types...>(
-        std::any_cast<Any>(any), result);
+    convert_variant_rec<0, Types...>(std::any_cast<Any>(any), result);
     return result;
   }
 };
@@ -593,7 +594,10 @@ std::any to_intermediate(const std::tuple<Types...> &tuple) {
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), Any>
 to_intermediate_variant_rec(const std::variant<Types...> &variant) {
-  throw std::invalid_argument("std::variant does not contain the required type. This is an exception that should not happen since the std::variant obviously contains it. If you see it, please make a bug report.");
+  throw std::invalid_argument(
+      "std::variant does not contain the required type. This is an exception "
+      "that should not happen since the std::variant obviously contains it. If "
+      "you see it, please make a bug report.");
   return Any();
 }
 
@@ -603,14 +607,15 @@ inline std::enable_if_t<(I < sizeof...(Types)), Any>
 to_intermediate_variant_rec(const std::variant<Types...> &variant) {
   using T = std::tuple_element_t<I, std::tuple<Types...>>;
 
-  if(std::holds_alternative<T>(variant)) {
-    const T& t = std::get<T>(variant);
+  if (std::holds_alternative<T>(variant)) {
+    const T &t = std::get<T>(variant);
 
     std::ostringstream os;
     Codec<T>::make_type_signature(os);
     std::string elementSignature = os.str();
 
-    return Any{get_debus_type<T>(), std::move(elementSignature), to_intermediate(t)};
+    return Any{get_debus_type<T>(), std::move(elementSignature),
+               to_intermediate(t)};
   }
   return to_intermediate_variant_rec<I + 1, Types...>(variant);
 }
