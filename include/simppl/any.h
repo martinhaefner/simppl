@@ -25,6 +25,7 @@
 #include "simppl/serialization.h"
 #include "simppl/tuple.h"
 #include "simppl/type_mapper.h"
+#include "simppl/variant.h"
 #include "simppl/vector.h"
 
 namespace simppl {
@@ -209,6 +210,14 @@ template <> struct Codec<IntermediateAnyTuple> {
 
 // ---------------------------------------TYPE-CHECK---------------------------------------
 
+template <typename T> struct is_type;
+template <> struct is_type<Any>;
+template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>>;
+template <typename... Types> struct is_type<std::tuple<Types...>>;
+template <typename... Types> struct is_type<std::variant<Types...>>;
+template <typename Key, typename T, typename Compare, typename Allocator>
+struct is_type<std::map<Key, T, Compare, Allocator>>;
+
 template <typename T> struct is_type {
   static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
@@ -222,12 +231,7 @@ template <typename T> struct is_type {
 };
 
 template <> struct is_type<Any> {
-  static bool check(const std::any &any) {
-    if (any.type() == typeid(Any)) {
-      return true;
-    }
-    return false;
-  }
+  static bool check(const std::any &any) { return any.type() == typeid(Any); }
 };
 
 template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
@@ -276,6 +280,40 @@ template <typename... Types> struct is_type<std::tuple<Types...>> {
 
     return check_tuple_rec<0, Types...>(
         std::any_cast<IntermediateAnyTuple>(any).elements);
+  }
+};
+
+// Base case: Last type
+template <size_t I = 0, typename... Types>
+inline std::enable_if_t<I >= sizeof...(Types), bool>
+check_variant_rec(const std::any & /*any*/) {
+  return false;
+}
+
+// Recursive case
+template <size_t I = 0, typename... Types>
+    inline std::enable_if_t <
+    I<sizeof...(Types), bool> check_variant_rec(const std::any &any) {
+  using T = std::tuple_element_t<I, std::tuple<Types...>>;
+  if (is_type<T>::check(any)) {
+    return true;
+  }
+  return check_variant_rec<I + 1, Types...>(any);
+}
+
+template <typename... Types> struct is_type<std::variant<Types...>> {
+  static bool check(const std::any &any) {
+    if (any.type() != typeid(Any)) {
+      return false;
+    }
+
+    // Unwrap any in any in any in ...
+    std::any anyInner = std::any_cast<Any>(any).value_;
+    if(anyInner.type() == typeid(Any)) {
+      return is_type<std::variant<Types...>>::check(std::any_cast<Any>(any).value_);
+    }
+
+    return check_variant_rec<0, Types...>(anyInner);
   }
 };
 
@@ -376,6 +414,44 @@ template <typename... Types> struct as_type<std::tuple<Types...>> {
   }
 };
 
+// Base case: Last type
+template <size_t I = 0, typename... Types>
+inline std::enable_if_t<(I >= sizeof...(Types)), void>
+convert_variant_rec(const Any &any,
+                  std::variant<Types...>& result) {
+  throw std::invalid_argument("std::variant does not contain the required type '" + any.containedTypeSignature + "'.");
+}
+
+// Recursive case
+template <size_t I = 0, typename... Types>
+inline std::enable_if_t<(I < sizeof...(Types)), void>
+convert_variant_rec(const Any &any,
+                  std::variant<Types...>& result) {
+  using T = std::tuple_element_t<I, std::tuple<Types...>>;
+  if(is_type<T>::check(any.value_)) {
+    result = as_type<T>::convert(any.value_);
+    return;
+  }
+  convert_variant_rec<I + 1, Types...>(any, result);
+}
+
+template <typename... Types> struct as_type<std::variant<Types...>> {
+  static std::variant<Types...> convert(const std::any &any) {
+    assert(any.type() == typeid(Any));
+
+    // Unwrap any in any in any in ...
+    std::any anyInner = std::any_cast<Any>(any).value_;
+    if(anyInner.type() == typeid(Any)) {
+      return is_type<std::variant<Types...>>::check(std::any_cast<Any>(any).value_);
+    }
+
+    std::variant<Types...> result;
+    convert_variant_rec<0, Types...>(
+        std::any_cast<Any>(any), result);
+    return result;
+  }
+};
+
 template <typename Key, typename T, typename Compare, typename Allocator>
 struct as_type<std::map<Key, T, Compare, Allocator>> {
   static std::map<Key, T, Compare, Allocator> convert(const std::any &any) {
@@ -450,6 +526,9 @@ std::any to_intermediate(const std::vector<T, Alloc> &vec);
 template <typename... Types>
 std::any to_intermediate(const std::tuple<Types...> &tuple);
 
+template <typename... Types>
+std::any to_intermediate(const std::variant<Types...> &variant);
+
 template <typename Key, typename T, typename Compare, typename Allocator>
 std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map);
 
@@ -508,6 +587,37 @@ std::any to_intermediate(const std::tuple<Types...> &tuple) {
 
   return IntermediateAnyTuple{std::move(tupleTypes), elementSignature,
                               std::move(tupleVec)};
+}
+
+// Base case: Last type
+template <size_t I = 0, typename... Types>
+inline std::enable_if_t<(I >= sizeof...(Types)), Any>
+to_intermediate_variant_rec(const std::variant<Types...> &variant) {
+  throw std::invalid_argument("std::variant does not contain the required type. This is an exception that should not happen since the std::variant obviously contains it. If you see it, please make a bug report.");
+  return Any();
+}
+
+// Recursive case
+template <size_t I = 0, typename... Types>
+inline std::enable_if_t<(I < sizeof...(Types)), Any>
+to_intermediate_variant_rec(const std::variant<Types...> &variant) {
+  using T = std::tuple_element_t<I, std::tuple<Types...>>;
+
+  if(std::holds_alternative<T>(variant)) {
+    const T& t = std::get<T>(variant);
+
+    std::ostringstream os;
+    Codec<T>::make_type_signature(os);
+    std::string elementSignature = os.str();
+
+    return Any{get_debus_type<T>(), std::move(elementSignature), to_intermediate(t)};
+  }
+  return to_intermediate_variant_rec<I + 1, Types...>(variant);
+}
+
+template <typename... Types>
+std::any to_intermediate(const std::variant<Types...> &variant) {
+  return to_intermediate_variant_rec<0, Types...>(variant);
 }
 
 template <typename Key, typename T, typename Compare, typename Allocator>

@@ -9,6 +9,7 @@
 #include <thread>
 #include <tuple>
 #include <vector>
+#include <variant>
 
 #include "simppl/interface.h"
 #include "simppl/objectpath.h"
@@ -340,6 +341,7 @@ template <typename T> void test_enc_dec(const T &t) {
     // Encode
     simppl::dbus::Any any = t;
     EXPECT_TRUE(any.is<T>());
+    EXPECT_EQ(any.as<T>(), t);
     simppl::dbus::Codec<simppl::dbus::Any>::encode(iter, any);
 
     dbus_message_iter_init(message, &iter);
@@ -349,7 +351,6 @@ template <typename T> void test_enc_dec(const T &t) {
 
     EXPECT_EQ(any.containedType, result.containedType);
     EXPECT_EQ(any.containedTypeSignature, result.containedTypeSignature);
-    EXPECT_TRUE(result.is<T>());
     EXPECT_EQ(any.as<T>(), result.as<T>());
   });
 }
@@ -649,4 +650,9 @@ TEST(Any, encode_decode_map_tuple_vector_any) {
 TEST(Any, encode_decode_object_path) {
   simppl::dbus::ObjectPath objPath("/org/example/TargetObject");
   test_enc_dec(objPath);
+}
+
+TEST(Any, encode_decode_variant) {
+  std::variant<std::string, uint32_t> var{"hallo"};
+  test_enc_dec(var);
 }

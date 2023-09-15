@@ -12,6 +12,7 @@
 #include <string>
 #include <map>
 #include <tuple>
+#include <variant>
 
 namespace simppl
 {
@@ -42,6 +43,8 @@ template<typename Key, typename T, typename Compare, typename Alloc>
 struct typecode_switch<std::map<Key, T, Compare, Alloc>> { enum { value = DBUS_TYPE_ARRAY       }; };
 template<typename... Types>
 struct typecode_switch<std::tuple<Types...>>             { enum { value = DBUS_TYPE_STRUCT      }; };
+template<typename... Types>
+struct typecode_switch<std::variant<Types...>>           { enum { value = DBUS_TYPE_VARIANT     }; };
 
 
 template<typename T, bool>

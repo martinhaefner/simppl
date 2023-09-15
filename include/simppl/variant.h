@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <cstring>
 #include <cassert>
+#include <memory>
 
 
 namespace simppl
