@@ -8,8 +8,8 @@
 #include <string>
 #include <thread>
 #include <tuple>
-#include <vector>
 #include <variant>
+#include <vector>
 
 #include "simppl/interface.h"
 #include "simppl/objectpath.h"
@@ -386,6 +386,11 @@ TEST(Any, encode_decode_int64) { test_enc_dec_number<int64_t>(); }
 
 TEST(Any, encode_decode_double) { test_enc_dec_number<double>(); }
 
+TEST(Any, encode_decode_bool) {
+  test_enc_dec(true);
+  test_enc_dec(false);
+}
+
 TEST(Any, encode_decode_string) {
   test_enc_dec(std::string{"https://http.cat/status/510"});
 }
@@ -590,20 +595,16 @@ TEST(Any, encode_decode_map_tuple_vector) {
 }
 
 TEST(Any, encode_decode_map_tuple) {
-  std::map<std::string, std::tuple<uint32_t,
-                                   std::string>>
-      map{{"asdasd", std::make_tuple<uint32_t,
-                                   std::string>(545, "asdasd")},
-                                   {"tzghjghjgh", std::make_tuple<uint32_t,
-                                   std::string>(8, "löiko")},
-                                   {"ppp", std::make_tuple<uint32_t,
-                                   std::string>(556, "asdasd")}};
+  std::map<std::string, std::tuple<uint32_t, std::string>> map{
+      {"asdasd", std::make_tuple<uint32_t, std::string>(545, "asdasd")},
+      {"tzghjghjgh", std::make_tuple<uint32_t, std::string>(8, "löiko")},
+      {"ppp", std::make_tuple<uint32_t, std::string>(556, "asdasd")}};
   test_enc_dec(map);
 }
 
 TEST(Any, encode_decode_map_vector) {
-  std::map<std::string, std::vector<uint32_t>>
-      map{{"asdasd", std::vector<uint32_t>{5, 4, 8}}};
+  std::map<std::string, std::vector<uint32_t>> map{
+      {"asdasd", std::vector<uint32_t>{5, 4, 8}}};
   test_enc_dec(map);
 }
 
@@ -620,8 +621,9 @@ TEST(Any, encode_decode_map_tuple_vector_any) {
         {"sadasdas",
          std::make_tuple<std::vector<std::string>,
                          std::map<std::string, simppl::dbus::Any>>(
-             {"g", "r", "t"}, std::map<std::string, simppl::dbus::Any>{
-                                  {"", std::string{"8"}}, {"ww", std::string{"8ssa"}}})}};
+             {"g", "r", "t"},
+             std::map<std::string, simppl::dbus::Any>{
+                 {"", std::string{"8"}}, {"ww", std::string{"8ssa"}}})}};
 
     // Encode
     simppl::dbus::Any any = map;

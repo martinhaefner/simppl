@@ -28,6 +28,8 @@ template <typename T> T decodeAsAny(DBusMessageIter &iter) {
 
 std::any decodeAsAny(DBusMessageIter &iter, int type) {
   switch (type) {
+  case DBUS_TYPE_BOOLEAN:
+    return decodeAsAny<bool>(iter);
   case DBUS_TYPE_BYTE:
     return decodeAsAny<uint8_t>(iter);
   case DBUS_TYPE_UINT16:
@@ -161,6 +163,9 @@ void encodeAny(DBusMessageIter &iter, const std::any &any) {
 
 void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
   switch (anyType) {
+  case DBUS_TYPE_BOOLEAN:
+    encodeAny<bool>(iter, any);
+    break;
   case DBUS_TYPE_BYTE:
     encodeAny<uint8_t>(iter, any);
     break;
