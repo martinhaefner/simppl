@@ -59,8 +59,7 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
   case DBUS_TYPE_DICT_ENTRY:
     return decode2<IntermediateAnyMapElement>(iter);
   default:
-    assert(false);
-    break;
+    throw std::invalid_argument("simppl::dbus::Any contained type unknown!");
   }
 }
 
