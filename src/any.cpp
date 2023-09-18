@@ -60,6 +60,7 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
     return decode2<IntermediateAnyMapElement>(iter);
   default:
     assert(false);
+    break;
   }
 }
 
