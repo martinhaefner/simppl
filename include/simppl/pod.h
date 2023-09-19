@@ -8,11 +8,6 @@
 #endif
 
 #include <cstdint>
-#include <vector>
-#include <string>
-#include <map>
-#include <tuple>
-#include <variant>
 
 namespace simppl
 {
@@ -35,17 +30,7 @@ template<> struct typecode_switch<int16_t>               { enum { value = DBUS_T
 template<> struct typecode_switch<int32_t>               { enum { value = DBUS_TYPE_INT32       }; };
 template<> struct typecode_switch<int64_t>               { enum { value = DBUS_TYPE_INT64       }; };
 template<> struct typecode_switch<double>                { enum { value = DBUS_TYPE_DOUBLE      }; };
-template<> struct typecode_switch<std::string>           { enum { value = DBUS_TYPE_STRING      }; };
 template<> struct typecode_switch<bool>                  { enum { value = DBUS_TYPE_BOOLEAN     }; };
-template<typename T, typename Alloc>
-struct typecode_switch<std::vector<T, Alloc>>            { enum { value = DBUS_TYPE_ARRAY       }; };
-template<typename Key, typename T, typename Compare, typename Alloc>
-struct typecode_switch<std::map<Key, T, Compare, Alloc>> { enum { value = DBUS_TYPE_ARRAY       }; };
-template<typename... Types>
-struct typecode_switch<std::tuple<Types...>>             { enum { value = DBUS_TYPE_STRUCT      }; };
-template<typename... Types>
-struct typecode_switch<std::variant<Types...>>           { enum { value = DBUS_TYPE_VARIANT     }; };
-
 
 template<typename T, bool>
 struct EnumTypeCodeHelper

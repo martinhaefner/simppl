@@ -1,6 +1,10 @@
 #pragma once
 
 #include "simppl/serialization.h"
+#include "vector.h"
+#include "map.h"
+#include "tuple.h"
+#include "string.h"
 
 namespace simppl {
 namespace dbus {

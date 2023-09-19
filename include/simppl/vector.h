@@ -64,6 +64,9 @@ struct Codec<std::vector<T, Alloc>>
    }
 
 }; 
+
+template<typename T, typename Alloc>
+struct detail::typecode_switch<std::vector<T, Alloc>> { enum { value = DBUS_TYPE_ARRAY }; };
 }   // namespace dbus
 
 }   // namespace simppl

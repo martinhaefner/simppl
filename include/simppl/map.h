@@ -62,9 +62,9 @@ struct Codec<std::map<KeyT, ValueT>>
    }
 };
 
-   
+template<typename Key, typename T, typename Compare, typename Alloc>
+struct detail::typecode_switch<std::map<Key, T, Compare, Alloc>> { enum { value = DBUS_TYPE_ARRAY }; };   
 }   // namespace dbus
-
 }   // namespace simppl
 
 

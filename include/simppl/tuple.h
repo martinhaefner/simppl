@@ -154,9 +154,9 @@ void detail::TupleSerializer::operator()(const T& t)   // seems to be already a 
    encode(iter_, t);
 }
 
-   
+template<typename... Types>
+struct detail::typecode_switch<std::tuple<Types...>> { enum { value = DBUS_TYPE_STRUCT }; };
 }   // namespace dbus
-
 }   // namespace simppl
 
 
