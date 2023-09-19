@@ -297,15 +297,22 @@ Any::Any(const Any &other) {
   value_ = other.value_;
 }
 
+Any &Any::operator=(Any &&old) {
+    containedType = old.containedType;
+    containedTypeSignature = std::move(old.containedTypeSignature);
+    value_ = std::move(old.value_);
+    return *this;
+  }
+
+  Any &Any::operator=(const Any &other) {
+    containedType = other.containedType;
+    containedTypeSignature = other.containedTypeSignature;
+    value_ = other.value_;
+    return *this;
+  }
+
 // -----------------------------------MISC-IMPLEMENTATIONS---------------------------------
 
 template <> int get_debus_type<Any>() { return DBUS_TYPE_VARIANT; }
 } // namespace dbus
 } // namespace simppl
-
-/**
- *
-  std::tuple<std::vector<uint16_t>,
-             std::vector<std::tuple<uint64_t, std::string>>>
- *
- */

@@ -78,21 +78,11 @@ struct Any {
   template <typename T> Any &operator=(T &&val);
   template <typename T> Any &operator=(const T &val);
 
-  Any &operator=(Any &&old) {
-    containedType = old.containedType;
-    containedTypeSignature = std::move(old.containedTypeSignature);
-    value_ = std::move(old.value_);
-    return *this;
-  }
-
-  Any &operator=(const Any &other) {
-    containedType = other.containedType;
-    containedTypeSignature = other.containedTypeSignature;
-    value_ = other.value_;
-    return *this;
-  }
+  Any &operator=(Any &&old);
+  Any &operator=(const Any &other);
 
   bool operator==(const Any &other) const = delete;
+  bool operator!=(const Any &other) const = delete;
 
   template <typename T> T as() const;
   template <typename T> bool is() const;
@@ -515,7 +505,7 @@ template <typename T> std::string get_signature_func(const T &t) {
   std::ostringstream os;
   get_signature<typename std::remove_cv<
       typename std::remove_reference<T>::type>::type>::value(os, t);
-  return os.str();
+  return std::move(os).str();
 }
 
 // --------------------------------INTERMEDIATE-CONVERSION---------------------------------
