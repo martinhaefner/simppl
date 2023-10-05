@@ -199,7 +199,7 @@ struct Dispatcher::Private
         //else
           // std::cout << "Not enabled" << std::endl;
 
-        watch_handlers_.insert(std::make_pair(fd.fd, w));
+        watch_handlers_.emplace(fd.fd, w);
 
         return TRUE;
     }
@@ -697,7 +697,7 @@ void Dispatcher::add_client(StubBase& clnt)
 {
    clnt.disp_ = this;
 
-   d->stubs_.insert(std::make_pair(clnt.objectpath(), &clnt));
+   d->stubs_.emplace(clnt.objectpath(), &clnt);
 
    // send connected request from event loop
    auto iter = d->busnames_.find(clnt.busname());
