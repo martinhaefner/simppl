@@ -376,7 +376,7 @@ struct Dispatcher::Private
     std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
 
-    std::multimap<std::string, StubBase*> stubs_;
+    std::multimap<std::string, StubBase*, std::less<>> stubs_;
     std::map<std::string, int> signal_matches_;
 
     /// service registration's list
