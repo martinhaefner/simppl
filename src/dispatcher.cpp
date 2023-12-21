@@ -185,7 +185,7 @@ struct Dispatcher::Private
     dbus_bool_t add_watch(DBusWatch* w)
     {
        //std::cout << "add_watch" << std::endl;
-        pollfd fd = { 0 };
+        pollfd fd = {};
 
         fd.fd = dbus_watch_get_unix_fd(w);
 
@@ -229,7 +229,7 @@ struct Dispatcher::Private
     }
 
 
-    void toggle_watch(DBusWatch* w)
+    void toggle_watch(DBusWatch* /*w*/)
     {
        assert(false);   // not implemented
         /*   auto iter = std::find_if(fds_.begin(), fds_.end(), [w](auto& pfd){ return dbus_watch_get_unix_fd(w) == pfd.fd; });
@@ -747,7 +747,7 @@ void Dispatcher::dispatch()
 }
 
 
-int Dispatcher::step_ms(int timeout_ms)
+int Dispatcher::step_ms(int /*timeout_ms*/)
 {
 #ifdef SIMPPL_USE_POLL
     d->poll(timeout_ms);
