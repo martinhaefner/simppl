@@ -27,6 +27,7 @@
 #include "simppl/type_mapper.h"
 #include "simppl/variant.h"
 #include "simppl/vector.h"
+#include "simppl/struct.h"
 
 namespace simppl {
 
@@ -90,7 +91,7 @@ struct Any {
 
 /**
  * A vector that can contain anything and acts as an intermediate representation
- *for data stored inside simppl::dbus::Any.
+ * for data stored inside simppl::dbus::Any.
  **/
 struct IntermediateAnyVec {
   // DBUS_TYPE_...
@@ -101,7 +102,7 @@ struct IntermediateAnyVec {
 
 /**
  * A map element that can contain anything and acts as an intermediate
- *representation for data stored inside simppl::dbus::Any.
+ * representation for data stored inside simppl::dbus::Any.
  **/
 struct IntermediateAnyMapElement {
   // DBUS_TYPE_...
@@ -115,7 +116,7 @@ struct IntermediateAnyMapElement {
 
 /**
  * A tuple that can contain anything and acts as an intermediate representation
- *for data stored inside simppl::dbus::Any.
+ * for data stored inside simppl::dbus::Any.
  **/
 struct IntermediateAnyTuple {
   // DBUS_TYPE_...
@@ -510,7 +511,10 @@ template <typename T> std::string get_signature_func(const T &t) {
 
 // --------------------------------INTERMEDIATE-CONVERSION---------------------------------
 
-template <typename T> std::any to_intermediate(const T &t) { return t; }
+// For all types that are no structs and do not have the `serializer_type` declaration.
+template <typename T, typename std::enable_if<!has_serializer_type<T>::value, int>::type = 0>
+std::any to_intermediate(const T &t) { return t; }
+
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec);
 
@@ -522,6 +526,10 @@ std::any to_intermediate(const std::variant<Types...> &variant);
 
 template <typename Key, typename T, typename Compare, typename Allocator>
 std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map);
+
+// For all structs with the `serializer_type` declaration.
+template <typename T, typename std::enable_if<has_serializer_type<T>::value, int>::type = 0>
+std::any to_intermediate(const T &t) { return t; } // TODO continue with the intermediate representation here
 
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec) {

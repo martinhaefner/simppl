@@ -28,6 +28,7 @@ using simppl::dbus::in;
 using simppl::dbus::oneway;
 using simppl::dbus::out;
 
+
 namespace test {
 namespace any {
 struct complex {
@@ -657,4 +658,20 @@ TEST(Any, encode_decode_object_path) {
 TEST(Any, encode_decode_variant) {
   std::variant<std::string, uint32_t> var{"hallo"};
   test_enc_dec(var);
+}
+
+struct TestStruct1 {
+    using serializer_type = typename simppl::dbus::make_serializer<uint8_t, std::string>::type;
+
+    uint8_t u1;
+    std::string s2;
+
+    bool operator==(const TestStruct1& other) const {
+        return u1 == other.u1 && s2 == other.s2;
+    }
+};
+
+TEST(Any, encode_decode_struct) {
+    TestStruct1 s1{42, "Olla"};
+    test_enc_dec(s1);
 }

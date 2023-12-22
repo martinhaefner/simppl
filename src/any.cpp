@@ -211,9 +211,8 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
     if (any.type() == typeid(IntermediateAnyTuple)) {
       encode2(iter, std::any_cast<IntermediateAnyTuple>(any));
     } else {
-      assert(
-          false); // Should not happen since we convert all tuples (structs)
-                  // that get passed to Any to an intermediate representation.
+      assert(false); // Should not happen since we convert all tuples (structs)
+                     // that get passed to Any to an intermediate representation.
     }
     break;
   case DBUS_TYPE_DICT_ENTRY:
