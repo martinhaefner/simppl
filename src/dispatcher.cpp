@@ -747,13 +747,15 @@ void Dispatcher::dispatch()
 }
 
 
-int Dispatcher::step_ms(int /*timeout_ms*/)
-{
 #ifdef SIMPPL_USE_POLL
+int Dispatcher::step_ms(int timeout_ms)
+{
     d->poll(timeout_ms);
 
     dispatch();
 #else
+int Dispatcher::step_ms(int /*timeout_ms*/)
+{
     dbus_connection_read_write_dispatch(conn_, 100);
 #endif
 
