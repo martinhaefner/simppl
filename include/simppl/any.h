@@ -2,13 +2,10 @@
 #define SIMPPL_ANY_H
 
 #include <any>
-#include <bits/utility.h>
 #include <cassert>
-#include <cstdint>
 #include <cstring>
 #include <dbus/dbus-protocol.h>
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <sys/types.h>
@@ -209,6 +206,13 @@ template <typename... Types> struct is_type<std::variant<Types...>>;
 template <typename Key, typename T, typename Compare, typename Allocator>
 struct is_type<std::map<Key, T, Compare, Allocator>>;
 
+template<typename T>
+struct get_underlying_type
+{
+	// enum to int mapping is simppl specific
+	using type = typename std::conditional_t<std::is_enum_v<T>, int, T>;
+};
+
 template <typename T> struct is_type {
   static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
@@ -217,7 +221,7 @@ template <typename T> struct is_type {
     if (any.type() == typeid(IntermediateAnyVec)) {
       return false;
     }
-    return any.type() == typeid(T);
+    return any.type() == typeid(typename get_underlying_type<T>::type);
   }
 };
 
@@ -352,7 +356,7 @@ template <typename T> struct as_type {
     if (any.type() == typeid(Any)) {
       return as_type<T>::convert(std::any_cast<Any>(any).value_);
     }
-    return std::any_cast<T>(any);
+    return static_cast<T>(std::any_cast<typename get_underlying_type<T>::type>(any));
   }
 };
 
@@ -379,7 +383,7 @@ template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), void>
 convert_tuple_rec(const std::vector<std::any> &elements,
-                  std::tuple<Types...> &result) {
+                  std::tuple<Types...> &/*result*/) {
   assert(I == elements.size());
 }
 
