@@ -194,7 +194,7 @@ private:
 
    template<typename T>
    static
-   message_ptr_t __throw(ServerMethodBase* obj, DBusMessage& req, const Error& err)
+   message_ptr_t __throw(ServerMethodBase* /*obj*/, DBusMessage& req, const Error& err)
    {
        return detail::ErrorFactory<T>::reply(req, err);
    }
