@@ -45,7 +45,7 @@ struct PropertyComparator<T, false>
     /// always evaluate to true, i.e. properties will emit even if no
     /// change is given.
     static inline
-    bool compare(typename CallTraits<T>::param_type t1, typename CallTraits<T>::param_type t2)
+    bool compare(typename CallTraits<T>::param_type /*t1*/, typename CallTraits<T>::param_type /*t2*/)
     {
         return true;
     }

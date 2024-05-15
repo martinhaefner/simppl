@@ -247,7 +247,7 @@ template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<I >= sizeof...(Types), bool>
-check_tuple_rec(const std::vector<std::any> &elements) {
+check_tuple_rec(const std::vector<std::any> & /*elements*/) {
   return true;
 }
 
@@ -554,9 +554,9 @@ std::any to_intermediate(const std::vector<T, Alloc> &vec) {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I == sizeof...(Types)), void>
-to_intermediate_tuple_rec(const std::tuple<Types...> &tuple,
+to_intermediate_tuple_rec(const std::tuple<Types...> &/*tuple*/,
                           std::vector<std::any> &tupleVec,
-                          std::vector<int> &tupleTypes, std::ostream &os) {
+                          std::vector<int> &tupleTypes, std::ostream &/*os*/) {
   assert((I == tupleVec.size()) && (I == tupleTypes.size()));
 }
 

@@ -368,7 +368,7 @@ template<>
 struct ForEach<>
 {
    template<typename FuncT>
-   static void eval(int i, FuncT& f)
+   static void eval(int /*i*/, FuncT& /*f*/)
    {
       // NOOP
    }

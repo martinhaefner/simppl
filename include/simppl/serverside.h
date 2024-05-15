@@ -209,7 +209,7 @@ private:
    }
 
    template<typename... T>
-   detail::ServerResponseHolder __impl(std::false_type, const T&... t)
+   detail::ServerResponseHolder __impl(std::false_type /*f*/, const T&... /*t*/)
    {
       return detail::ServerResponseHolder([](DBusMessageIter&){ /*NOOP*/ });
    }

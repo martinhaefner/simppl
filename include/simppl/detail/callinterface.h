@@ -74,7 +74,7 @@ struct FunctionCaller<0, std::tuple<>>
 {
    template<typename FunctorT, typename ErrorT, typename... T>
    static inline
-   void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const std::tuple<>& tuple)
+   void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const std::tuple<>& /*tuple*/)
    {
       f(cs);
    }
