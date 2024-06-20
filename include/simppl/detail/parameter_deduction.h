@@ -16,6 +16,33 @@ namespace simppl
 namespace dbus
 {
 
+struct oneway
+{
+   typedef oneway real_type;
+};
+
+
+// marker
+template<typename T>
+struct in
+{
+   typedef T real_type;
+};
+
+// marker
+template<typename T>
+struct out
+{
+   typedef T real_type;
+};
+
+// marker
+template<typename T>
+struct _throw
+{
+   typedef T real_type;
+};
+
 namespace detail
 {
 
@@ -368,7 +395,7 @@ template<>
 struct ForEach<>
 {
    template<typename FuncT>
-   static void eval(int i, FuncT& f)
+   static void eval(int /*i*/, FuncT& /*f*/)
    {
       // NOOP
    }

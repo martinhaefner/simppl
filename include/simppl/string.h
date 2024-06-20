@@ -39,9 +39,8 @@ struct Codec<std::string> : public StringCodec {};
 template<>
 struct Codec<char*> : public StringCodec {};
 
-   
+template<> struct detail::typecode_switch<std::string> { enum { value = DBUS_TYPE_STRING }; };
 }   // namespace dbus
-
 }   // namespace simppl
 
 

@@ -2,6 +2,7 @@
 #define SIMPPL_DBUS_POD_H
 
 #include <dbus/dbus-protocol.h>
+#include <dbus/dbus.h>
 #ifndef SIMPPL_SERIALIZATION_H
 #   error "Do not include this file manually. Use serialization.h instead."
 #endif
@@ -18,19 +19,18 @@ namespace dbus
 namespace detail
 {
 
-template<typename T>
-struct typecode_switch;
+template<typename T, typename Enable = void> struct typecode_switch;
 
-template<> struct typecode_switch<uint8_t>            { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct typecode_switch<uint16_t>           { enum { value = DBUS_TYPE_UINT16  }; };
-template<> struct typecode_switch<uint32_t>           { enum { value = DBUS_TYPE_UINT32  }; };
-template<> struct typecode_switch<uint64_t>           { enum { value = DBUS_TYPE_UINT64  }; };
-template<> struct typecode_switch<int8_t>             { enum { value = DBUS_TYPE_BYTE    }; };
-template<> struct typecode_switch<int16_t>            { enum { value = DBUS_TYPE_INT16   }; };
-template<> struct typecode_switch<int32_t>            { enum { value = DBUS_TYPE_INT32   }; };
-template<> struct typecode_switch<int64_t>            { enum { value = DBUS_TYPE_INT64   }; };
-template<> struct typecode_switch<double>             { enum { value = DBUS_TYPE_DOUBLE  }; };
-
+template<> struct typecode_switch<uint8_t>               { enum { value = DBUS_TYPE_BYTE        }; };
+template<> struct typecode_switch<uint16_t>              { enum { value = DBUS_TYPE_UINT16      }; };
+template<> struct typecode_switch<uint32_t>              { enum { value = DBUS_TYPE_UINT32      }; };
+template<> struct typecode_switch<uint64_t>              { enum { value = DBUS_TYPE_UINT64      }; };
+template<> struct typecode_switch<int8_t>                { enum { value = DBUS_TYPE_BYTE        }; };
+template<> struct typecode_switch<int16_t>               { enum { value = DBUS_TYPE_INT16       }; };
+template<> struct typecode_switch<int32_t>               { enum { value = DBUS_TYPE_INT32       }; };
+template<> struct typecode_switch<int64_t>               { enum { value = DBUS_TYPE_INT64       }; };
+template<> struct typecode_switch<double>                { enum { value = DBUS_TYPE_DOUBLE      }; };
+template<> struct typecode_switch<bool>                  { enum { value = DBUS_TYPE_BOOLEAN     }; };
 
 template<typename T, bool>
 struct EnumTypeCodeHelper

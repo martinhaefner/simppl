@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <cstring>
 #include <cassert>
+#include <memory>
 
 
 namespace simppl
@@ -150,9 +151,9 @@ void detail::VariantSerializer::operator()(const T& t)   // seems to be already 
     dbus_message_iter_close_container(&iter_, &iter);
 }
 
-
+template<typename... Types>
+struct detail::typecode_switch<std::variant<Types...>> { enum { value = DBUS_TYPE_VARIANT }; };
 }   // namespace dbus
-
 }   // namespace simppl
 
 
