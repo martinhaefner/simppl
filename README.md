@@ -497,3 +497,15 @@ You may now throw the error in a server's method callback:
 This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without
 the need of a complex tool chain for glue-code generation.
+
+
+##Short comings
+
+In the beginning, simppl was designed without DBus as the transport layer.
+Therefore, the connected/disconnected handling currently of the clients only 
+works if the server binary will exit, i.e. the DBus connection hold to the 
+bus daemon will be closed. Otherwise, the bus names will not be released
+and therefore, clients will not get notified if a server object was destroyed.
+A solution would be simple if any server had a unique bus name, but this
+may not be the preferred solution, so releasing a bus name after server
+object destruction would yield strange results.
