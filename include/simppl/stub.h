@@ -68,9 +68,9 @@ public:
 /// for storing a function in the connected function object
 template<typename CallableT>
 inline
-void operator>> (std::function<void(simppl::dbus::ConnectionState)>& func, const CallableT& callable)
+void operator>> (simppl::dbus::StubBase::Connected& conn, const CallableT& callable)
 {
-   func = callable;
+   conn.set_callback(callable);
 }
 
 

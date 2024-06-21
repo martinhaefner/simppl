@@ -672,3 +672,48 @@ TEST(Simple, empty_signal_args)
    // no copy operation took place
    EXPECT_EQ(3, sig_count);
 }
+
+
+TEST(Simple, lazy_connect)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+	std::thread t1([](){
+	  std::this_thread::sleep_for(500ms);
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "s1");
+      d.run();
+   });
+   
+   std::thread t2([](){	  	  
+      simppl::dbus::Dispatcher d("bus:session");
+      Server s(d, "s2");
+      d.run();
+   });        
+   
+   simppl::dbus::Stub<Simple> stub(d, "s1");
+   
+   // Lazy stub which will be connected once the first stub if connected.
+   // This was a bug in older implementations since the connected state 
+   // was not checked when the handler was registered, so it was necessary
+   // to register the handler in the same callout than the stub was created
+   // (as done for the non-laze stub in this example).
+   simppl::dbus::Stub<Simple> lazy_stub(d, "s2");
+
+   stub.connected >> [&stub, &lazy_stub](simppl::dbus::ConnectionState st){
+	   	   
+       lazy_stub.connected >> [&stub, &lazy_stub](simppl::dbus::ConnectionState st){           
+		   
+		   // stop the servers
+		   stub.oneway(7777);		   
+		   lazy_stub.oneway(7777);
+		
+           lazy_stub.disp().stop();
+	   };
+   };
+   
+   d.run();   
+   
+   t1.join();
+   t2.join();
+}

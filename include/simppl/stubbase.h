@@ -69,6 +69,32 @@ struct StubBase
 
    StubBase(const StubBase&) = delete;
    StubBase& operator=(const StubBase&) = delete;
+   
+   struct Connected
+   {
+	   friend struct StubBase;
+	   
+	   Connected(StubBase* parent);	
+	   
+	   void set_callback(const std::function<void(ConnectionState)>& cb);	   
+	   
+	   /// for compatibility issues. Use operator>> instead.
+	   void operator=(const std::function<void(ConnectionState)>& cb)
+	   {
+		   set_callback(cb);
+	   }
+	   
+   private:
+   
+       void state_changed(ConnectionState cb, bool force);
+       
+	   
+	   StubBase* parent_;
+	   
+	   ConnectionState conn_state_;
+	   std::function<void(ConnectionState)> cb_;
+   }; 
+
 
 protected:
 
@@ -78,9 +104,10 @@ protected:
    void init(char* iface, const char* busname, const char* objectpath);
 
 
-public:
-
-   std::function<void(ConnectionState)> connected;
+public:  
+   
+   /// attach a function callback of type @c std::function<void(ConnectionState)>
+   Connected connected;
 
    StubBase();
 
@@ -103,7 +130,7 @@ public:
    inline
    bool is_connected() const
    {
-       return conn_state_ == ConnectionState::Connected;
+       return connected.conn_state_ == ConnectionState::Connected;
    }
 
    inline
@@ -131,7 +158,7 @@ protected:
 
    void try_handle_signal(DBusMessage* msg);
 
-   void connection_state_changed(ConnectionState state);
+   void connection_state_changed(ConnectionState state, bool force = false);
 
    void cleanup();
 
@@ -177,8 +204,7 @@ protected:
 
    std::vector<std::string> ifaces_;
    char* objectpath_;
-   std::string busname_;
-   ConnectionState conn_state_;
+   std::string busname_;   
 
    Dispatcher* disp_;
 
