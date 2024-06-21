@@ -51,10 +51,45 @@ namespace simppl
 namespace dbus
 {
 
-StubBase::StubBase()
- : get_all_properties(*this)
- , objectpath_(nullptr)
+StubBase::Connected::Connected(StubBase* parent)
+ : parent_(parent)
  , conn_state_(ConnectionState::Disconnected)
+{
+   // NOOP
+}
+
+
+void StubBase::Connected::set_callback(const std::function<void(ConnectionState)>& cb)
+{
+   cb_ = cb;		
+   
+   if (cb_ && conn_state_ == ConnectionState::Connected)
+   {	   	   	
+	  // call via eventloop, not directly
+	  parent_->disp_->notify_connected(*parent_);	  
+   }
+}
+
+
+void StubBase::Connected::state_changed(ConnectionState state, bool force)
+{
+	if (conn_state_ != state || force)
+	{
+		conn_state_ = state;
+		
+		if (cb_)
+			cb_(conn_state_);
+	}
+}
+
+
+// ---------------------------------------------------------------------
+  
+
+StubBase::StubBase()
+ : connected(this)
+ , get_all_properties(*this)
+ , objectpath_(nullptr) 
  , disp_(nullptr)
  , signals_(nullptr)
  , attached_properties_(0)
@@ -278,16 +313,10 @@ message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::fu
 }
 
 
-void StubBase::connection_state_changed(ConnectionState state)
+void StubBase::connection_state_changed(ConnectionState state, bool force)
 {
-   if (conn_state_ != state)
-   {
-      conn_state_ = state;
-
-      if (connected)
-         connected(conn_state_);
-   }
-}
+   connected.state_changed(state, force);
+}   
 
 
 void StubBase::register_signal(ClientSignalBase& sigbase)

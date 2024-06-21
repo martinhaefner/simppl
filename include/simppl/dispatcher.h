@@ -22,6 +22,7 @@ namespace dbus
 struct StubBase;
 struct SkeletonBase;
 struct ClientSignalBase;
+struct ObjectPath;
 
 
 void enable_threads();
@@ -148,8 +149,12 @@ private:
 
    /// Do a single iteration on the self-hosted mainloop.
    int step_ms(int millis);
+   
+   /// Stub want's to be called due the callback registration
+   void notify_connected(StubBase& stub);
 
    void notify_clients(const std::string& boundname, ConnectionState state);
+   void notify_client(const std::string& boundname, const std::string& objpath);
 
    DBusConnection* conn_;
    int request_timeout_;    ///< default request timeout in milliseconds

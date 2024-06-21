@@ -5,7 +5,6 @@
 
 #include <unistd.h>
 
-#include <iostream>
 #include <map>
 #include <set>
 #include <atomic>
@@ -453,7 +452,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
    dbus_error_init(&err);
    std::ostringstream match_string;
    match_string
-       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
+       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::gettid() << '/' << this << "'";
 
    dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
    if (dbus_error_is_set(&err))
@@ -492,6 +491,36 @@ Dispatcher::~Dispatcher()
 
    delete d;
    d = 0;
+}
+
+
+void Dispatcher::notify_connected(StubBase& stub)
+{	
+	std::ostringstream objpath;
+	objpath << "/org/simppl/dispatcher/" << ::gettid() << '/' << this;
+
+	DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
+
+	DBusMessageIter iter;
+	dbus_message_iter_init_append(msg, &iter);
+
+	encode(iter, stub.busname(), stub.objectpath());
+
+	dbus_connection_send(conn_, msg, nullptr);
+	dbus_message_unref(msg);
+}
+
+
+void Dispatcher::notify_client(const std::string& boundname, const std::string& objpath)
+{
+	auto r = d->stubs_.equal_range(objpath);
+	
+	auto iter = r.first;
+	while(iter != r.second)
+	{
+		iter->second->connection_state_changed(ConnectionState::Connected, true);		
+		++iter;
+	}
 }
 
 
@@ -617,14 +646,15 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
         if (!strcmp(dbus_message_get_member(msg), "notify_client"))
         {
            std::string busname;
+           std::string objpath;
 
            DBusMessageIter iter;
            dbus_message_iter_init(msg, &iter);
 
-           decode(iter, busname);
+           decode(iter, busname, objpath);
 
-           if (d->busnames_.find(busname) != d->busnames_.end())
-                notify_clients(busname, ConnectionState::Connected);
+           if (d->busnames_.find(busname) != d->busnames_.end())           
+              notify_client(busname, objpath);		   
 
            return DBUS_HANDLER_RESULT_HANDLED;
         }
@@ -697,24 +727,12 @@ void Dispatcher::add_client(StubBase& clnt)
    clnt.disp_ = this;
 
    d->stubs_.insert(std::make_pair(clnt.objectpath(), &clnt));
-
-   // send connected request from event loop
+   
    auto iter = d->busnames_.find(clnt.busname());
-   if (iter != d->busnames_.end())
-   {
-      std::ostringstream objpath;
-      objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
-      DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
-
-      DBusMessageIter iter;
-      dbus_message_iter_init_append(msg, &iter);
-
-      encode(iter, clnt.busname());
-
-      dbus_connection_send(conn_, msg, nullptr);
-      dbus_message_unref(msg);
-   }
+   // send connected request from event loop   
+   if (iter != d->busnames_.end())      
+	  notify_connected(clnt);            
 }
 
 
