@@ -142,7 +142,7 @@ void StubBase::init(char* iface, const char* role)
 
 void StubBase::add_property(ClientPropertyBase* property)
 {
-    properties_.push_back(std::make_pair(property, false));
+    properties_.emplace_back(property, false);
 }
 
 

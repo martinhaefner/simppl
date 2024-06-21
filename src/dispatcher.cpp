@@ -198,7 +198,7 @@ struct Dispatcher::Private
         //else
           // std::cout << "Not enabled" << std::endl;
 
-        watch_handlers_.insert(std::make_pair(fd.fd, w));
+        watch_handlers_.emplace(fd.fd, w);
 
         return TRUE;
     }
@@ -375,7 +375,7 @@ struct Dispatcher::Private
     std::multimap<int, DBusWatch*> watch_handlers_;
     std::map<int, DBusTimeout*> tm_handlers_;
 
-    std::multimap<std::string, StubBase*> stubs_;
+    std::multimap<std::string, StubBase*, std::less<>> stubs_;
     std::map<std::string, int> signal_matches_;
 
     /// service registration's list
@@ -726,8 +726,8 @@ bool Dispatcher::is_running() const
 void Dispatcher::add_client(StubBase& clnt)
 {
    clnt.disp_ = this;
-
-   d->stubs_.insert(std::make_pair(clnt.objectpath(), &clnt));
+   
+   d->stubs_.emplace(clnt.objectpath(), &clnt);
    
    auto iter = d->busnames_.find(clnt.busname());
 
