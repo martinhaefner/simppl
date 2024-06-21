@@ -499,7 +499,7 @@ developing client/server applications with the means of C++ and without
 the need of a complex tool chain for glue-code generation.
 
 
-##Short comings
+## Short comings
 
 In the beginning, simppl was designed without DBus as the transport layer.
 Therefore, the connected/disconnected handling currently of the clients only 
