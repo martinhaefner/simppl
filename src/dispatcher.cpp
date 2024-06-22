@@ -453,7 +453,7 @@ void Dispatcher::init(int have_introspection, const char* busname)
    dbus_error_init(&err);
    std::ostringstream match_string;
    match_string
-       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::gettid() << '/' << this << "'";
+       << "type='signal',interface='org.simppl.dispatcher',member='notify_client',path='/org/simppl/dispatcher/" << ::getpid() << '/' << this << "'";
 
    dbus_bus_add_match(conn_, match_string.str().c_str(), &err);
    if (dbus_error_is_set(&err))
@@ -498,7 +498,7 @@ Dispatcher::~Dispatcher()
 void Dispatcher::notify_connected(StubBase& stub)
 {	
 	std::ostringstream objpath;
-	objpath << "/org/simppl/dispatcher/" << ::gettid() << '/' << this;
+	objpath << "/org/simppl/dispatcher/" << ::getpid() << '/' << this;
 
 	DBusMessage* msg = dbus_message_new_signal(objpath.str().c_str(), "org.simppl.dispatcher", "notify_client");
 
