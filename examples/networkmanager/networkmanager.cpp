@@ -5,8 +5,7 @@
 #include "simppl/stub.h"
 #include "simppl/vector.h"
 #include "simppl/tuple.h"
-
-#include "objectmanager.h"
+#include "simppl/api/objectmanager.h"
 
 
 struct print_value

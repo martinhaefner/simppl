@@ -3,6 +3,11 @@ for DBus messaging by using solely the C++ language and compiler for
 the definition of remote interfaces. No extra tools are necessary to
 generate the binding glue code.
 
+simppl/dbus can interact with standard DBus services and also provides
+support for the DBus.Properties and DBus.ObjectManager APIs. See the
+examples subfolder on how to interact with standard Linux system services
+like WPA supplicant or NetworkManager.
+
 
 ## Setup
 
@@ -20,7 +25,7 @@ expect the code to work on any other compiler family without appropriate
 code adaptions.
 
 For structure serialization boost::fusion can be used. See benchmark example
-for more information how to serialize structures when sending remote messages.
+for more information on how to serialize structures when sending remote messages.
 The boost way is the formal and correct way to serialize structures. The old
 way of defining serializer_type's typdefs within structures is no longer
 recommended since that one makes heavy use of C++ language to memory
@@ -30,29 +35,25 @@ virtual functions or containing multiple inheritence.
 
 ## Status
 
-The library is used in a production project and but it still can be
+The library is used in a production project but it still can be
 regarded as 'proof of concept'. Interface design may still be under change.
 Due to the simplicity of the glue layer and the main functionality provided
 by libdbus I would recommend to give it a try in real projects.
 
 
-## CopyLeft
-
-Feel free to do with the code whatever you want. It's free open-source code.
-
-
 ## First steps
 
-DBus uses an XML document for interface definition. This is rather tricky
-to read and typically source code is generated in order to provide
-these interfaces in the native programming language of a project.
-simppl/dbus does provide a binding written entirely in C++ itself.
-DBus provides many possibilities to map services (interfaces) to busnames
-and objectpaths. Simppl currently makes some assumptions and therefore
-looses some generality which is no problem for pure simppl projects but
-currently may provide trouble with accessing existing services which do
-not share these simplifications. But let's go on and see how a simppl
-service is defined. We will recall these facts later.
+The standard way to access DBus services is typically through using libdbus
+or GDBus. While the APIs are very powerful, they do not provide an
+adequate level of abstraction which could be provided by code generation
+from DBus interface definitions, i.e. the DBus introspection XML.
+simppl/dbus provides such an abstraction with the help of interface
+descriptions written entirely in C++. This results is service APIs
+which just looks like ordinary C++ function calls, on both sides, clients
+(aka. stub) and servers (aka. skeletons).
+
+The easiest way to implement services is to let simppl generate
+bus names and object paths for your service interface definitions.
 
 
 ### Defining an interface
@@ -97,7 +98,7 @@ glue code, but it's very simple. The full interface looks like this:
    }   // namespace
 ```
 
-Now the interface is complete C++. You need the implement the constructor
+Now the interface is complete C++. You need to implement the constructor
 to correctly initialize the members. For oneway methods, you just add
 the keyword oneway to the method definition. oneway, in and out are
 part of the C++ namespace simppl::dbus.
@@ -107,7 +108,7 @@ definition? Then you can already imagine how the service is mapped, can't you?
 Services are typically instantiated and each instance will have its own
 instance name. For now, let's say the instance name was 'myEcho'.
 With this information provided in the constructor of the service instance,
-the dbus busname requested will be
+the dbus bus name requested will be
 
 ```
    test.EchoService.myEcho
@@ -120,14 +121,13 @@ provided under
    /test/EchoService/myEcho
 ```
 
-This mapping is done automatically by simppl, for servers this is currently
-fix. But clients may connect to any bus/objectpath layout in order to connect
-any DBus service. This also means that only one interface can be provided
-by a distinct objectpath, at least other than the properties interface needed for
-providing service properties. But we will ignore signals and
-properties for now and continue with our EchoService. Let's instantiate the
-service server by inheriting our implementation class from simppl's
-Skeleton:
+This mapping is done by simppl automatically. But, as mentioned earlier,
+you may connect your DBus object to any bus name and object path layout
+in order to connect any available DBus service. Also, a server object
+instance may provide multiple interfaces. But we ignore these details
+for now and continue with our EchoService. Let's implement the
+server by inheriting our implementation class from simppl's
+skeleton, giving the skeleton the interface definition from above:
 
 
 ```c++
@@ -140,7 +140,7 @@ Skeleton:
    };
 ```
 
-This service instance did not implement a handler for the echo method
+This service instance does not implement a handler for the echo method
 yet. But you have seen how the service's instance name is provided.
 Let's provide an implementation for the echo method:
 
@@ -160,9 +160,12 @@ Let's provide an implementation for the echo method:
 ```
 
 Now, simppl will receive the echo request, unmarshall the argument and
-forward the request to the provided lambda function (of course, you may
-also bind any other function via std::bind). But there is still
-no response yet. Let's send a response back to the client:
+forward the request to the provided lambda function connected via the
+right shift operator. Instead of lambda functions, you may of course
+use any other method to bind to a std::function with an appropriate
+call interface, e.g. via using std::bind.
+
+But there is still no response yet. Let's send a response back to the client:
 
 
 ```c++
@@ -180,7 +183,11 @@ no response yet. Let's send a response back to the client:
    };
 ```
 
-That's simppl, isn't it? Setup the eventloop and the server is finished:
+That's simppl, isn't it? simppl is designed to even provide asynchronous
+responses with a call to defer_response. For more information, see examples
+provided in the unittests.
+
+Setup the eventloop and the server is finished:
 
 
    ```c++
@@ -215,19 +222,19 @@ with a simple blocking client:
 ```
 
 That's it. The method call blocks until the response is received and
-stored in the echoed variable. In case of an error, an exception is thrown.
+the result is stored in the echoed variable. In case of an error, an exception is thrown.
 Note that the underlying DBus implementation will block on the fd correlated
-with the request and therefore a blocking client can never be running on the
-same connection as the server (ok, that's only a test setup, in real world
-client and server typically reside in different applications.
+with the request and therefore a blocking client shall never be running on the
+same connection as server objects, which could easily be mixed up in
+more complex distributed services.
 
-Important notice: simppl always
+Important notice: simppl currently always
 adds a signal filter to the message bus. Therefore, connections instantiated
-for blocking clients and therfore never running any kind of event loop, will cause
+for blocking clients and therefore never running any kind of event loop, will cause
 the bus daemon to grow in size, as these bus clients will never read these signal
 notifications from the bus.
 
-But have a look on the message loop driven client. The best way to implement
+But let's have a look on the message loop driven client. The best way to implement
 such a client is to derive from the stub base template and delegate the
 callbacks to member functions. Note that the method is called via the async(...)
 member function.
@@ -262,12 +269,12 @@ member function.
 ```
 
 Event loop driven clients always get callbacks called from the dbus runtime
-when any event occurs. The initial event for a client is the connected event
-which will be emitted when the server registers itself on the bus (remember
+for any occuring DBus event. The initial event for a client is the connected event
+which will be emitted as soon as the server registers itself on the bus (remember
 the busname). After being connected, the client may start an
 asynchronous method like in the example above. The method response callbacks
 can be any function object fullfilling the response signature, the preferred
-way nowadays in a C++ lambda. The main program is as simple as in the
+way nowadays is a C++ lambda function. The main program is as simple as in the
 blocking example:
 
 
@@ -321,9 +328,9 @@ and server. See the following example:
 ```
 
 The Data structure is any C/C++ struct but must not include virtual functions.
-For structures with complexer memory layout it is adviced to use boost::fusion
+For structures with a more complex memory layout it is adviced to use boost::fusion
 to map the struct to a template-iteratable type sequence. For simpler types
-like above, the make_serializer generates an adequate serializing code for
+like above, the make_serializer generates an adequate serialization code for
 the structure, i.e. the structure can be used as any simple data type:
 
 
@@ -499,13 +506,43 @@ developing client/server applications with the means of C++ and without
 the need of a complex tool chain for glue-code generation.
 
 
-## Short comings
+## Lifetime tracking
 
-In the beginning, simppl was designed without DBus as the transport layer.
-Therefore, the connected/disconnected handling currently of the clients only 
-works if the server binary will exit, i.e. the DBus connection hold to the 
+In the beginning, simppl was designed without DBus as the transport layer in mind.
+Therefore, the connected/disconnected handling  of the clients currently only
+works if the server binary will exit, i.e. the DBus connection hold to the
 bus daemon will be closed. Otherwise, the bus names will not be released
-and therefore, clients will not get notified if a server object was destroyed.
-A solution would be simple if any server had a unique bus name, but this
-may not be the preferred solution, so releasing a bus name after server
-object destruction would yield strange results.
+and therefore, clients will not get notified when a server object was destroyed.
+A more robust solution for this topic is to make use of the DBus ObjectManager
+interface, which will inform you whenever DBus objects are being added or
+removed from an object path instead of the bus name.
+
+This can be achieved by simply creating a server object which implements
+the standard DBus.ObjectManager interface:
+
+```c++
+   #define SIMPPL_HAVE_OBJECTMANAGER 1
+
+   #include "simppl/...>
+
+   simppl::dbus::Skeleton<org::freedesktop::DBus::ObjectManager> mgr(s, "s");
+
+   simppl::dbus::Skeleton<test::One> o(s, "s");
+   o.Str = "Hallo";
+   o.Int = 42;
+
+   mgr.add_managed_object(&o);
+```
+
+ObjectManager support may be disabled for compatibility reasons in cmake.
+Beware, that client code has to set the macro to the same value as during
+library compilation.
+
+
+## Eventloop integration
+
+The libdbus reference implementation allows the integration of the DBus
+API in any thirdparty event loop. You may access the DBusConnection object
+from the simppl::dbus::Dispatcher in order to integrate simppl in your
+project's event loop. For an example implementation using boost::asio
+see the examples source code in the asio subdirectory.
