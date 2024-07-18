@@ -20,9 +20,8 @@ add_subdirectory(${PROJECT_BINARY_DIR}/googletest-src
                  ${PROJECT_BINARY_DIR}/googletest-build
                  EXCLUDE_FROM_ALL)
 
-
-add_executable(unittests
-   timeout.cpp
+SET(UNITTEST_SOURCES
+    timeout.cpp
    simple.cpp
    errors.cpp
    async_server.cpp
@@ -35,6 +34,15 @@ add_executable(unittests
    utils.cpp
    any.cpp
 )
+
+if(SIMPPL_HAVE_OBJECTMANAGER)
+    SET(UNITTEST_SOURCES ${UNITTEST_SOURCES} objectmanager.cpp)
+endif()
+
+add_executable(unittests
+   ${UNITTEST_SOURCES}
+)
+
 if(Boost_FOUND)
    target_compile_definitions(unittests PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)
 endif()

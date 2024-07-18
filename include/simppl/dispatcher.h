@@ -21,6 +21,7 @@ namespace dbus
 // forward decls
 struct StubBase;
 struct SkeletonBase;
+struct ObjectManagerMixin;
 struct ClientSignalBase;
 struct ObjectPath;
 
@@ -38,6 +39,7 @@ struct Dispatcher
 {
    friend struct StubBase;
    friend struct SkeletonBase;
+   friend struct ObjectManagerMixin;
 
    friend void dispatcher_add_stub(Dispatcher&, StubBase&);
    friend void dispatcher_add_skeleton(Dispatcher&, SkeletonBase&);
@@ -149,7 +151,7 @@ private:
 
    /// Do a single iteration on the self-hosted mainloop.
    int step_ms(int millis);
-   
+
    /// Stub want's to be called due the callback registration
    void notify_connected(StubBase& stub);
 
