@@ -17,20 +17,21 @@ namespace dbus
 namespace detail
 {
 
-#if SIMPPL_HAVE_OBJECTMANAGER
-
-template<template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class I>
+template<template<int, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class I>
 struct make_server_type
 {
-    typedef I<0, SkeletonBase, ServerMethod, ServerSignal, ServerProperty, SkeletonBase> type;
+    typedef I<0, ServerMethod, ServerSignal, ServerProperty, SkeletonBase> type;
 };
+
+
+#if SIMPPL_HAVE_OBJECTMANAGER
 
 
 /**
  * Check if object manager interface is part of the implemented interfaces
  * and potentially include the mixin in the inheritance hierarchy.
  */
-template<template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class... Is>
+template<template<int, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class... Is>
 struct ObjectManagerInterposer
 {
     typedef typename make_server_type<org::freedesktop::DBus::ObjectManager>::type objectmanager_server_type;
@@ -45,7 +46,7 @@ struct ObjectManagerInterposer
 /**
  * No objectmanager interposing. You may implement the API for yourself.
  */
-template<template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class... Is>
+template<template<int, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class... Is>
 struct ObjectManagerInterposer
 {
     typedef SizedSkeletonBase<sizeof...(Is)> type;
