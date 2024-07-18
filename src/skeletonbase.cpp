@@ -182,6 +182,12 @@ const ServerRequestDescriptor& SkeletonBase::current_request() const
 }
 
 
+DBusHandlerResult SkeletonBase::handle_objectmanager_request(DBusMessage* msg)
+{
+    return handle_error(msg, DBUS_ERROR_UNKNOWN_INTERFACE);
+}
+
+
 DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 {
     const char* method_name = dbus_message_get_member(msg);
@@ -190,6 +196,11 @@ DBusHandlerResult SkeletonBase::handle_request(DBusMessage* msg)
 #if SIMPPL_HAVE_INTROSPECTION
     if (!strcmp(interface_name, "org.freedesktop.DBus.Introspectable"))
         return handle_introspect_request(msg);
+#endif
+
+#if SIMPPL_HAVE_OBJECTMANAGER
+    if (!strcmp(interface_name, "org.freedesktop.DBus.ObjectManager"))
+        return handle_objectmanager_request(msg);
 #endif
 
     if (!strcmp(interface_name, "org.freedesktop.DBus.Properties"))

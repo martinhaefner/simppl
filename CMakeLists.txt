@@ -24,6 +24,8 @@ endif()
 option(HAVE_INTROSPECTION "Have introspection" ON)
 include(CMakeDependentOption)
 
+option(SIMPPL_HAVE_OBJECTMANAGER "Have native objectmanager support in server objects" ON)
+
 cmake_dependent_option(SIMPPL_BUILD_TESTS "Build tests"
     ON "SIMPPL_NOT_SUBPROJECT" OFF
 )
@@ -65,14 +67,23 @@ add_library(simppl SHARED
     src/bool.cpp
     src/holders.cpp
     src/properties.cpp
+    src/objectmanagermixin.cpp
 )
 # Provide a namespaced alias
 add_library(Simppl::simppl ALIAS simppl)
 
+# DBus introspection support
 if(HAVE_INTROSPECTION)
     target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_INTROSPECTION=1)
 else()
     target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_INTROSPECTION=0)
+endif()
+
+# Native objectmanager support on server side. Add or remove objects to/from
+# a skeleton implementing the standard DBus ObjectManager interface. The
+# standard API is automatically activated just like with properties.
+if(SIMPPL_HAVE_OBJECTMANAGER)
+    target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_OBJECTMANAGER=1)
 endif()
 
 target_include_directories(simppl

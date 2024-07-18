@@ -36,6 +36,7 @@ struct SkeletonBase
     friend struct ServerMethodBase;
     friend struct ServerPropertyBase;
     friend struct ServerSignalBase;
+    friend struct ObjectManagerMixin;
 
     static DBusHandlerResult method_handler(DBusConnection *connection, DBusMessage *message, void *user_data);
 
@@ -103,6 +104,8 @@ protected:
     DBusHandlerResult handle_interface_request(DBusMessage* msg, ServerMethodBase& method);
     DBusHandlerResult handle_error(DBusMessage* msg, const char* dbus_error);
     DBusHandlerResult handle_property_getall_request(DBusMessage* msg, int iface_id);
+
+    virtual DBusHandlerResult handle_objectmanager_request(DBusMessage* msg);
 
 #if SIMPPL_HAVE_INTROSPECTION
     void introspect_interface(std::ostream& os, size_type index) const;

@@ -9,6 +9,7 @@
 #include "simppl/serverside.h"
 #include "simppl/typelist.h"
 #include "simppl/detail/interposer.h"
+#include "simppl/detail/objectmanagerinterposer.h"
 
 
 namespace simppl
@@ -27,7 +28,9 @@ template<template<int,
                   template<typename...> class,
                   template<typename,int> class,
                   typename> class... Is>
-struct Skeleton : detail::Interposer<sizeof...(Is)-1, detail::SizedSkeletonBase<sizeof...(Is)>, ServerMethod, ServerSignal, ServerProperty, Is...>
+struct Skeleton : public detail::Interposer<sizeof...(Is)-1, detail::SizedSkeletonBase<sizeof...(Is)>,
+                                            typename detail::ObjectManagerInterposer<Is...>::type,
+                                            ServerMethod, ServerSignal, ServerProperty, Is...>
 {
     friend struct Dispatcher;
 
