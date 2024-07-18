@@ -28,13 +28,14 @@ template<template<int,
                   template<typename...> class,
                   template<typename,int> class,
                   typename> class... Is>
-struct Skeleton : public detail::Interposer<sizeof...(Is)-1, detail::SizedSkeletonBase<sizeof...(Is)>,
+struct Skeleton : public detail::Interposer<sizeof...(Is)-1,
+                                            detail::SizedSkeletonBase<sizeof...(Is)>,
                                             typename detail::ObjectManagerInterposer<Is...>::type,
-                                            ServerMethod, ServerSignal, ServerProperty, Is...>
+                                            Is...>
 {
     friend struct Dispatcher;
 
-    using interface_list = make_typelist<Is<0, SkeletonBase, ServerMethod, ServerSignal, ServerProperty, SkeletonBase>...>;
+    using interface_list = make_typelist<typename detail::make_server_type<Is>::type...>;
 
     static constexpr std::size_t iface_count = sizeof...(Is);
 

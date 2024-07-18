@@ -11,23 +11,21 @@ namespace detail
 {
 
 
+/// Make inheritence structure so inherit recursively from all interfaces.
 template<int Id,
          typename AncestorT,
-         typename Ancestor0T,
-         template<typename...> class Method,
-         template<typename...> class Signal,
-         template<typename, int> class Property,
+         typename Ancestor0T,    ///< here the objectmanager could be interposed
          template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class I,
          template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class... Is>
-struct Interposer : I<Id, AncestorT, Method, Signal, Property, Interposer<Id-1, AncestorT, Ancestor0T, Method, Signal, Property, Is...>> {};
+struct Interposer : I<Id, AncestorT, ServerMethod, ServerSignal, ServerProperty, Interposer<Id-1, AncestorT, Ancestor0T, Is...>> {};
 
+/**
+ * Specialization for last interface: inherit from base class.
+ */
 template<typename AncestorT,
          typename Ancestor0T,
-         template<typename...> class Method,
-         template<typename...> class Signal,
-         template<typename, int> class Property,
          template<int, typename, template<typename...> class, template<typename...> class, template<typename, int> class, typename> class I>
-struct Interposer<0, AncestorT, Ancestor0T, Method, Signal, Property, I> : I<0, Ancestor0T, Method, Signal, Property, Ancestor0T> {};
+struct Interposer<0, AncestorT, Ancestor0T, I> : I<0, Ancestor0T, ServerMethod, ServerSignal, ServerProperty, Ancestor0T> {};
 
 
 }   // detail

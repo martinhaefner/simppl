@@ -42,8 +42,11 @@ private:
 };
 
 
+namespace detail
+{
+
 template<size_t N>
-struct SizedObjectManagerMixin : public ObjectManagerMixin
+struct SizedObjectManagerMixin : public simppl::dbus::ObjectManagerMixin
 {
     SizedObjectManagerMixin()
      : ObjectManagerMixin(N)
@@ -51,6 +54,8 @@ struct SizedObjectManagerMixin : public ObjectManagerMixin
         // NOOP
     }
 };
+
+}   // detail
 
 }   // dbus
 
