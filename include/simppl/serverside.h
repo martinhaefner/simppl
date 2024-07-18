@@ -372,7 +372,7 @@ namespace detail
         static
         void eval(BaseProperty<DataT>& p, const DataT& d)
         {
-            if (!std::get_if<DataT>(&p.t_) || PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
+            if (PropertyComparator<DataT, (Flags & Always ? false : true)>::compare(p.value(), d))
             {
                 p.t_ = d;
                 p.notify(d);
@@ -394,7 +394,14 @@ struct ServerProperty : BaseProperty<DataT>, std::conditional<Flags & ReadWrite,
 
    ServerProperty& operator=(const DataT& data)
    {
-      detail::Assigner<Flags & Notifying ? true : false, Flags>::eval(*this, data);
+      // do not notify on initialization
+      if (this->t_.index() == std::variant_npos)
+      {
+         this->t_ = data;
+      }
+      else
+         detail::Assigner<Flags & Notifying ? true : false, Flags>::eval(*this, data);
+
       return *this;
    }
 
