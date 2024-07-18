@@ -23,7 +23,6 @@ void dispatcher_add_skeleton(Dispatcher&, StubBase&);
 
 
 template<template<int,
-                  typename,
                   template<typename...> class,
                   template<typename...> class,
                   template<typename,int> class,
