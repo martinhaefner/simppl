@@ -5,8 +5,6 @@
 #include <vector>
 
 #include "simppl/serialization.h"
-#include "simppl/type_mapper.h"
-
 
 namespace simppl
 {

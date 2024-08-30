@@ -310,8 +310,5 @@ Any &Any::operator=(Any &&old) {
     return *this;
   }
 
-// -----------------------------------MISC-IMPLEMENTATIONS---------------------------------
-
-template <> int get_debus_type<Any>() { return DBUS_TYPE_VARIANT; }
 } // namespace dbus
 } // namespace simppl

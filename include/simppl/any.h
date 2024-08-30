@@ -122,10 +122,6 @@ struct IntermediateAnyTuple {
   std::vector<std::any> elements;
 };
 
-// ---------------------------------------DBUS-TYPE----------------------------------------
-
-template <> int get_debus_type<Any>();
-
 // ---------------------------------------CODEC-IMPL---------------------------------------
 
 template <> struct Codec<Any> {
