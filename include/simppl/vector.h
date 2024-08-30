@@ -3,6 +3,7 @@
 
 
 #include <vector>
+#include <type_traits>
 
 #include "simppl/serialization.h"
 
@@ -11,8 +12,6 @@ namespace simppl
 
 namespace dbus
 {
-    
-   
 template<typename T, typename Alloc>
 struct Codec<std::vector<T, Alloc>>
 {
@@ -65,6 +64,7 @@ struct Codec<std::vector<T, Alloc>>
 
 template<typename T, typename Alloc>
 struct detail::typecode_switch<std::vector<T, Alloc>> { enum { value = DBUS_TYPE_ARRAY }; };
+
 }   // namespace dbus
 
 }   // namespace simppl
