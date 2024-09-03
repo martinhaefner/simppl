@@ -47,7 +47,7 @@ find_package(DBus REQUIRED)
 find_package(Boost)
 
 
-add_library(simppl SHARED
+add_library(simppl
     src/dispatcher.cpp
     src/error.cpp
     src/serverresponseholder.cpp
