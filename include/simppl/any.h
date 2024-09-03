@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <sys/types.h>
 #include <tuple>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 
@@ -227,6 +228,9 @@ template <> struct is_type<Any> {
 
 template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
   static bool check(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return is_type<std::vector<T, Alloc>>::check(std::any_cast<Any>(any).value_);
+    }
     if (any.type() != typeid(IntermediateAnyVec)) {
       return false;
     }
@@ -365,6 +369,9 @@ template <> struct as_type<Any> {
 
 template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
   static std::vector<T, Alloc> convert(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return as_type<std::vector<T, Alloc>>::convert(std::any_cast<Any>(any).value_);
+    }
     assert(any.type() == typeid(IntermediateAnyVec));
 
     std::vector<T, Alloc> result;
