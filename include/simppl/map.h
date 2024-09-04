@@ -47,7 +47,7 @@ struct Codec<std::map<KeyT, ValueT>>
          std::pair<KeyT, ValueT> p;
          Codec<decltype(p)>::decode(_iter, p);
 
-         m.insert(p);
+         m.insert(std::move(p));
       }
 
       // advance to next element
