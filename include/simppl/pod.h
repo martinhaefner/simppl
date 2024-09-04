@@ -73,7 +73,8 @@ struct CodecImpl<T, Pod>
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
-      return os << (char)dbus_type_code;
+      const char dbus_type_code_string[2]{dbus_type_code, 0};
+      return os << dbus_type_code_string;
    }
 };
 
