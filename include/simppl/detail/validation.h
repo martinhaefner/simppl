@@ -2,6 +2,8 @@
 #define SIMPPL_DETAIL_VALIDATION_H
 
 
+#include "simppl/detail/parameter_deduction.h"
+#include "simppl/parameter_deduction.h"
 namespace simppl
 {
 

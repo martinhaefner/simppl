@@ -888,3 +888,13 @@ TEST(Properties, via_properties_interface)
    t.join();
 }
 
+/*
+std::map<std::string, std::tuple<std::vector<std::string>,
+                                   std::map<std::string, std::string>>>
+      map{{"asdasd", std::make_tuple<std::vector<std::string>,
+                                     std::map<std::string, std::string>>(
+                         {"a", "b", "c"}, {{"1", "2"}})},
+          {"sadasdas", std::make_tuple<std::vector<std::string>,
+                                       std::map<std::string, std::string>>(
+                           {"g", "r", "t"}, {{"", "8"}})}};
+*/

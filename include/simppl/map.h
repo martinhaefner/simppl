@@ -47,7 +47,7 @@ struct Codec<std::map<KeyT, ValueT>>
          std::pair<KeyT, ValueT> p;
          Codec<decltype(p)>::decode(_iter, p);
 
-         m.insert(p);
+         m.insert(std::move(p));
       }
 
       // advance to next element
@@ -62,9 +62,9 @@ struct Codec<std::map<KeyT, ValueT>>
    }
 };
 
-   
+template<typename Key, typename T, typename Compare, typename Alloc>
+struct detail::typecode_switch<std::map<Key, T, Compare, Alloc>> { enum { value = DBUS_TYPE_ARRAY }; };   
 }   // namespace dbus
-
 }   // namespace simppl
 
 
