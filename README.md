@@ -171,8 +171,8 @@ But there is still no response yet. Let's send a response back to the client:
 ```c++
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
-      MyEcho()
-       : simppl::dbus::Skeleton<EchoService>("myEcho")
+      MyEcho(simppl::dbus::Dispatcher& disp)
+       : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
       {
          echo >> [this](const std::string& echo_string)
          {
