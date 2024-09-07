@@ -62,6 +62,11 @@ bus names and object paths for your service interface definitions.
 Let's start with a simple echo service. See the service description:
 
 ```c++
+   // Must match CMake option `HAVE_INTROSPECTION`
+   #define SIMPPL_HAVE_INTROSPECTION 1
+
+   #include <simppl/interface.h>
+
    namespace test
    {
 
@@ -81,6 +86,11 @@ glue code, but it's very simple. The full interface looks like this:
 
 
 ```c++
+   // Must match CMake option `HAVE_INTROSPECTION`
+   #define SIMPPL_HAVE_INTROSPECTION 1
+
+   #include <simppl/interface.h>
+
    namespace test
    {
 
@@ -131,10 +141,17 @@ skeleton, giving the skeleton the interface definition from above:
 
 
 ```c++
+   // Must match CMake option `HAVE_INTROSPECTION`
+   #define SIMPPL_HAVE_INTROSPECTION 1
+   
+   #include <simppl/dispatcher.h>
+   #include <simppl/interface.h>
+   #include <simppl/skeleton.h>
+
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho(simppl::dbus::Dispatcher& disp)
-       : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
+       : simppl::dbus::Skeleton<test::EchoService>(disp, "myEcho")
       {
       }
    };
@@ -146,10 +163,12 @@ Let's provide an implementation for the echo method:
 
 
 ```c++
+   // ... Same includes and SIMPPL_HAVE_INTROSPECTION 
+
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho(simppl::dbus::Dispatcher& disp)
-       : simppl::dbus::Skeleton<EchoService>(disp, "myEcho")
+       : simppl::dbus::Skeleton<test::EchoService>(disp, "myEcho")
       {
          echo >> [](const std::string& echo_string)
          {
@@ -169,6 +188,8 @@ But there is still no response yet. Let's send a response back to the client:
 
 
 ```c++
+   // ... Same includes and SIMPPL_HAVE_INTROSPECTION 
+   
    class MyEcho : simppl::dbus::Skeleton<EchoService>
    {
       MyEcho()
