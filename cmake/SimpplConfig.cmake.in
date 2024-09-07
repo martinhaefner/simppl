@@ -2,7 +2,7 @@
 
 # Same syntax as find_package
 include(CMakeFindDependencyMacro)
-find_dependency(DBUS REQUIRED)
+find_dependency(DBUS REQUIRED) 
 
 check_required_components(Simppl)
 
