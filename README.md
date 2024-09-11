@@ -193,7 +193,7 @@ Setup the eventloop and the server is finished:
    ```c++
    int main()
    {
-      simppl::dbus::Dispatcher disp("bus::session");
+      simppl::dbus::Dispatcher disp("bus:session");
       MyEcho instance(disp);
 
       disp.run();
