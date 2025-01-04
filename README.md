@@ -494,6 +494,31 @@ You may now throw the error in a server's method callback:
    };
 ```
 
+On client side, the exception will either be part of the CallState for 
+asynchronous clients or directly thrown by the called method when using the
+blocking API:
+
+```c++   
+   obj.hello.async() >> [](const CallState& st, const std::string& hello_string) 
+   {
+      if (!st)      
+      {
+         // exception could either be 1) of standard type, e.g. when service 
+         // is not available or 2) of dedicated type as returned from the MyHello 
+         // implementation above
+         try
+         {
+            int res = st.as<MyError>().result;
+            ...
+         }
+         catch(std::runtime_error&)
+         {
+            // probably standard error
+         }  
+      }
+   };
+```
+
 This was a short introduction to simppl/dbus. I hope you will like
 developing client/server applications with the means of C++ and without
 the need of a complex tool chain for glue-code generation.
