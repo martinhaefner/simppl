@@ -42,7 +42,7 @@ struct Codec<std::map<KeyT, ValueT>>
       DBusMessageIter _iter;
       simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
 
-      while(dbus_message_iter_get_arg_type(&_iter) != 0)
+      while(dbus_message_iter_get_arg_type(&_iter) != DBUS_TYPE_INVALID)
       {
          std::pair<KeyT, ValueT> p;
          Codec<decltype(p)>::decode(_iter, p);

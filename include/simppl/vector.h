@@ -44,7 +44,7 @@ struct Codec<std::vector<T>>
       DBusMessageIter iter;
       simppl_dbus_message_iter_recurse(&s, &iter, DBUS_TYPE_ARRAY);
 
-      while(dbus_message_iter_get_arg_type(&iter) != 0)
+      while(dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INVALID)
       {
          T t;
          Codec<T>::decode(iter, t);

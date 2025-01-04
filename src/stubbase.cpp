@@ -298,7 +298,25 @@ message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::fu
         dbus_pending_call_unref(pending);
 
         if (dbus_message_get_type(rc.get()) == DBUS_MESSAGE_TYPE_ERROR)
-            method->_throw(*rc);
+        {
+			// default message, retrieved e.g. from the daemon, even if 
+			// interface forces a user defined exception
+			if (!strcmp(dbus_message_get_signature(rc.get()), DBUS_TYPE_STRING_AS_STRING))
+			{				
+				DBusMessageIter iter;
+				dbus_message_iter_init(rc.get(), &iter);
+
+				std::string text;
+				decode(iter, text);        
+        				
+				Error err;				
+				err.set_members(dbus_message_get_error_name(rc.get()), text.c_str(), dbus_message_get_reply_serial(rc.get()));
+				
+				throw err;
+			}
+			else			
+				method->_throw(*rc);
+		}
     }
     else
     {

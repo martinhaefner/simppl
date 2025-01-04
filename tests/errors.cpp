@@ -24,10 +24,9 @@ namespace test
  *
  * But with boost::fusion everything works ok.
  *
- * @note that if mixing simppl code with raw DBus calls you must make sure
- * that when using the exceptions feature, the dbus message must contain
- * a message in addition to the error name, otherwise deserialization would
- * yield an error.
+ * @note you must make sure that the dbus message must contain
+ * data in addition to the error name, otherwise the exception type returned
+ * by the client side API will just be simppl::dbus::Error.
  */
 struct MyException : simppl::dbus::Error
 {
@@ -107,12 +106,12 @@ struct Client : simppl::dbus::Stub<Errors>
             EXPECT_STREQ(state.exception().name(), "shit.happens");
 
 #if SIMPPL_HAVE_BOOST_FUSION
-            hello2.async() >> [this](const simppl::dbus::TCallState<MyException>& state){
+            hello2.async() >> [this](const simppl::dbus::CallState& state){
                 EXPECT_FALSE((bool)state);
                 EXPECT_STREQ(state.exception().name(), "My.Exception");
-                EXPECT_EQ(42, state.exception().rc);
+                EXPECT_EQ(42, state.as<MyException>().rc);
 
-                hello3.async() >> [this](const simppl::dbus::TCallState<MyException>& state){
+                hello3.async() >> [this](const simppl::dbus::CallState& state){
                     EXPECT_FALSE((bool)state);
                     EXPECT_STREQ(state.exception().name(), "simppl.dbus.UnhandledException");
 #endif
@@ -167,6 +166,51 @@ struct Server : simppl::dbus::Skeleton<Errors>
 
 
 }   // anonymous namespace
+
+
+TEST(Errors, default_type)
+{
+	simppl::dbus::Dispatcher d("bus:session");
+    Client c(d);
+    
+    bool called = false;
+    
+    try
+    {
+		c.hello2();
+	}
+	catch(const test::MyException& e)
+    {
+		ASSERT_FALSE(true);        
+    }
+    catch(const simppl::dbus::Error& e)
+    {
+		// since server is not running, the returned error must be of simppl standard error type
+		called = true;		
+    }
+    EXPECT_TRUE(called);
+    
+    c.hello2.async() >> [](const simppl::dbus::CallState& state){
+				
+		EXPECT_STREQ(state.exception().name(), "My.Exception");
+		
+		bool called = false;
+		try
+		{
+			state.as<MyException>();
+			EXPECT_TRUE(false);
+		}
+		catch(simppl::dbus::Error&)
+		{
+			EXPECT_TRUE(false);
+		}
+		catch(std::runtime_error&)
+		{
+			called = true;
+		}
+		EXPECT_TRUE(called);
+	};
+}
 
 
 TEST(Errors, methods)
@@ -263,13 +307,12 @@ TEST(Errors, blocking)
    }
    catch(const test::MyException& e)
    {
-       EXPECT_STREQ(e.name(), "simppl.dbus.UnhandledException");
-       // e.rc is not set
+	   ASSERT_FALSE(true);       
    }
    catch(const simppl::dbus::Error& e)
    {
-       // does not reach the default exception handler
-       ASSERT_FALSE(true);
+       // unhandled exception will be mapped to default error
+       ASSERT_TRUE(true);
    }
    catch(...)
    {

@@ -83,7 +83,7 @@ struct CallbackHolder
        auto that = (CallbackHolder*)data;
        assert(that->f_);
 
-       TCallState<ErrorT> cs(*msg);
+       CallState cs(*msg, (ErrorT*)nullptr);
 
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);

@@ -26,7 +26,7 @@ namespace detail {
 struct Error : public std::exception
 {
     template<typename> friend struct detail::ErrorFactory;
-    template<typename> friend struct TCallState;
+    friend struct CallState;
     template<typename...> friend struct ClientMethod;
     friend struct StubBase;
 

@@ -3,6 +3,7 @@
 
 
 #include <cstdint>
+#include <cstring>
 
 #include "simppl/error.h"
 
@@ -21,20 +22,24 @@ namespace dbus
 // forward decl
 namespace detail {
     template<typename, typename, typename> struct CallbackHolder;
-    template<typename, typename> struct PropertyCallbackHolder;
+    template<typename, typename> struct PropertyCallbackHolder;    
 }
 
 
-template<typename ErrorT>
-struct TCallState
+struct CallState
 {
     template<typename, typename, typename> friend struct detail::CallbackHolder;
     template<typename, typename> friend struct detail::PropertyCallbackHolder;
     template<typename, int> friend struct ClientProperty;
     friend struct StubBase;
+    
+private:
 
+    static std::unique_ptr<Error> error_from_message(DBusMessage& msg);
+    
+public:
 
-   TCallState(TCallState&& st)
+   CallState(CallState&& st)
     : ex_(st.ex_.release())
     , serial_(st.serial_)
    {
@@ -56,22 +61,36 @@ struct TCallState
    }
 
    inline
-   const char*  what() const
+   const char* what() const
    {
       return ex_->what();
    }
 
    inline
-   const ErrorT& exception() const
+   const Error& exception() const
    {
       return *ex_;
+   }
+   
+   template<typename ErrorT>
+   inline
+   const ErrorT& as() const
+   {
+	   if (ex_)
+	   {
+		   const ErrorT* p = dynamic_cast<const ErrorT*>(ex_.get());
+		   if (p)
+			  return *p;
+	   }
+	   
+	   throw std::runtime_error("invalid type or no error");
    }
 
 
 private:
 
    explicit inline
-   TCallState(uint32_t serial)
+   CallState(uint32_t serial)
     : ex_()
     , serial_(serial)
    {
@@ -79,9 +98,9 @@ private:
    }
 
 
-   /// @param ex The function takes ownership of the exception.
+   /// @param ex The function takes ownership of the exception.   
    explicit inline
-   TCallState(ErrorT* ex)
+   CallState(Error* ex)
     : ex_(ex)
     , serial_(SIMPPL_INVALID_SERIAL)
    {
@@ -89,26 +108,35 @@ private:
    }
 
 
-   TCallState(DBusMessage& msg)
+   CallState(DBusMessage& msg);   
+   
+   template<typename ErrorT>
+   CallState(DBusMessage& msg, ErrorT* /*type identity only*/)
     : ex_()
     , serial_(SIMPPL_INVALID_SERIAL)
    {
       if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
       {
-         ex_.reset(new ErrorT);
-         detail::ErrorFactory<ErrorT>::init(*ex_, msg);
+		 if (!strcmp(dbus_message_get_signature(&msg), DBUS_TYPE_STRING_AS_STRING))
+  		 {				
+			ex_ = error_from_message(msg);			
+		 }
+		 else			
+		 {    
+			ErrorT* err = new ErrorT;			 
+            detail::ErrorFactory<ErrorT>::init(*err, msg);
+            ex_.reset(err);         
+		 }		 
       }
       else
-         serial_ = dbus_message_get_reply_serial(&msg);
+         serial_ = dbus_message_get_reply_serial(&msg); 
    }
 
 
-   std::unique_ptr<ErrorT> ex_;
+   std::unique_ptr<Error> ex_;
    uint32_t serial_;
 };
 
-
-typedef TCallState<Error> CallState;
 
 
 }   // namespace dbus

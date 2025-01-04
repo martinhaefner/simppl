@@ -63,17 +63,17 @@ struct ErrorFactory
         dbus_message_iter_init(&msg, &iter);
 
         std::string text;
-        decode(iter, text);
-
+        decode(iter, text);        
+        
         // set default members
-        err.set_members(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg));
+		err.set_members(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg));
 
         // any other unexpected dbus error, e.g. exception during method body
-        if (dbus_message_iter_get_arg_type(&iter) != 0)
-        {
+        if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INVALID)
+        {					
             // and now the rest
-            decode(iter, err);
-        }
+            decode(iter, err);                   
+        }        
     }
 };
 

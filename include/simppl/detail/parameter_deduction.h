@@ -269,7 +269,7 @@ template<typename ErrorT, typename... T>
 struct generate_callback_function
 {
    typedef typename filter<is_out, T...>::list_type list_type;
-   typedef typename make_function_from_list<list_type, std::function<void(const TCallState<ErrorT>&)>>::type type;
+   typedef typename make_function_from_list<list_type, std::function<void(const CallState&)>>::type type;
 };
 
 template<typename... T>
