@@ -1,6 +1,7 @@
 #ifndef SIMPPL_DETAIL_ERROR_H
 #define SIMPPL_DETAIL_ERROR_H
 
+#include <iostream>  // FIXME remove this
 
 #include "simppl/types.h"
 #include "simppl/string.h"
@@ -90,7 +91,7 @@ struct ErrorFactory<Error>
 
     static
     void init(Error& err, DBusMessage& msg)
-    {
+    {		
         DBusMessageIter iter;
         dbus_message_iter_init(&msg, &iter);
 

@@ -109,7 +109,8 @@ struct Client : simppl::dbus::Stub<Errors>
             hello2.async() >> [this](const simppl::dbus::CallState& state){
                 EXPECT_FALSE((bool)state);
                 EXPECT_STREQ(state.exception().name(), "My.Exception");
-                EXPECT_EQ(42, state.as<MyException>().rc);
+                EXPECT_NE(state.as<MyException>(), nullptr);
+                EXPECT_EQ(42, state.as<MyException>()->rc);
 
                 hello3.async() >> [this](const simppl::dbus::CallState& state){
                     EXPECT_FALSE((bool)state);
@@ -187,28 +188,15 @@ TEST(Errors, default_type)
     {
 		// since server is not running, the returned error must be of simppl standard error type
 		called = true;		
-    }
+    }    
     EXPECT_TRUE(called);
     
     c.hello2.async() >> [](const simppl::dbus::CallState& state){
 				
 		EXPECT_STREQ(state.exception().name(), "My.Exception");
-		
-		bool called = false;
-		try
-		{
-			state.as<MyException>();
-			EXPECT_TRUE(false);
-		}
-		catch(simppl::dbus::Error&)
-		{
-			EXPECT_TRUE(false);
-		}
-		catch(std::runtime_error&)
-		{
-			called = true;
-		}
-		EXPECT_TRUE(called);
+				
+		EXPECT_EQ(state.as<MyException>(), nullptr);
+		EXPECT_NE(state.as<simppl::dbus::Error>(), nullptr);		
 	};
 }
 
@@ -254,8 +242,9 @@ TEST(Errors, blocking)
    {
       EXPECT_STREQ(e.name(), "shit.happens");
    }
-   catch(...)
+   catch(std::exception& ex)
    {
+	   std::cout << ex.what() << std::endl;
       ASSERT_FALSE(true);
    }
 

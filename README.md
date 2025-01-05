@@ -503,18 +503,13 @@ blocking API:
    {
       if (!st)      
       {
-         // exception could either be 1) of standard type, e.g. when service 
-         // is not available or 2) of dedicated type as returned from the MyHello 
-         // implementation above
-         try
-         {
-            int res = st.as<MyError>().result;
-            ...
-         }
-         catch(std::runtime_error&)
-         {
-            // probably standard error
-         }  
+         // exception could either be 
+         // 1) of standard type, e.g. when service is not available or 
+         // 2) of dedicated type as returned from the MyHello implementation above
+         
+         auto err = st.as<MyError>();
+         if (err)
+		    std::cout << "rc=: " << err->rc << std::endl;
       }
    };
 ```

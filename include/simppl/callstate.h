@@ -21,23 +21,18 @@ namespace dbus
 
 // forward decl
 namespace detail {
-    template<typename, typename, typename> struct CallbackHolder;
-    template<typename, typename> struct PropertyCallbackHolder;    
+   template<typename, typename, typename> struct CallbackHolder;
+   template<typename, typename> struct PropertyCallbackHolder;    
 }
 
 
 struct CallState
 {
-    template<typename, typename, typename> friend struct detail::CallbackHolder;
-    template<typename, typename> friend struct detail::PropertyCallbackHolder;
-    template<typename, int> friend struct ClientProperty;
-    friend struct StubBase;
+   template<typename, typename, typename> friend struct detail::CallbackHolder;
+   template<typename, typename> friend struct detail::PropertyCallbackHolder;
+   template<typename, int> friend struct ClientProperty;
+   friend struct StubBase;    
     
-private:
-
-    static std::unique_ptr<Error> error_from_message(DBusMessage& msg);
-    
-public:
 
    CallState(CallState&& st)
     : ex_(st.ex_.release())
@@ -74,16 +69,14 @@ public:
    
    template<typename ErrorT>
    inline
-   const ErrorT& as() const
+   const ErrorT* as() const
    {
-	   if (ex_)
-	   {
-		   const ErrorT* p = dynamic_cast<const ErrorT*>(ex_.get());
-		   if (p)
-			  return *p;
-	   }
+	   const ErrorT* rc = nullptr;
 	   
-	   throw std::runtime_error("invalid type or no error");
+	   if (ex_)	   
+		   rc = dynamic_cast<const ErrorT*>(ex_.get());		   	   
+	   
+	   return rc;
    }
 
 
@@ -118,8 +111,9 @@ private:
       if (dbus_message_get_type(&msg) == DBUS_MESSAGE_TYPE_ERROR)
       {
 		 if (!strcmp(dbus_message_get_signature(&msg), DBUS_TYPE_STRING_AS_STRING))
-  		 {				
-			ex_ = error_from_message(msg);			
+  		 {	
+			ex_.reset(new Error);			
+			detail::ErrorFactory<Error>::init(*ex_, msg);			
 		 }
 		 else			
 		 {    

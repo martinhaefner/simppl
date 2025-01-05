@@ -145,7 +145,7 @@ struct ServerMethod : ServerMethodBase
     typedef typename detail::generate_serializer<typename return_type_generator::list_type>::type serializer_type;
 
     typedef typename detail::get_exception_type<ArgsT...>::type                                   exception_type;
-
+    
     static_assert(!is_oneway || (is_oneway && std::is_same<return_type, void>::value), "oneway check");
 
 
