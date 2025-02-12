@@ -32,6 +32,7 @@ SET(UNITTEST_SOURCES
    multi_interface.cpp
    no_interface.cpp
    utils.cpp
+   type_mapper.cpp
    any.cpp
 )
 

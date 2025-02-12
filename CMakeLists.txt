@@ -20,6 +20,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+option(SIMPPL_USE_POLL "On to enable poll for dbus events. This requires a dbus implementation with a proper `/org/freedesktop/DBus` for filtering signals." ON)
+if(SIMPPL_USE_POLL)
+    add_compile_definitions(SIMPPL_USE_POLL)
+endif()
+
 # enable introspection by default
 option(HAVE_INTROSPECTION "Have introspection" ON)
 include(CMakeDependentOption)
@@ -47,7 +52,7 @@ find_package(DBus REQUIRED)
 find_package(Boost)
 
 
-add_library(simppl SHARED
+add_library(simppl
     src/dispatcher.cpp
     src/error.cpp
     src/serverresponseholder.cpp
@@ -65,6 +70,7 @@ add_library(simppl SHARED
     src/clientside.cpp
     src/serialization.cpp
     src/bool.cpp
+    src/any.cpp
     src/holders.cpp
     src/properties.cpp
     src/objectmanagermixin.cpp

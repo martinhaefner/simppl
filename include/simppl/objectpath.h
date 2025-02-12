@@ -86,6 +86,9 @@ struct ObjectPathCodec
    std::ostream& make_type_signature(std::ostream& os);
 };
 
+template<> struct
+detail::typecode_switch<simppl::dbus::ObjectPath> { enum { value = DBUS_TYPE_OBJECT_PATH }; };
+
 
 template<>
 struct Codec<ObjectPath> : public ObjectPathCodec {};

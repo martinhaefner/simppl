@@ -17,6 +17,13 @@ namespace simppl
 namespace dbus
 {
 
+// Type trait to check for `serializer_type` declaration inside a struct. 
+template <typename, typename = std::void_t<>>
+struct has_serializer_type : std::false_type{};
+
+template <typename T>
+struct has_serializer_type<T, std::void_t<typename T::serializer_type>> : std::true_type{};
+
 
 template<typename T1, typename T2>
 struct SerializerTuple : T1
