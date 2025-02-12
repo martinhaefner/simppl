@@ -188,7 +188,7 @@ private:
        DBusMessageIter iter;
        dbus_message_iter_init(msg, &iter);
 
-       detail::GetCaller<args_type>::type::template eval(iter, ((ServerMethod*)obj)->f_);
+       detail::GetCaller<args_type>::type::template eval<>(iter, ((ServerMethod*)obj)->f_);
    }
 
 

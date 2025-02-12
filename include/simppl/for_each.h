@@ -60,7 +60,7 @@ struct StdTupleForEach
    {
      enum { __M = std::tuple_size<typename std::remove_const<TupleT>::type>::value - N };
       func(std::get<__M>(t));
-      StdTupleForEach<N-1>::template eval(t, func);
+      StdTupleForEach<N-1>::template eval<TupleT, FunctorT>(t, func);
    }
 };
 
@@ -81,7 +81,7 @@ template<typename TupleT, typename FunctorT>
 inline
 void std_tuple_for_each(TupleT& t, FunctorT functor)
 {
-   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value>::template eval(t, functor);
+   StdTupleForEach<std::tuple_size<typename std::remove_const<TupleT>::type>::value>::template eval<TupleT, FunctorT>(t, functor);
 }
 
 

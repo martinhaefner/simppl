@@ -26,28 +26,28 @@ struct FunctionCaller
    static inline
    void eval(FunctorT& f, const TupleT& tuple)
    {
-      FunctionCaller<N, TupleT>::template eval_intern(f, tuple);
+      FunctionCaller<N, TupleT>::template eval_intern<FunctorT>(f, tuple);
    }
 
    template<typename FunctorT, typename ErrorT>
    static inline
    void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& tuple)
    {
-      FunctionCaller<N, TupleT>::template eval_intern_cs(f, cs, tuple);
+      FunctionCaller<N, TupleT>::template eval_intern_cs<FunctorT, ErrorT>(f, cs, tuple);
    }
 
    template<typename FunctorT, typename... T>
    static inline
    void eval_intern(FunctorT& f, const TupleT& tuple, const T&... t)
    {
-     FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern(f, tuple, t..., std::get<N>(tuple));
+     FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern<FunctorT>(f, tuple, t..., std::get<N>(tuple));
    }
 
    template<typename FunctorT, typename ErrorT, typename... T>
    static inline
    void eval_intern_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& tuple, const T&... t)
    {
-      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs(f, cs, tuple, t..., std::get<N>(tuple));
+      FunctionCaller<N+1 == std::tuple_size<TupleT>::value ? -1 : N+1, TupleT>::template eval_intern_cs<FunctorT, ErrorT>(f, cs, tuple, t..., std::get<N>(tuple));
    }
 };
 
@@ -91,7 +91,7 @@ struct DeserializeAndCall : simppl::NonInstantiable
       std::tuple<T> tuple;
       Codec<std::tuple<T>>::decode_flattened(iter, tuple);
 
-      FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
+      FunctionCaller<0, std::tuple<T>>::template eval<FunctorT>(f, tuple);
    }
 
    template<typename FunctorT, typename ErrorT>
@@ -103,7 +103,7 @@ struct DeserializeAndCall : simppl::NonInstantiable
       if (cs)
          Codec<std::tuple<T>>::decode_flattened(iter, tuple);
 
-      FunctionCaller<0, std::tuple<T>>::template eval_cs(f, cs, tuple);
+      FunctionCaller<0, std::tuple<T>>::template eval_cs<FunctorT, ErrorT>(f, cs, tuple);
    }
 };
 
@@ -118,7 +118,7 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
       std::tuple<T...> tuple;
       Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
 
-      FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
+      FunctionCaller<0, std::tuple<T...>>::template eval<FunctorT>(f, tuple);
    }
 
    template<typename FunctorT, typename ErrorT>
@@ -130,7 +130,7 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
       if (cs)
          Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
 
-      FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
+      FunctionCaller<0, std::tuple<T...>>::template eval_cs<FunctorT, ErrorT>(f, cs, tuple);
    }
 };
 
