@@ -134,7 +134,9 @@ template <> Any decode2(DBusMessageIter &iter) {
   std::string elementSignature = dbus_message_iter_get_signature(&varIter);
 
   int type = dbus_message_iter_get_arg_type(&varIter);
+  std::cout << "x " << elementSignature << std::endl;
   std::any any = decodeAsAny(varIter, type);
+  std::cout << "y" << std::endl;
 
   // Advance to next element
   dbus_message_iter_next(&iter);

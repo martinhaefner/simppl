@@ -15,26 +15,26 @@ namespace dbus
 template<typename T, typename Alloc>
 struct Codec<std::vector<T, Alloc>>
 {
-   static 
+   static
    void encode(DBusMessageIter& s, const std::vector<T, Alloc>& v)
    {
       DBusMessageIter iter;
-      
+
       std::ostringstream buf;
       Codec<T>::make_type_signature(buf);
 
       dbus_message_iter_open_container(&s, DBUS_TYPE_ARRAY, buf.str().c_str(), &iter);
 
-      for (auto& t : v) 
+      for (auto& t : v)
       {
          Codec<T>::encode(iter, t);
       }
 
       dbus_message_iter_close_container(&s, &iter);
    }
-   
-   
-   static 
+
+
+   static
    void decode(DBusMessageIter& s, std::vector<T, Alloc>& v)
    {
       v.clear();
@@ -52,15 +52,15 @@ struct Codec<std::vector<T, Alloc>>
       // advance to next element
       dbus_message_iter_next(&s);
    }
-   
-   
+
+
    static inline
    std::ostream& make_type_signature(std::ostream& os)
    {
       return Codec<T>::make_type_signature(os << DBUS_TYPE_ARRAY_AS_STRING);
    }
 
-}; 
+};
 
 template<typename T, typename Alloc>
 struct detail::typecode_switch<std::vector<T, Alloc>> { enum { value = DBUS_TYPE_ARRAY }; };

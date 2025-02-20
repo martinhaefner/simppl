@@ -130,7 +130,7 @@ template <> struct Codec<Any> {
 
   static void decode(DBusMessageIter &orig, Any &v) {
     v = decode2<Any>(orig);
-    dbus_message_iter_next(&orig);
+    //dbus_message_iter_next(&orig);
   }
 
   static inline std::ostream &make_type_signature(std::ostream &os) {
@@ -206,14 +206,19 @@ struct is_type<std::map<Key, T, Compare, Allocator>>;
 template<typename T>
 struct get_underlying_type
 {
-	// enum to int mapping is simppl specific
-	using type = typename std::conditional_t<std::is_enum_v<T>, int, T>;
+    // enum to int mapping is simppl specific
+    using type = typename std::conditional_t<std::is_enum_v<T>, int, T>;
 };
 
 template <typename T> struct is_type {
   static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
       return is_type<T>::check(std::any_cast<Any>(any).value_);
+    }
+    if (any.type() == typeid(IntermediateAnyTuple)) {
+        std::ostringstream oss;
+        Codec<T>::make_type_signature(oss);
+        return oss.str() == std::any_cast<IntermediateAnyTuple>(any).elementsSignature;
     }
     if (any.type() == typeid(IntermediateAnyVec)) {
       return false;
@@ -347,18 +352,45 @@ template <typename T> bool Any::is() const { return is_type<T>::check(value_); }
 
 // --------------------------------------TYPE-CONVERT--------------------------------------
 
-template <typename T> struct as_type {
-  static T convert(const std::any &any) {
-    assert(any.type() != typeid(IntermediateAnyVec));
-    assert(any.type() != typeid(IntermediateAnyTuple));
-    assert(any.type() != typeid(IntermediateAnyMapElement));
+// forward decl
+template<typename T> struct as_type;
 
-    if (any.type() == typeid(Any)) {
-      return as_type<T>::convert(std::any_cast<Any>(any).value_);
+
+template<typename T>
+struct convert_triv
+{
+    static
+    T eval(const std::any &any)
+    {
+        assert(any.type() != typeid(IntermediateAnyVec));
+        assert(any.type() != typeid(IntermediateAnyTuple));
+        assert(any.type() != typeid(IntermediateAnyMapElement));
+
+        if (any.type() == typeid(Any))
+            return as_type<T>::convert(std::any_cast<Any>(any).value_);
+
+        return static_cast<T>(std::any_cast<typename get_underlying_type<T>::type>(any));   // static cast because of enums
     }
-    return static_cast<T>(std::any_cast<typename get_underlying_type<T>::type>(any));
-  }
 };
+
+template<typename T>
+struct convert_struct
+{
+    static
+    T eval(const std::any &any);
+};
+
+
+template <typename T>
+struct as_type
+{
+    static T convert(const std::any &any)
+    {
+        typedef typename std::conditional<has_serializer_type<T>::value, convert_struct<T>, convert_triv<T>>::type impl_type;
+        return impl_type::eval(any);
+    }
+};
+
 
 template <> struct as_type<Any> {
   static Any convert(const std::any &any) {
@@ -366,6 +398,7 @@ template <> struct as_type<Any> {
     return std::any_cast<Any>(any);
   }
 };
+
 
 template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
   static std::vector<T, Alloc> convert(const std::any &any) {
@@ -534,9 +567,106 @@ std::any to_intermediate(const std::variant<Types...> &variant);
 template <typename Key, typename T, typename Compare, typename Allocator>
 std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map);
 
+template<typename T1, typename T2>
+struct IntermediateSerializerTuple : T1
+{
+   void to_intermediate(IntermediateAnyTuple& t) const
+   {
+       T1::to_intermediate(t);
+       t.elements.push_back(simppl::dbus::to_intermediate(data_));
+   }
+
+
+   void from_intermediate(const IntermediateAnyTuple& t)
+   {
+       traverse(t.elements.rbegin());
+   }
+
+   void traverse(std::vector<std::any>::const_reverse_iterator iter)
+   {
+       T1::traverse(iter+1);
+       data_ = as_type<T2>::convert(*iter);
+   }
+
+
+   static
+   void make_type_signature(std::ostream& os)
+   {
+      T1::make_type_signature(os);
+      Codec<T2>::make_type_signature(os);
+   }
+
+   T2 data_;
+};
+
+
+template<typename T>
+struct IntermediateSerializerTuple<T, NilType>
+{
+   void to_intermediate(IntermediateAnyTuple& t) const
+   {
+       t.elementTypes.push_back(get_debus_type<T>());
+       t.elements.push_back(simppl::dbus::to_intermediate(data_));
+   }
+
+
+   void traverse(std::vector<std::any>::const_reverse_iterator iter)
+   {
+       data_ = as_type<T>::convert(*iter);
+   }
+
+
+   static
+   void make_type_signature(std::ostream& os)
+   {
+      Codec<T>::make_type_signature(os);
+   }
+
+   T data_;
+};
+
+template<typename T>
+struct convert_serializer;
+
+template<typename T1, typename T2, typename T3>
+struct convert_serializer<simppl::dbus::SerializerTuple<simppl::dbus::SerializerTuple<T1, T2>, T3>>
+{
+    typedef IntermediateSerializerTuple<typename convert_serializer<simppl::dbus::SerializerTuple<T1, T2>>::type, T3> type;
+};
+
+template<typename T>
+struct convert_serializer<simppl::dbus::SerializerTuple<T, NilType>>
+{
+    typedef IntermediateSerializerTuple<T, NilType> type;
+};
+
+
+/*static*/
+template<typename T>
+T convert_struct<T>::eval(const std::any &any)
+{
+    T t;
+
+    typename convert_serializer<typename T::serializer_type>::type* conv = (typename convert_serializer<typename T::serializer_type>::type*)&t;
+
+    conv->from_intermediate(std::any_cast<IntermediateAnyTuple>(any));
+    return t;
+}
+
+
 // For all structs with the `serializer_type` declaration.
 template <typename T, typename std::enable_if<has_serializer_type<T>::value, int>::type = 0>
-std::any to_intermediate(const T &t) { return t; } // TODO continue with the intermediate representation here
+std::any to_intermediate(const T &t) {
+    IntermediateAnyTuple tup;
+    typename convert_serializer<typename T::serializer_type>::type* conv = (typename convert_serializer<typename T::serializer_type>::type*)&t;
+    conv->to_intermediate(tup);
+    std::ostringstream oss;
+    oss << "(";
+    conv->make_type_signature(oss);
+    oss << ")";
+    tup.elementsSignature = oss.str();
+    return tup;
+}
 
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec) {

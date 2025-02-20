@@ -3,6 +3,7 @@
 
 
 #include <tuple>
+#include <functional>
 
 #include "simppl/serialization.h"
 #include "simppl/for_each.h"
@@ -26,7 +27,7 @@ struct TupleSerializer // : noncopable
    {
       dbus_message_iter_open_container(&orig_, DBUS_TYPE_STRUCT, nullptr, &iter_);
    }
-   
+
 
    inline
    ~TupleSerializer()
@@ -65,46 +66,46 @@ struct TupleDeserializer // : noncopable
    template<typename T>
    void operator()(T& t);
 
-   
+
    DBusMessageIter& orig_;
    DBusMessageIter iter_;
-   
+
    DBusMessageIter* use_;
-   
+
    bool flattened_;
 };
 
 
 }   // namespace detail
 
-   
+
 template<typename... T>
 struct Codec<std::tuple<T...>>
 {
-   static 
+   static
    void encode(DBusMessageIter& iter, const std::tuple<T...>& t)
    {
       detail::TupleSerializer ts(iter);
       std_tuple_for_each(t, std::ref(ts));
    }
-   
-   
-   static 
+
+
+   static
    void decode(DBusMessageIter& iter, std::tuple<T...>& t)
    {
       detail::TupleDeserializer tds(iter);
       std_tuple_for_each(t, std::ref(tds));
    }
-   
-   
+
+
    static
    void decode_flattened(DBusMessageIter& iter, std::tuple<T...>& t)
    {
       detail::TupleDeserializer tds(iter, true);
       std_tuple_for_each(t, std::ref(tds));
    }
-   
-   
+
+
    // if templated lambdas are available this could be removed!
    struct helper
    {
@@ -128,10 +129,10 @@ struct Codec<std::tuple<T...>>
    std::ostream& make_type_signature(std::ostream& os)
    {
       os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
-      
+
       std::tuple<T...>* t = nullptr;
       std_tuple_for_each(*t, helper(os));
-      
+
       os << DBUS_STRUCT_END_CHAR_AS_STRING;
 
       return os;
