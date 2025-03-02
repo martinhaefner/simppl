@@ -11,9 +11,6 @@ if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
     set(SIMPPL_NOT_SUBPROJECT ON)
 endif()
 
-# Reference the FindDBus module until an upstream one is available
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
-
 set(CMAKE_CXX_STANDARD 17)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -42,10 +39,10 @@ endif()
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
-
-find_package(DBus REQUIRED)
 find_package(Boost)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(DBUS REQUIRED dbus-1)
 
 add_library(simppl SHARED
     src/dispatcher.cpp
@@ -90,11 +87,15 @@ target_include_directories(simppl
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        ${DBUS_INCLUDE_DIRS}
 )
-
+target_link_directories(simppl
+    PUBLIC
+        ${DBUS_LIBRARY_DIRS}
+)
 target_compile_options(simppl PRIVATE -Werror -Wall -Wno-error=deprecated-declarations)
 target_link_libraries(simppl PUBLIC
-    DBUS::DBUS
+    ${DBUS_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
