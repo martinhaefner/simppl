@@ -83,15 +83,16 @@ if(SIMPPL_HAVE_OBJECTMANAGER)
     target_compile_definitions(simppl PUBLIC SIMPPL_HAVE_OBJECTMANAGER=1)
 endif()
 
+include_directories(simppl
+    ${DBUS_INCLUDE_DIRS}
+)
 target_include_directories(simppl
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        ${DBUS_INCLUDE_DIRS}
 )
-target_link_directories(simppl
-    PUBLIC
-        ${DBUS_LIBRARY_DIRS}
+link_directories(simppl
+    ${DBUS_LIBRARY_DIRS}
 )
 target_compile_options(simppl PRIVATE -Werror -Wall -Wno-error=deprecated-declarations)
 target_link_libraries(simppl PUBLIC
@@ -127,6 +128,7 @@ if(SIMPPL_NOT_SUBPROJECT)
         NAMESPACE Simppl::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/simppl
     )
+
     install(DIRECTORY include/simppl
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
