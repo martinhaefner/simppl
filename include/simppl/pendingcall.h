@@ -1,7 +1,7 @@
 #ifndef SIMPPL_PENDINGCALL_H
 #define SIMPPL_PENDINGCALL_H
 
-
+#include <cstdint>
 #include "simppl/types.h"
 
 namespace simppl
