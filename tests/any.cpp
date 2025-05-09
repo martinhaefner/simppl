@@ -28,7 +28,6 @@ using simppl::dbus::in;
 using simppl::dbus::oneway;
 using simppl::dbus::out;
 
-
 namespace test {
 namespace any {
 struct complex {
@@ -318,6 +317,17 @@ TEST(Any, types) {
   EXPECT_EQ(1, v[0]);
   EXPECT_EQ(2, v[1]);
   EXPECT_EQ(3, v[2]);
+
+  simppl::dbus::Any f(
+      std::vector<simppl::dbus::Any>{std::tuple<std::string, int>{"olaf", 1}});
+  EXPECT_FALSE(f.is<std::vector<std::tuple<std::string>>>());
+  bool fResult = f.is<std::vector<std::tuple<std::string, int>>>();
+  EXPECT_TRUE(fResult);
+
+  simppl::dbus::Any g(
+      std::vector<simppl::dbus::Any>{std::map<std::string, int>{{"olaf", 1}}});
+  bool gb = g.is<std::vector<std::map<std::string, int>>>();
+  EXPECT_TRUE(gb);
 }
 
 void test_enc_dec_f(
@@ -661,17 +671,18 @@ TEST(Any, encode_decode_variant) {
 }
 
 struct TestStruct1 {
-    using serializer_type = typename simppl::dbus::make_serializer<uint8_t, std::string>::type;
+  using serializer_type =
+      typename simppl::dbus::make_serializer<uint8_t, std::string>::type;
 
-    uint8_t u1;
-    std::string s2;
+  uint8_t u1;
+  std::string s2;
 
-    bool operator==(const TestStruct1& other) const {
-        return u1 == other.u1 && s2 == other.s2;
-    }
+  bool operator==(const TestStruct1 &other) const {
+    return u1 == other.u1 && s2 == other.s2;
+  }
 };
 
 TEST(Any, encode_decode_struct) {
-    TestStruct1 s1{42, "Olla"};
-    test_enc_dec(s1);
+  TestStruct1 s1{42, "Olla"};
+  test_enc_dec(s1);
 }

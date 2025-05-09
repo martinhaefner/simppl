@@ -21,11 +21,11 @@
 #include "simppl/map.h"
 #include "simppl/pod.h"
 #include "simppl/serialization.h"
+#include "simppl/struct.h"
 #include "simppl/tuple.h"
 #include "simppl/type_mapper.h"
 #include "simppl/variant.h"
 #include "simppl/vector.h"
-#include "simppl/struct.h"
 
 namespace simppl {
 
@@ -61,7 +61,7 @@ struct Any {
   std::string containedTypeSignature;
   std::any value_;
 
-  Any(){};
+  Any() {};
 
   Any(int type, std::string &&containedTypeSignature, std::any &&any)
       : containedType(type),
@@ -203,11 +203,9 @@ template <typename... Types> struct is_type<std::variant<Types...>>;
 template <typename Key, typename T, typename Compare, typename Allocator>
 struct is_type<std::map<Key, T, Compare, Allocator>>;
 
-template<typename T>
-struct get_underlying_type
-{
-	// enum to int mapping is simppl specific
-	using type = typename std::conditional_t<std::is_enum_v<T>, int, T>;
+template <typename T> struct get_underlying_type {
+  // enum to int mapping is simppl specific
+  using type = typename std::conditional_t<std::is_enum_v<T>, int, T>;
 };
 
 template <typename T> struct is_type {
@@ -229,7 +227,8 @@ template <> struct is_type<Any> {
 template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
   static bool check(const std::any &any) {
     if (any.type() == typeid(Any)) {
-      return is_type<std::vector<T, Alloc>>::check(std::any_cast<Any>(any).value_);
+      return is_type<std::vector<T, Alloc>>::check(
+          std::any_cast<Any>(any).value_);
     }
     if (any.type() != typeid(IntermediateAnyVec)) {
       return false;
@@ -246,16 +245,15 @@ template <typename T, typename Alloc> struct is_type<std::vector<T, Alloc>> {
 
 // Base case: Last type
 template <size_t I = 0, typename... Types>
-inline std::enable_if_t<I >= sizeof...(Types), bool>
+inline std::enable_if_t<(I >= sizeof...(Types)), bool>
 check_tuple_rec(const std::vector<std::any> & /*elements*/) {
   return true;
 }
 
 // Recursive case
 template <size_t I = 0, typename... Types>
-    inline std::enable_if_t <
-    I<sizeof...(Types), bool>
-    check_tuple_rec(const std::vector<std::any> &elements) {
+inline std::enable_if_t<(I < sizeof...(Types)), bool>
+check_tuple_rec(const std::vector<std::any> &elements) {
   if (I >= elements.size()) {
     return false;
   }
@@ -269,6 +267,11 @@ template <size_t I = 0, typename... Types>
 
 template <typename... Types> struct is_type<std::tuple<Types...>> {
   static bool check(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return is_type<std::tuple<Types...>>::check(
+          std::any_cast<Any>(any).value_);
+    }
+
     if (any.type() != typeid(IntermediateAnyTuple)) {
       return false;
     }
@@ -316,6 +319,11 @@ template <typename... Types> struct is_type<std::variant<Types...>> {
 template <typename Key, typename T, typename Compare, typename Allocator>
 struct is_type<std::map<Key, T, Compare, Allocator>> {
   static bool check(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return is_type<std::vector<IntermediateAnyMapElement, Allocator>>::check(
+          std::any_cast<Any>(any).value_);
+    }
+
     if (any.type() != typeid(IntermediateAnyVec)) {
       return false;
     }
@@ -356,7 +364,8 @@ template <typename T> struct as_type {
     if (any.type() == typeid(Any)) {
       return as_type<T>::convert(std::any_cast<Any>(any).value_);
     }
-    return static_cast<T>(std::any_cast<typename get_underlying_type<T>::type>(any));
+    return static_cast<T>(
+        std::any_cast<typename get_underlying_type<T>::type>(any));
   }
 };
 
@@ -370,7 +379,8 @@ template <> struct as_type<Any> {
 template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
   static std::vector<T, Alloc> convert(const std::any &any) {
     if (any.type() == typeid(Any)) {
-      return as_type<std::vector<T, Alloc>>::convert(std::any_cast<Any>(any).value_);
+      return as_type<std::vector<T, Alloc>>::convert(
+          std::any_cast<Any>(any).value_);
     }
     assert(any.type() == typeid(IntermediateAnyVec));
 
@@ -386,7 +396,7 @@ template <typename T, typename Alloc> struct as_type<std::vector<T, Alloc>> {
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), void>
 convert_tuple_rec(const std::vector<std::any> &elements,
-                  std::tuple<Types...> &/*result*/) {
+                  std::tuple<Types...> & /*result*/) {
   assert(I == elements.size());
 }
 
@@ -404,6 +414,10 @@ convert_tuple_rec(const std::vector<std::any> &elements,
 
 template <typename... Types> struct as_type<std::tuple<Types...>> {
   static std::tuple<Types...> convert(const std::any &any) {
+    if (any.type() == typeid(Any)) {
+      return as_type<std::tuple<Types...>>::convert(
+          std::any_cast<Any>(any).value_);
+    }
     assert(any.type() == typeid(IntermediateAnyTuple));
 
     std::tuple<Types...> result;
@@ -518,9 +532,13 @@ template <typename T> std::string get_signature_func(const T &t) {
 
 // --------------------------------INTERMEDIATE-CONVERSION---------------------------------
 
-// For all types that are no structs and do not have the `serializer_type` declaration.
-template <typename T, typename std::enable_if<!has_serializer_type<T>::value, int>::type = 0>
-std::any to_intermediate(const T &t) { return t; }
+// For all types that are no structs and do not have the `serializer_type`
+// declaration.
+template <typename T, typename std::enable_if<!has_serializer_type<T>::value,
+                                              int>::type = 0>
+std::any to_intermediate(const T &t) {
+  return t;
+}
 
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec);
@@ -535,8 +553,11 @@ template <typename Key, typename T, typename Compare, typename Allocator>
 std::any to_intermediate(const std::map<Key, T, Compare, Allocator> &map);
 
 // For all structs with the `serializer_type` declaration.
-template <typename T, typename std::enable_if<has_serializer_type<T>::value, int>::type = 0>
-std::any to_intermediate(const T &t) { return t; } // TODO continue with the intermediate representation here
+template <typename T,
+          typename std::enable_if<has_serializer_type<T>::value, int>::type = 0>
+std::any to_intermediate(const T &t) {
+  return t;
+} // TODO continue with the intermediate representation here
 
 template <typename T, typename Alloc>
 std::any to_intermediate(const std::vector<T, Alloc> &vec) {
@@ -557,9 +578,9 @@ std::any to_intermediate(const std::vector<T, Alloc> &vec) {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I == sizeof...(Types)), void>
-to_intermediate_tuple_rec(const std::tuple<Types...> &/*tuple*/,
+to_intermediate_tuple_rec(const std::tuple<Types...> & /*tuple*/,
                           std::vector<std::any> &tupleVec,
-                          std::vector<int> &tupleTypes, std::ostream &/*os*/) {
+                          std::vector<int> &tupleTypes, std::ostream & /*os*/) {
   assert((I == tupleVec.size()) && (I == tupleTypes.size()));
 }
 
@@ -598,7 +619,7 @@ std::any to_intermediate(const std::tuple<Types...> &tuple) {
 // Base case: Last type
 template <size_t I = 0, typename... Types>
 inline std::enable_if_t<(I >= sizeof...(Types)), Any>
-to_intermediate_variant_rec(const std::variant<Types...> &/*variant*/) {
+to_intermediate_variant_rec(const std::variant<Types...> & /*variant*/) {
   throw std::invalid_argument(
       "std::variant does not contain the required type. This is an exception "
       "that should not happen since the std::variant obviously contains it. If "
