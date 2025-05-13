@@ -87,7 +87,7 @@ struct Dispatcher
    inline
    int step(std::chrono::duration<RepT, PeriodT> duration)
    {
-       return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+       return step_ms(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()));
    }
 
    /**
