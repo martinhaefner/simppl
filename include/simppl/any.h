@@ -398,6 +398,7 @@ inline std::enable_if_t<(I >= sizeof...(Types)), void>
 convert_tuple_rec(const std::vector<std::any> &elements,
                   std::tuple<Types...> & /*result*/) {
   assert(I == elements.size());
+  (void)elements;
 }
 
 // Recursive case
