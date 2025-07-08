@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include "simppl/types.h"
+#include <cstdint>
 
 namespace simppl
 {

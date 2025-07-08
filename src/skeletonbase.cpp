@@ -34,7 +34,7 @@ using DemangledNamePtr = std::unique_ptr<char, FreeDeleter>;
 
 
 /*static*/
-DBusHandlerResult SkeletonBase::method_handler(DBusConnection* connection, DBusMessage* msg, void *user_data)
+DBusHandlerResult SkeletonBase::method_handler(DBusConnection* /*connection*/, DBusMessage* msg, void *user_data)
 {
    SkeletonBase* skel = (SkeletonBase*)user_data;
    return skel->handle_request(msg);

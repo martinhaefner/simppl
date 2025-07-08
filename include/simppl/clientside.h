@@ -106,7 +106,7 @@ private:
    static
    void __eval(ClientSignalBase* obj, DBusMessageIter& iter)
    {
-      detail::GetCaller<args_type>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
+      detail::GetCaller<args_type>::type::template eval<>(iter, ((ClientSignal*)(obj))->f_);
    }
 
    function_type f_;

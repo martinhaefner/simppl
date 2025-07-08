@@ -88,7 +88,7 @@ struct CallbackHolder
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
 
-       GetCaller<ReturnT>::type::template evalResponse(iter, that->f_, cs);
+       GetCaller<ReturnT>::type::template evalResponse<FuncT, ErrorT>(iter, that->f_, cs);
    }
 
    FuncT f_;

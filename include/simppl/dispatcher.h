@@ -48,12 +48,17 @@ struct Dispatcher
    Dispatcher& operator=(const Dispatcher&) = delete;
 
    /**
+    * @brief Construct a new Dispatcher object
+    * 
     * @param busname the busname to use, e.g. "bus:session" or "bus:system. nullptr means session.
+    * @param skipRegistration if true skips the initial registration with 'NameOwnerChanged' inside 'org.freedesktop.DBus'. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon). 
+    * @param skipEnumeration if true skips the initial enumeration with 'ListNames' inside 'org.freedesktop.DBus'. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon).
+    * @param hasStandardOrgFreedesktopDBus if false the implementation will not rely on `/org/freedesktop/DBus` for filtering signals. Instead we do our own filtering. This is useful in case you are dealing with an non standard dbus implementation like it's being done by rpm-ostree (https://coreos.github.io/rpm-ostree/architecture-daemon/#the-rpm-ostree-daemon).
     */
    inline
-   Dispatcher(const char* busname = nullptr)
+   Dispatcher(const char* busname = nullptr, bool skipRegistration = false, bool skipEnumeration = false, bool hasStandardOrgFreedesktopDBus = true) : hasStandardOrgFreedesktopDBus(hasStandardOrgFreedesktopDBus)
    {
-      init(SIMPPL_HAVE_INTROSPECTION, busname);
+      init(SIMPPL_HAVE_INTROSPECTION, busname, skipRegistration, skipEnumeration);
    }
 
    ~Dispatcher();
@@ -85,7 +90,7 @@ struct Dispatcher
    inline
    int step(std::chrono::duration<RepT, PeriodT> duration)
    {
-       return step_ms(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+       return step_ms(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()));
    }
 
    /**
@@ -130,7 +135,7 @@ private:
     * 'Inlined constructor' for checking match of introspection macro setting
     * in user-code and compiled shared library.
     */
-   void init(int have_introspection, const char* busname);
+   void init(int have_introspection, const char* busname, bool skipRegistration, bool skipEnumeration);
 
    void register_signal_match(const std::string& match_string);
    void unregister_signal_match(const std::string& match_string);
@@ -163,6 +168,7 @@ private:
 
    struct Private;
    Private* d;
+   bool hasStandardOrgFreedesktopDBus;
 };
 
 

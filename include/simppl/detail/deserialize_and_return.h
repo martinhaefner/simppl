@@ -1,6 +1,9 @@
 #ifndef SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H
 #define SIMPPL_DETAIL_DESERIALIZE_AND_RETURN_H
 
+#include <dbus/dbus.h>
+#include <tuple>
+#include "simppl/serialization.h"
 
 namespace simppl
 {

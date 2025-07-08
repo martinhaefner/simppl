@@ -188,13 +188,13 @@ private:
        DBusMessageIter iter;
        dbus_message_iter_init(msg, &iter);
 
-       detail::GetCaller<args_type>::type::template eval(iter, ((ServerMethod*)obj)->f_);
+       detail::GetCaller<args_type>::type::template eval<>(iter, ((ServerMethod*)obj)->f_);
    }
 
 
    template<typename T>
    static
-   message_ptr_t __throw(ServerMethodBase* obj, DBusMessage& req, const Error& err)
+   message_ptr_t __throw(ServerMethodBase* /*obj*/, DBusMessage& req, const Error& err)
    {
        return detail::ErrorFactory<T>::reply(req, err);
    }
@@ -209,7 +209,7 @@ private:
    }
 
    template<typename... T>
-   detail::ServerResponseHolder __impl(std::false_type, const T&... t)
+   detail::ServerResponseHolder __impl(std::false_type /*f*/, const T&... /*t*/)
    {
       return detail::ServerResponseHolder([](DBusMessageIter&){ /*NOOP*/ });
    }
