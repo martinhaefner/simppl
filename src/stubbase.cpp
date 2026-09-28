@@ -185,6 +185,8 @@ void StubBase::get_all_properties_request()
 
 simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage& response, bool __throw)
 {
+    DecodingScope scope(&response);
+
     DBusMessageIter iter;
     dbus_message_iter_init(&response, &iter);
 
@@ -529,6 +531,8 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
 
 void StubBase::try_handle_signal(DBusMessage* msg)
 {
+   DecodingScope scope(msg);
+
    // FIXME better check -> include interface!
    if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
    {

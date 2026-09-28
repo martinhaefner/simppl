@@ -58,6 +58,7 @@ struct FunctionCaller<-1, TupleT>
    static inline
    void eval_intern(FunctorT& f, const TupleT& /*tuple*/, const T&... t)
    {
+      DecodingScope user_code(nullptr);
       f(t...);
    }
 
@@ -65,6 +66,7 @@ struct FunctionCaller<-1, TupleT>
    static inline
    void eval_intern_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& /*tuple*/, const T&... t)
    {
+      DecodingScope user_code(nullptr);
       f(cs, t...);
    }
 };
@@ -76,6 +78,7 @@ struct FunctionCaller<0, std::tuple<>>
    static inline
    void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const std::tuple<>& tuple)
    {
+      DecodingScope user_code(nullptr);
       f(cs);
    }
 };
@@ -141,6 +144,7 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
    static inline
    void eval(DBusMessageIter& /*iter*/, FunctorT& f)
    {
+      DecodingScope user_code(nullptr);
       f();
    }
 
@@ -148,6 +152,7 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
    static inline
    void evalResponse(DBusMessageIter& /*iter*/, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
+      DecodingScope user_code(nullptr);
       f(cs);
    }
 };

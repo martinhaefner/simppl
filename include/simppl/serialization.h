@@ -115,6 +115,37 @@ class DecoderError : public std::exception
 };
 
 
+/**
+ * Makes the message currently being decoded known to codecs which keep a
+ * reference on it instead of copying the data (i.e. Any). Scopes nest,
+ * the innermost wins. A scope with nullptr hides the enclosing ones.
+ *
+ * simppl sets up the scope for all messages it decodes. User code only
+ * needs it when decoding own messages with simppl::dbus::decode(), without
+ * a scope an Any keeps a private copy of its data.
+ */
+class DecodingScope
+{
+public:
+
+   explicit
+   DecodingScope(DBusMessage* msg);
+
+   ~DecodingScope();
+
+   DecodingScope(const DecodingScope&) = delete;
+   DecodingScope& operator=(const DecodingScope&) = delete;
+
+   /// @return the message of the innermost scope of the calling thread or nullptr
+   static
+   DBusMessage* current();
+
+private:
+
+   DBusMessage* prev_;
+};
+
+
 }   // namespace dbus
 
 }   // namespace simppl

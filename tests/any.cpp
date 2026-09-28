@@ -11,6 +11,8 @@
 #include "simppl/string.h"
 #include "simppl/vector.h"
 #include "simppl/any.h"
+#include "simppl/map.h"
+#include "simppl/tuple.h"
 
 
 using namespace std::literals::chrono_literals;
@@ -41,6 +43,9 @@ namespace test
       };
 
 
+      enum Color { Red, Green, Blue };
+
+
       INTERFACE(AServer)
       {
          Method<in<simppl::dbus::Any>> set;
@@ -55,6 +60,10 @@ namespace test
          Method<out<simppl::dbus::Any>> getVecEmpty;
          Method<in<simppl::dbus::Any>, out<simppl::dbus::Any>> setGet;
 
+         Method<in<simppl::dbus::Any>, out<simppl::dbus::Any>> echo;
+         Method<in<std::map<std::string, simppl::dbus::Any>>, out<std::map<std::string, simppl::dbus::Any>>> echoDict;
+         Method<in<simppl::dbus::Any>, out<bool>> scopeInCallback;
+
 
          AServer()
           : INIT(set)
@@ -64,6 +73,9 @@ namespace test
           , INIT(stop)
           , INIT(getVecEmpty)
           , INIT(setGet)
+          , INIT(echo)
+          , INIT(echoDict)
+          , INIT(scopeInCallback)
          {
             // NOOP
          }
@@ -153,11 +165,8 @@ namespace {
 
          in_the_middle >> [this](int i, const simppl::dbus::Any& a, const std::string& str){
 
-             // do never try to send a received any again,
-             // create a new one from the received data
-             simppl::dbus::Any ret = a.as<std::vector<int>>();
-
-             respond_with(in_the_middle(i, ret, str));
+             // a received Any can be sent again as it is
+             respond_with(in_the_middle(i, a, str));
          };
 
 
@@ -181,6 +190,26 @@ namespace {
             simppl::dbus::Any a(vec);
 
             respond_with(getVecEmpty(a));
+         };
+
+
+         // send the received data back without looking at it
+         echo >> [this](const simppl::dbus::Any& a){
+
+            respond_with(echo(a));
+         };
+
+
+         echoDict >> [this](const std::map<std::string, simppl::dbus::Any>& m){
+
+            respond_with(echoDict(m));
+         };
+
+
+         scopeInCallback >> [this](const simppl::dbus::Any&){
+
+            // user code must not see the message being dispatched
+            respond_with(scopeInCallback(simppl::dbus::DecodingScope::current() == nullptr));
          };
       }
    };
@@ -389,6 +418,102 @@ TEST(Any, empty)
 
         EXPECT_TRUE(a.is<std::vector<std::string>>());
     }
+
+    stub.stop();   // stop server
+    t.join();
+}
+
+
+TEST(Any, structural_types)
+{
+    simppl::dbus::Any a(test::any::Blue);
+    EXPECT_TRUE(a.is<int>());
+    EXPECT_TRUE(a.is<test::any::Color>());
+    EXPECT_EQ(test::any::Blue, a.as<test::any::Color>());
+    EXPECT_EQ(2, a.as<int>());
+
+    simppl::dbus::Any c(test::any::complex(1.5, 2.5));
+    EXPECT_TRUE((c.is<std::tuple<double, double>>()));
+    EXPECT_EQ(2.5, std::get<1>(c.as<std::tuple<double, double>>()));
+
+    simppl::dbus::Any s("Hello");
+    EXPECT_TRUE(s.is<std::string>());
+    EXPECT_EQ("Hello", s.as<std::string>());
+
+    EXPECT_THROW(s.as<int>(), std::runtime_error);
+}
+
+
+TEST(Any, empty_cannot_be_sent)
+{
+    std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL), &dbus_message_unref);
+
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(msg.get(), &iter);
+
+    EXPECT_THROW(simppl::dbus::encode(iter, simppl::dbus::Any()), std::logic_error);
+}
+
+
+TEST(Any, decode_without_scope)
+{
+    simppl::dbus::Any a;
+
+    {
+        std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL), &dbus_message_unref);
+
+        DBusMessageIter iter;
+        dbus_message_iter_init_append(msg.get(), &iter);
+        simppl::dbus::encode(iter, simppl::dbus::Any(std::vector<std::string>{ "a", "b" }));
+
+        EXPECT_EQ(nullptr, simppl::dbus::DecodingScope::current());
+
+        dbus_message_iter_init(msg.get(), &iter);
+        simppl::dbus::decode(iter, a);
+    }
+
+    // the message is gone, the Any has its own copy
+    EXPECT_TRUE(a.is<std::vector<std::string>>());
+    EXPECT_EQ("b", a.as<std::vector<std::string>>()[1]);
+}
+
+
+TEST(Any, echo)
+{
+    simppl::dbus::Dispatcher d("bus:session");
+
+    std::thread t([](){
+        simppl::dbus::Dispatcher d("bus:session");
+        Server s(d);
+        d.run();
+    });
+
+    simppl::dbus::Stub<test::any::AServer> stub(d, "role");
+
+    // wait for server to get ready
+    std::this_thread::sleep_for(200ms);
+
+    EXPECT_EQ(42, stub.echo(42).as<int>());
+    EXPECT_EQ("Hello", stub.echo(std::string("Hello")).as<std::string>());
+    EXPECT_EQ(4711, stub.echo(test::any::complex(42, 4711)).as<test::any::complex>().im);
+    EXPECT_TRUE(stub.echo(std::vector<int>()).as<std::vector<int>>().empty());
+
+    // a received Any can be sent again, also a nested one
+    simppl::dbus::Any received = stub.echo(std::vector<std::string>{ "x", "y" });
+    simppl::dbus::Any again = stub.echo(received);
+    EXPECT_EQ("y", again.as<std::vector<std::string>>()[1]);
+
+    std::map<std::string, simppl::dbus::Any> inner{ { "i", 1 }, { "s", "string" } };
+    std::map<std::string, simppl::dbus::Any> dict{ { "inner", inner }, { "d", 3.5 } };
+
+    auto result = stub.echoDict(stub.echoDict(dict));
+    EXPECT_EQ(3.5, result["d"].as<double>());
+
+    auto result_inner = result["inner"].as<std::map<std::string, simppl::dbus::Any>>();
+    EXPECT_EQ(1, result_inner["i"].as<int>());
+    EXPECT_EQ("string", result_inner["s"].as<std::string>());
+
+    EXPECT_TRUE(stub.scopeInCallback(1));
 
     stub.stop();   // stop server
     t.join();

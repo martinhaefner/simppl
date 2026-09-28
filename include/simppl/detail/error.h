@@ -59,6 +59,8 @@ struct ErrorFactory
     static
     void init(ExceptionT& err, DBusMessage& msg)
     {
+        DecodingScope scope(&msg);
+
         DBusMessageIter iter;
         dbus_message_iter_init(&msg, &iter);
 

@@ -61,6 +61,7 @@ add_library(simppl SHARED
     src/filedescriptor.cpp
     src/clientside.cpp
     src/serialization.cpp
+    src/any.cpp
     src/bool.cpp
     src/holders.cpp
     src/properties.cpp

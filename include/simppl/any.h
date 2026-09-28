@@ -3,15 +3,15 @@
 
 
 #include <any>
-#include <cassert>
 #include <cstring>
 #include <memory>
+#include <stdexcept>
 #include <variant>
 
 #include <dbus/dbus.h>
 
 #include "simppl/serialization.h"
-#include "simppl/detail/deserialize_and_return.h"
+#include "simppl/string.h"
 
 
 namespace simppl
@@ -20,348 +20,202 @@ namespace simppl
 namespace dbus
 {
 
+namespace detail
+{
+
+/**
+ * Copy the value 'from' points to into 'to' and advance 'from'. Works for
+ * any D-Bus type, the value is walked along its signature.
+ */
+void copy_value(DBusMessageIter& from, DBusMessageIter& to);
+
+}   // namespace detail
+
+
 /**
  * A true D-Bus variant that can really hold *anything*, as a replacement
  * for variants.
  *
- * Note, that the actual internal data representation of an Any is
- * dependent whether it was created from an actual data or if it was
- * received by a D-Bus method call. A received Any holds a reference on the
- * actual D-Bus stream iterator and cannot be serialized any more into
- * a subsequent D-Bus function call. In order to achieve this, the any
- * has to be deserialized into a variable and this variable can be
- * once again sent as an Any over a D-Bus interface. An example can be seen
- * in the any unittests.
+ * An Any behaves the same, no matter if it was created from data or
+ * received over D-Bus: is<T>() and as<T>() compare D-Bus signatures, so an
+ * Any holding an enum is also an int32_t. A received Any may be sent again.
+ *
+ * Internally, a locally created Any holds the typed value, a received Any
+ * holds a reference on the received message, so no data is copied.
  */
 class Any
 {
-    friend class Codec<Any>;
+    friend struct Codec<Any>;
 
-    typedef void(*encoder_func_t)(DBusMessageIter&, const std::any& a);
+    typedef void(*encoder_type)(DBusMessageIter&, const std::any&);
 
-
-    struct Iterator
+    struct Local
     {
-        Iterator()
-         : iter_(DBUS_MESSAGE_ITER_INIT_CLOSED)
-         , msg_(nullptr)
-        {
-            // NOOP
-        }
-
-        Iterator(DBusMessage* msg, const DBusMessageIter& iter)
-         : iter_(iter)
-         , msg_(msg)
-        {
-            dbus_message_ref(msg_);
-        }
-
-        ~Iterator()
-        {
-            if (msg_)
-                dbus_message_unref(msg_);
-        }
-
-        Iterator(const Iterator& rhs)
-         : iter_(rhs.iter_)
-         , msg_(rhs.msg_)
-        {
-            if (msg_)
-                dbus_message_ref(msg_);
-        }
-
-        Iterator& operator=(const Iterator& rhs)
-        {
-            if (&rhs != this)
-            {
-                if (msg_)
-                    dbus_message_unref(msg_);
-
-                iter_ = rhs.iter_;
-                msg_ = rhs.msg_;
-
-                if (msg_)
-                    dbus_message_ref(msg_);
-            }
-
-            return *this;
-        }
-
-        DBusMessageIter iter_;
-        DBusMessage* msg_;
-    };
-
-
-    struct AnyImpl
-    {
-        AnyImpl()
-         : enc_(nullptr)
-        {
-            //  NOOP
-        }
-
-
-        AnyImpl(const AnyImpl& rhs)
-         : enc_(rhs.enc_)
-         , value_(rhs.value_)
-        {
-            // NOOP
-        }
-
-
-        template<typename T>
-        AnyImpl(encoder_func_t e, const T& t)
-         : enc_(e)
-         , value_(t)
-        {
-            // NOOP
-        }
-
-
-        AnyImpl& operator=(const AnyImpl& rhs)
-        {
-            if (&rhs != this)
-            {
-                enc_ = rhs.enc_;
-                value_ = rhs.value_;
-            }
-
-            return *this;
-        }
-
-        encoder_func_t enc_;
-
         std::any value_;
+        const char* signature_;
+        encoder_type encode_;
     };
 
-
-    struct EncodingVisitor
+    struct Received
     {
-        EncodingVisitor(DBusMessageIter& iter)
-         : iter_(iter)
+        Received(DBusMessage* msg, const DBusMessageIter& iter)
+         : msg_(dbus_message_ref(msg))
+         , iter_(iter)
         {
             // NOOP
         }
 
-        void operator()(const Iterator&) const
-        {
-            // never called?!
-            assert(false);
-        }
-
-        template<typename T>
-        void operator()(const T& t) const
-        {
-            encoder<T>(iter_, t);
-        }
-
-        void operator()(const AnyImpl& p) const
-        {
-            if (p.value_.has_value())
-                (*p.enc_)(iter_, p.value_);
-        }
-
-    private:
-
-        DBusMessageIter& iter_;
-    };
-
-
-    template<typename T>
-    struct TypeVisitor
-    {
-        TypeVisitor()
+        Received(const Received& rhs)
+         : msg_(dbus_message_ref(rhs.msg_))
+         , iter_(rhs.iter_)
         {
             // NOOP
         }
 
-        bool operator()(const Iterator& iter) const
+        Received& operator=(const Received& rhs)
         {
-            if (iter.msg_)
-            {
-                std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
-                return !strcmp(sig.get(), signature_of<T>());
-            }
+            Received tmp(rhs);
+            std::swap(msg_, tmp.msg_);
+            iter_ = rhs.iter_;
 
-            return false;
+            return *this;
         }
 
-        template<typename U>
-        bool operator()(const U&) const
+        ~Received()
         {
-            return std::is_same<T, U>::value;
+            dbus_message_unref(msg_);
         }
 
-        bool operator()(const AnyImpl& p) const
-        {
-            return std::any_cast<T>(&p.value_) != 0;
-        }
+        DBusMessage* msg_;
+        DBusMessageIter iter_;
     };
 
-
-    template<typename T>
-    struct ExtractionVisitor
-    {
-        T operator()(const Iterator& iter) const
-        {
-            if (iter.msg_)
-            {
-                std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
-
-                // TODO some better exception message: expected ..., provided ...
-                if (strcmp(sig.get(), signature_of<T>()))
-                    throw std::runtime_error("Invalid type");
-
-                // make a copy, so the method may be called multiple times
-                DBusMessageIter __iter = iter.iter_;
-                return detail::deserialize_and_return_from_iter<T>::eval(const_cast<DBusMessageIter*>(&__iter));
-            }
-
-            throw std::runtime_error("No type");
-        }
-
-        template<typename U>
-        T operator()(const U& u) const
-        {
-            // would be nicer to use a switching template
-            if (std::is_same_v<T, U>)
-                return *(T*)&u;
-
-            throw std::runtime_error("Invalid type");
-        }
-
-        T operator()(const AnyImpl& p) const
-        {
-            return std::any_cast<T>(p.value_);
-        }
-    };
+    typedef std::unique_ptr<char, void(*)(void*)> signature_ptr;
 
 
     template<typename T>
     static
-    void any_encoder(DBusMessageIter& iter, const std::any& data)
+    void encoder(DBusMessageIter& iter, const std::any& data)
     {
-        encoder<T>(iter, *std::any_cast<T>(&data));
+        Codec<T>::encode(iter, *std::any_cast<T>(&data));
     }
+
+
+    static
+    signature_ptr received_signature(const Received& r)
+    {
+        return signature_ptr(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&r.iter_)), &dbus_free);
+    }
+
 
     template<typename T>
     static
-    void encoder(DBusMessageIter& iter, const T& data)
+    T decode_from(DBusMessage* msg, const DBusMessageIter& iter)
     {
-        DBusMessageIter iter2;
-        dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, signature_of<T>(), &iter2);
+        // nested Anys shall refer to the message the data is decoded from
+        DecodingScope scope(msg);
 
-        Codec<T>::encode(iter2, data);
+        DBusMessageIter _iter = iter;
 
-        dbus_message_iter_close_container(&iter, &iter2);
+        T t;
+        Codec<T>::decode(_iter, t);
+
+        return t;
     }
 
-    void set_message_iterator(DBusMessage* msg, const DBusMessageIter& iter)
-    {
-        value_ = std::move(Iterator(msg, iter));
-    }
 
-    void encode(DBusMessageIter& iter) const
-    {
-        std::visit(EncodingVisitor(iter), value_);
-    }
+    void encode(DBusMessageIter& iter) const;
 
 
 public:
 
     /**
-     * construction/destruction
+     * An empty Any, is<T>() is false for all T and it cannot be sent.
      */
-    Any()
-    {
-        // NOOP
-    }
+    Any() = default;
 
-    Any(int i)
-     : value_(i)
-    {
-        // NOOP
-    }
-
-    Any(double d)
-     : value_(d)
-    {
-        // NOOP
-    }
-
-    Any(const std::string& str)
-     : value_(str)
-    {
-        // NOOP
-    }
-
-    template<typename T>
+    template<typename T, typename = std::enable_if_t<!std::is_same<std::decay_t<T>, Any>::value>>
     Any(const T& t)
-     : value_(AnyImpl(&any_encoder<T>, t))
+     : value_(Local{ t, signature_of<T>(), &encoder<T> })
     {
         // NOOP
     }
 
-    ~Any()
+    Any(const char* str)
+     : Any(std::string(str))
     {
         // NOOP
+    }
+
+
+    template<typename T, typename = std::enable_if_t<!std::is_same<std::decay_t<T>, Any>::value>>
+    Any& operator=(const T& t)
+    {
+        return *this = Any(t);
     }
 
 
     /**
-     * assignment
+     * @return true if the contained D-Bus type matches the D-Bus type of T.
      */
-    Any& operator=(const Any&) = default;
-
     template<typename T>
-    Any& operator=(const T& t)
+    bool is() const
     {
-        AnyImpl p(&any_encoder<T>, t);
-        value_ = p;
+        if (auto l = std::get_if<Local>(&value_))
+            return !strcmp(l->signature_, signature_of<T>());
 
-        return *this;
-    }
+        if (auto r = std::get_if<Received>(&value_))
+            return !strcmp(received_signature(*r).get(), signature_of<T>());
 
-    Any& operator=(int i)
-    {
-        value_ = i;
-        return *this;
-    }
-
-    Any& operator=(double d)
-    {
-        value_ = d;
-        return *this;
-    }
-
-    Any& operator=(const std::string& str)
-    {
-        value_ = str;
-        return *this;
+        return false;
     }
 
 
     /**
      * Extraction by value, not reference since the normal use case is to
      * extract the data from a DBus message and not from a preset type.
+     *
+     * @throw std::runtime_error if the D-Bus type does not match.
      */
     template<typename T>
     T as() const
     {
-        return std::visit(ExtractionVisitor<T>(), value_);
-    }
+        if (auto l = std::get_if<Local>(&value_))
+        {
+            // fast path, exactly the type the Any was created with
+            if (auto p = std::any_cast<T>(&l->value_))
+                return *p;
 
+            if (strcmp(l->signature_, signature_of<T>()))
+                throw std::runtime_error("Invalid type");
 
-    template<typename T>
-    bool is() const
-    {
-        return std::visit(TypeVisitor<T>(), value_);
+            // same D-Bus type, other C++ type: convert via the wire format
+            std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL), &dbus_message_unref);
+
+            DBusMessageIter iter;
+            dbus_message_iter_init_append(msg.get(), &iter);
+            (*l->encode_)(iter, l->value_);
+
+            dbus_message_iter_init(msg.get(), &iter);
+            return decode_from<T>(msg.get(), iter);
+        }
+
+        if (auto r = std::get_if<Received>(&value_))
+        {
+            // TODO some better exception message: expected ..., provided ...
+            if (strcmp(received_signature(*r).get(), signature_of<T>()))
+                throw std::runtime_error("Invalid type");
+
+            return decode_from<T>(r->msg_, r->iter_);
+        }
+
+        throw std::runtime_error("No type");
     }
 
 
 private:
 
-    std::variant<Iterator, int, double, std::string, AnyImpl> value_;
+    std::variant<std::monostate, Local, Received> value_;
 };
 
 
@@ -376,17 +230,7 @@ struct Codec<Any> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 
 
     static
-    void decode(DBusMessageIter& orig, Any& v)
-    {
-        DBusMessageIter iter;
-        simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
-
-        // FIXME TODO XXX take the message from the codec calls since this is
-        // highly implementation dependent
-        v.set_message_iterator((DBusMessage*)iter.dummy1, iter);
-
-        dbus_message_iter_next(&orig);
-    }
+    void decode(DBusMessageIter& iter, Any& v);
 };
 
 }   // dbus
@@ -395,4 +239,3 @@ struct Codec<Any> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 
 
 #endif   // SIMPPL_ANY_H
-

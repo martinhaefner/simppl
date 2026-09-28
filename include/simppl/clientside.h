@@ -239,10 +239,15 @@ private:
           {
               data_type d;
               detail::PropertyCodec<data_type>::decode(*iter, d);
+
+              DecodingScope user_code(nullptr);
               that->f_(CallState(42), d);
           }
           else
+          {
+              DecodingScope user_code(nullptr);
               that->f_(CallState(new Error("simppl.dbus.Invalid")), data_type());
+          }
       }
    }
 
@@ -255,6 +260,8 @@ template<typename DataT, int Flags>
 DataT ClientProperty<DataT, Flags>::get()
 {
    message_ptr_t msg = this->stub_->get_property(this->name_);
+
+   DecodingScope scope(msg.get());
 
    DBusMessageIter iter;
    dbus_message_iter_init(msg.get(), &iter);

@@ -185,6 +185,8 @@ private:
    static
    void __eval(ServerMethodBase* obj, DBusMessage* msg)
    {
+       DecodingScope scope(msg);
+
        DBusMessageIter iter;
        dbus_message_iter_init(msg, &iter);
 
@@ -339,6 +341,8 @@ struct ServerWritableMixin
     {
         if (f_)
         {
+            DecodingScope user_code(nullptr);
+
             f_(d);
             return false;
         }

@@ -425,6 +425,7 @@ DBusHandlerResult SkeletonBase::handle_property_set_request(DBusMessage* msg, Se
 
     try
     {
+        DecodingScope scope(msg);
         property.evalSet(iter);
         response = make_message(dbus_message_new_method_return(msg));
     }

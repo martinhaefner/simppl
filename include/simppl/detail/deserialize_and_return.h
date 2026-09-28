@@ -32,6 +32,8 @@ struct deserialize_and_return
    static
    ReturnT eval(DBusMessage* msg)
    {
+      DecodingScope scope(msg);
+
       DBusMessageIter iter;
       dbus_message_iter_init(msg, &iter);
 
@@ -61,6 +63,8 @@ struct deserialize_and_return<std::tuple<T...>>
    return_type eval(DBusMessage* msg)
    {
       return_type rc;
+
+      DecodingScope scope(msg);
 
       DBusMessageIter iter;
       dbus_message_iter_init(msg, &iter);

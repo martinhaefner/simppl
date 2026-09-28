@@ -85,6 +85,8 @@ struct CallbackHolder
 
        TCallState<ErrorT> cs(*msg);
 
+       DecodingScope scope(msg.get());
+
        DBusMessageIter iter;
        dbus_message_iter_init(msg.get(), &iter);
 
@@ -131,7 +133,10 @@ struct PropertyCallbackHolder
           dbus_message_iter_init(msg.get(), &iter);
 
           std::variant<DataT> v;
-          decode(iter, v);
+          {
+             DecodingScope scope(msg.get());
+             decode(iter, v);
+          }
 
           that->f_(cs, std::get<DataT>(v));
        }

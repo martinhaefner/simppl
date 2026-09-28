@@ -18,3 +18,40 @@ void simppl_dbus_message_iter_get_basic(DBusMessageIter* iter, void* p, int expe
    dbus_message_iter_get_basic(iter, p);
    dbus_message_iter_next(iter);
 }
+
+
+namespace simppl
+{
+
+namespace dbus
+{
+
+namespace
+{
+   thread_local DBusMessage* current_decoding_message = nullptr;
+}
+
+
+DecodingScope::DecodingScope(DBusMessage* msg)
+ : prev_(current_decoding_message)
+{
+   current_decoding_message = msg;
+}
+
+
+DecodingScope::~DecodingScope()
+{
+   current_decoding_message = prev_;
+}
+
+
+/*static*/
+DBusMessage* DecodingScope::current()
+{
+   return current_decoding_message;
+}
+
+
+}   // namespace dbus
+
+}   // namespace simppl
