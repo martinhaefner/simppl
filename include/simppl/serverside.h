@@ -424,9 +424,8 @@ protected:
 #if SIMPPL_HAVE_INTROSPECTION
    void introspect(std::ostream& os) const override
    {
-      os << "    <property name=\"" << this->name_ << "\" type=\"";
-      Codec<DataT>::make_type_signature(os);
-      os << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
+      os << "    <property name=\"" << this->name_ << "\" type=\"" << signature_of<DataT>()
+         << "\" access=\"" << (Flags & ReadWrite?"readwrite":"read") << "\"/>\n";
    }
 #endif
 };

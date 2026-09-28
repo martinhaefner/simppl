@@ -13,7 +13,7 @@ namespace simppl
 namespace dbus
 {
  
-struct WStringCodec
+struct WStringCodec : composite_signature<signature_chars<DBUS_TYPE_ARRAY>, Codec<uint32_t>>
 {
    static 
    void encode(DBusMessageIter& s, const std::wstring& str);
@@ -26,9 +26,6 @@ struct WStringCodec
    
    static 
    void decode(DBusMessageIter& s, wchar_t*& str);
-   
-   static
-   std::ostream& make_type_signature(std::ostream& os);
 };
 
    

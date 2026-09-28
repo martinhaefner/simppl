@@ -16,6 +16,7 @@ namespace dbus
    
 template<typename KeyT, typename ValueT>
 struct Codec<std::pair<KeyT, ValueT>>
+ : composite_signature<signature_chars<DBUS_DICT_ENTRY_BEGIN_CHAR>, Codec<KeyT>, Codec<ValueT>, signature_chars<DBUS_DICT_ENTRY_END_CHAR>>
 {
    static 
    void encode(DBusMessageIter& iter, const std::pair<KeyT, ValueT>& p)
@@ -41,18 +42,6 @@ struct Codec<std::pair<KeyT, ValueT>>
       
       // advance to next element
       dbus_message_iter_next(&iter);
-   }
-   
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      os << DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING;
-      
-      Codec<KeyT>::make_type_signature(os);
-      Codec<ValueT>::make_type_signature(os);
-      
-      return os << DBUS_DICT_ENTRY_END_CHAR_AS_STRING;
    }
 };
 

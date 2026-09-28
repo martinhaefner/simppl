@@ -87,7 +87,7 @@ struct FixedSizeBuffer
 
 // FIXME make slim implementation in src file
 template<size_t len>
-struct Codec<FixedSizeBuffer<len>>
+struct Codec<FixedSizeBuffer<len>> : composite_signature<signature_chars<DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE>>
 {
    static 
    void encode(DBusMessageIter& iter, const FixedSizeBuffer<len>& b)
@@ -114,13 +114,6 @@ struct Codec<FixedSizeBuffer<len>>
       
       // advance to next element
       dbus_message_iter_next(&iter);
-   }
-   
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return os << DBUS_TYPE_ARRAY_AS_STRING;
    }
 };
 

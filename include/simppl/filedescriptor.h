@@ -54,16 +54,13 @@ private:
 };
 
 
-struct FileDescriptorCodec
+struct FileDescriptorCodec : composite_signature<signature_chars<DBUS_TYPE_UNIX_FD>>
 {
    static
    void encode(DBusMessageIter& iter, const FileDescriptor& fd);
 
    static
    void decode(DBusMessageIter& iter, FileDescriptor& fd);
-
-   static
-   std::ostream& make_type_signature(std::ostream& os);
 };
 
 

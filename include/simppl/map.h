@@ -16,15 +16,13 @@ namespace dbus
    
 template<typename KeyT, typename ValueT>
 struct Codec<std::map<KeyT, ValueT>>
+ : composite_signature<signature_chars<DBUS_TYPE_ARRAY>, Codec<std::pair<typename std::decay<KeyT>::type, ValueT>>>
 {
    static 
    void encode(DBusMessageIter& iter, const std::map<KeyT, ValueT>& m)
    {
-      std::ostringstream buf;
-      Codec<std::pair<KeyT, ValueT>>::make_type_signature(buf);
-
       DBusMessageIter _iter;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, buf.str().c_str(), &_iter);
+      dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, signature_of<std::pair<KeyT, ValueT>>(), &_iter);
 
       for (auto& e : m) {
          Codec<std::pair<KeyT, ValueT>>::encode(_iter, e);
@@ -52,13 +50,6 @@ struct Codec<std::map<KeyT, ValueT>>
 
       // advance to next element
       dbus_message_iter_next(&iter);
-   }
-   
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return Codec<std::pair<typename std::decay<KeyT>::type, ValueT>>::make_type_signature(os << DBUS_TYPE_ARRAY_AS_STRING);
    }
 };
 

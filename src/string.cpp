@@ -59,13 +59,6 @@ void StringCodec::decode(DBusMessageIter& iter, char*& str)
 }
 
 
-/*static*/
-std::ostream& StringCodec::make_type_signature(std::ostream& os)
-{
-   return os << DBUS_TYPE_STRING_AS_STRING;
-}
-
-
 }   // namespace dbus
 
 }   // namespace simppl

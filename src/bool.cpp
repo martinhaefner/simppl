@@ -26,13 +26,6 @@ void BoolCodec::decode(DBusMessageIter& iter, bool& t)
 }
 
 
-/*static*/ 
-std::ostream& BoolCodec::make_type_signature(std::ostream& os)
-{
-   return os << DBUS_TYPE_BOOLEAN_AS_STRING;
-}
-
-
 }   // namespace dbus
 
 }   // namespace simppl

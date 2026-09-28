@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <cstring>
 #include <cassert>
+#include <memory>
 
 
 namespace simppl
@@ -38,56 +39,6 @@ struct VariantSerializer
 
 
 template<typename... T>
-struct VariantDeserializer;
-
-template<typename T1, typename... T>
-struct VariantDeserializer<T1, T...>
-{
-   template<typename VariantT>
-   static
-   bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
-   {
-      std::ostringstream buf;
-      Codec<T1>::make_type_signature(buf);
-
-      if (!strcmp(buf.str().c_str(), sig))
-      {
-         v = T1();
-         Codec<T1>::decode(iter, std::get<T1>(v));
-
-         return true;
-      }
-      else
-         return VariantDeserializer<T...>::eval(iter, v, sig);
-   }
-};
-
-
-template<typename T>
-struct VariantDeserializer<T>
-{
-   template<typename VariantT>
-   static
-   bool eval(DBusMessageIter& iter, VariantT& v, const char* sig)
-   {
-      std::ostringstream buf;
-      Codec<T>::make_type_signature(buf);
-
-      if (!strcmp(buf.str().c_str(), sig))
-      {
-         v = T();
-         Codec<T>::decode(iter, std::get<T>(v));
-
-         return true;
-      }
-
-      // stop recursion
-      return false;
-   }
-};
-
-
-template<typename... T>
 bool try_deserialize(DBusMessageIter& iter, std::variant<T...>& v, const char* sig);
 
 
@@ -95,7 +46,7 @@ bool try_deserialize(DBusMessageIter& iter, std::variant<T...>& v, const char* s
 
 
 template<typename... T>
-struct Codec<std::variant<T...>>
+struct Codec<std::variant<T...>> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 {
    static
    void encode(DBusMessageIter& iter, const std::variant<T...>& v)
@@ -118,20 +69,14 @@ struct Codec<std::variant<T...>>
 
       dbus_message_iter_next(&orig);
    }
-
-
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return os << DBUS_TYPE_VARIANT_AS_STRING;
-   }
 };
 
 
 template<typename... T>
 bool detail::try_deserialize(DBusMessageIter& iter, std::variant<T...>& v, const char* sig)
 {
-   return VariantDeserializer<T...>::eval(iter, v, sig);
+   // the first alternative with matching signature wins
+   return ((!strcmp(signature_of<T>(), sig) && (Codec<T>::decode(iter, v.template emplace<T>()), true)) || ...);
 }
 
 
@@ -139,11 +84,8 @@ template<typename T>
 inline
 void detail::VariantSerializer::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
-    std::ostringstream buf;
-    Codec<T>::make_type_signature(buf);
-
     DBusMessageIter iter;
-    dbus_message_iter_open_container(&iter_, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter);
+    dbus_message_iter_open_container(&iter_, DBUS_TYPE_VARIANT, signature_of<T>(), &iter);
 
     Codec<T>::encode(iter, t);
 

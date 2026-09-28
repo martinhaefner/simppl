@@ -8,6 +8,7 @@
 #include <dbus/dbus.h>
 
 #include "simppl/typelist.h"
+#include "simppl/signature.h"
 
 
 /// throwing exception if expected_type is not met.
@@ -63,34 +64,17 @@ template<typename T, typename DeducerT>
 struct CodecImpl;
 
 
+template<typename T>
+using deducer_type_t = typename std::conditional<isPod<T>::value || std::is_enum<T>::value, Pod, Struct>::type;
+
+
 // type switch
 template<typename T>
-struct Codec
+struct Codec : CodecImpl<T, deducer_type_t<T>>
 {
-   typedef typename std::conditional<isPod<T>::value || std::is_enum<T>::value, Pod, Struct>::type deducer_type;
-      
+   typedef deducer_type_t<T> deducer_type;
+
    typedef CodecImpl<T, deducer_type> impl_type;
-   
-      
-   static inline
-   void encode(DBusMessageIter& s, const T& t)
-   {
-      impl_type::encode(s, t);
-   }
-   
-   
-   static inline
-   void decode(DBusMessageIter& s, T& t)
-   {
-      impl_type::decode(s, t);
-   }
-   
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return impl_type::make_type_signature(os);
-   }
 };
 
 

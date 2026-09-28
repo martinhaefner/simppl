@@ -8,6 +8,9 @@
 #   include <boost/fusion/adapted/struct/adapt_struct.hpp>
 #   include <boost/fusion/support/is_sequence.hpp>
 #   include <boost/fusion/algorithm.hpp>
+#   include <boost/fusion/include/size.hpp>
+#   include <boost/fusion/include/value_at.hpp>
+#   include <utility>
 #endif
 
 
@@ -34,14 +37,6 @@ struct SerializerTuple : T1
       Codec<T2>::decode(iter, data_);
    }
 
-
-   static
-   void make_type_signature(std::ostream& os)
-   {
-      T1::make_type_signature(os);
-      Codec<T2>::make_type_signature(os);
-   }
-
    T2 data_;
 };
 
@@ -60,13 +55,6 @@ struct SerializerTuple<T, NilType>
       Codec<T>::decode(iter, data_);
    }
 
-
-   static
-   void make_type_signature(std::ostream& os)
-   {
-      Codec<T>::make_type_signature(os);
-   }
-
    T data_;
 };
 
@@ -75,7 +63,34 @@ namespace detail
 {
 
 
+/// signature of all members of a SerializerTuple, without the struct braces
+template<typename SerializerT>
+struct serializer_signature;
+
+template<typename T>
+struct serializer_signature<SerializerTuple<T, NilType>> : composite_signature<Codec<T>> {};
+
+template<typename T1, typename T2>
+struct serializer_signature<SerializerTuple<T1, T2>> : composite_signature<serializer_signature<T1>, Codec<T2>> {};
+
+
 #if SIMPPL_HAVE_BOOST_FUSION
+
+template<typename StructT, typename IndexSequenceT>
+struct fusion_signature_impl;
+
+template<typename StructT, std::size_t... I>
+struct fusion_signature_impl<StructT, std::index_sequence<I...>>
+ : composite_signature<
+      signature_chars<DBUS_STRUCT_BEGIN_CHAR>,
+      Codec<typename std::remove_cv<typename boost::fusion::result_of::value_at_c<StructT, I>::type>::type>...,
+      signature_chars<DBUS_STRUCT_END_CHAR>>
+{
+};
+
+template<typename StructT>
+using fusion_signature = fusion_signature_impl<StructT, std::make_index_sequence<boost::fusion::result_of::size<StructT>::value>>;
+
 
 struct FusionEncoder
 {
@@ -117,30 +132,15 @@ struct FusionDecoder
 };
 
 
-struct FusionTypeWriter
-{
-   explicit inline
-   FusionTypeWriter(std::ostream& os)
-    : os_(os)
-   {
-      // NOOP
-   }
-
-   template<typename T>
-   inline
-   void operator()(const T&) const
-   {
-      Codec<T>::make_type_signature(os_);
-   }
-
-   std::ostream& os_;
-};
-
 #endif   // SIMPPL_HAVE_BOOST_FUSION
 
 
 template<typename StructT, typename SelectorT>
 struct StructSerializationHelper
+ : composite_signature<
+      signature_chars<DBUS_STRUCT_BEGIN_CHAR>,
+      serializer_signature<typename StructT::serializer_type>,
+      signature_chars<DBUS_STRUCT_END_CHAR>>
 {
    typedef typename StructT::serializer_type s_type;
 
@@ -149,13 +149,6 @@ struct StructSerializationHelper
 
    static
    void decode(DBusMessageIter& iter, const StructT& st);
-
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      s_type::make_type_signature(os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING);
-      return os << DBUS_STRUCT_END_CHAR_AS_STRING;
-   }
 };
 
 
@@ -188,7 +181,7 @@ void StructSerializationHelper<StructT, SelectorT>::decode(DBusMessageIter& iter
 #if SIMPPL_HAVE_BOOST_FUSION
 
 template<typename StructT>
-struct StructSerializationHelper<StructT, boost::mpl::true_>
+struct StructSerializationHelper<StructT, boost::mpl::true_> : fusion_signature<StructT>
 {
    static inline
    void encode(DBusMessageIter& iter, const StructT& st)
@@ -211,65 +204,26 @@ struct StructSerializationHelper<StructT, boost::mpl::true_>
 
       dbus_message_iter_next(&iter);
    }
-
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
-
-      StructT* st = nullptr;
-      boost::fusion::for_each(*st, FusionTypeWriter(os));
-
-      return os << DBUS_STRUCT_END_CHAR_AS_STRING;
-   }
 };
 
 #endif   // SIMPPL_HAVE_BOOST_FUSION
+
+
+template<typename T>
+using struct_selector_t =
+#if SIMPPL_HAVE_BOOST_FUSION
+   typename boost::fusion::traits::is_sequence<T>::type;
+#else
+   int;   /* just any type but mpl::true_*/
+#endif
+
 
 }   // namespace detail
 
 
 template<typename T>
-struct CodecImpl<T, Struct>
+struct CodecImpl<T, Struct> : detail::StructSerializationHelper<T, detail::struct_selector_t<T>>
 {
-   static
-   void encode(DBusMessageIter& iter, const T& st)
-   {
-      detail::StructSerializationHelper<T,
-#if SIMPPL_HAVE_BOOST_FUSION
-         typename boost::fusion::traits::is_sequence<T>::type
-#else
-         int
-#endif
-      >::encode(iter, st);
-   }
-
-
-   static
-   void decode(DBusMessageIter& iter, T& st)
-   {
-      detail::StructSerializationHelper<T,
-#if SIMPPL_HAVE_BOOST_FUSION
-         typename boost::fusion::traits::is_sequence<T>::type
-#else
-         int /* just any type but mpl::true_*/
-#endif
-      >::decode(iter, st);
-   }
-
-
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      detail::StructSerializationHelper<T,
-#if SIMPPL_HAVE_BOOST_FUSION
-         typename boost::fusion::traits::is_sequence<T>::type
-#else
-         int /* just any type but mpl::true_*/
-#endif
-      >::make_type_signature(os);
-      return os;
-   }
 };
 
 

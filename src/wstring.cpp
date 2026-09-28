@@ -111,13 +111,6 @@ void WStringCodec::decode(DBusMessageIter& iter, wchar_t*& str)
 }
 
 
-/*static*/
-std::ostream& WStringCodec::make_type_signature(std::ostream& os)
-{
-   return Codec<uint32_t>::make_type_signature(os << DBUS_TYPE_ARRAY_AS_STRING);
-}
-
-
 }   // namespace dbus
 
 }   // namespace simppl

@@ -29,6 +29,7 @@ SET(UNITTEST_SOURCES
    variant.cpp
    buffer.cpp
    serialization.cpp
+   signature.cpp
    multi_interface.cpp
    no_interface.cpp
    utils.cpp
@@ -42,6 +43,9 @@ endif()
 add_executable(unittests
    ${UNITTEST_SOURCES}
 )
+
+# tests the deprecated legacy codec interface on purpose
+set_source_files_properties(signature.cpp PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
 
 if(Boost_FOUND)
    target_compile_definitions(unittests PRIVATE SIMPPL_HAVE_BOOST_FUSION=1)

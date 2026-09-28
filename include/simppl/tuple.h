@@ -80,6 +80,7 @@ struct TupleDeserializer // : noncopable
    
 template<typename... T>
 struct Codec<std::tuple<T...>>
+ : composite_signature<signature_chars<DBUS_STRUCT_BEGIN_CHAR>, Codec<T>..., signature_chars<DBUS_STRUCT_END_CHAR>>
 {
    static 
    void encode(DBusMessageIter& iter, const std::tuple<T...>& t)
@@ -102,39 +103,6 @@ struct Codec<std::tuple<T...>>
    {
       detail::TupleDeserializer tds(iter, true);
       std_tuple_for_each(t, std::ref(tds));
-   }
-   
-   
-   // if templated lambdas are available this could be removed!
-   struct helper
-   {
-      helper(std::ostream& os)
-       : os_(os)
-      {
-         // NOOP
-      }
-
-      template<typename U>
-      void operator()(const U&)
-      {
-         Codec<U>::make_type_signature(os_);
-      }
-
-      std::ostream& os_;
-   };
-
-
-   static
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      os << DBUS_STRUCT_BEGIN_CHAR_AS_STRING;
-      
-      std::tuple<T...>* t = nullptr;
-      std_tuple_for_each(*t, helper(os));
-      
-      os << DBUS_STRUCT_END_CHAR_AS_STRING;
-
-      return os;
    }
 };
 

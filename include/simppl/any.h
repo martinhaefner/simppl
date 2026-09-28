@@ -6,7 +6,6 @@
 #include <cassert>
 #include <cstring>
 #include <memory>
-#include <sstream>
 #include <variant>
 
 #include <dbus/dbus.h>
@@ -180,11 +179,8 @@ class Any
         {
             if (iter.msg_)
             {
-                std::ostringstream oss;
-                Codec<T>::make_type_signature(oss);
-
                 std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
-                return !strcmp(sig.get(), oss.str().c_str());
+                return !strcmp(sig.get(), signature_of<T>());
             }
 
             return false;
@@ -210,13 +206,10 @@ class Any
         {
             if (iter.msg_)
             {
-                std::ostringstream oss;
-                Codec<T>::make_type_signature(oss);
-
                 std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(const_cast<DBusMessageIter*>(&iter.iter_)), &dbus_free);
 
                 // TODO some better exception message: expected ..., provided ...
-                if (strcmp(sig.get(), oss.str().c_str()))
+                if (strcmp(sig.get(), signature_of<T>()))
                     throw std::runtime_error("Invalid type");
 
                 // make a copy, so the method may be called multiple times
@@ -255,11 +248,8 @@ class Any
     static
     void encoder(DBusMessageIter& iter, const T& data)
     {
-        std::ostringstream buf;
-        Codec<T>::make_type_signature(buf);
-
         DBusMessageIter iter2;
-        dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, buf.str().c_str(), &iter2);
+        dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, signature_of<T>(), &iter2);
 
         Codec<T>::encode(iter2, data);
 
@@ -376,7 +366,7 @@ private:
 
 
 template<>
-struct Codec<Any>
+struct Codec<Any> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 {
     static
     void encode(DBusMessageIter& iter, const Any& v)
@@ -396,13 +386,6 @@ struct Codec<Any>
         v.set_message_iterator((DBusMessage*)iter.dummy1, iter);
 
         dbus_message_iter_next(&orig);
-    }
-
-
-    static inline
-    std::ostream& make_type_signature(std::ostream& os)
-    {
-        return os << DBUS_TYPE_VARIANT_AS_STRING;
     }
 };
 

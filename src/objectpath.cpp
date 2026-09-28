@@ -31,13 +31,6 @@ void ObjectPathCodec::decode(DBusMessageIter& iter, ObjectPath& p)
 }
 
 
-/*static*/
-std::ostream& ObjectPathCodec::make_type_signature(std::ostream& os)
-{
-   return os << DBUS_TYPE_OBJECT_PATH_AS_STRING;
-}
-
-
 }   // namespace dbus
 
 }   // namespace simppl

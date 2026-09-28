@@ -124,11 +124,7 @@ struct Codec<test::TestStruct>
    }
    
    
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return os << "(isi)";
-   }
+   static constexpr auto signature = make_signature("(isi)");
 };
 
 

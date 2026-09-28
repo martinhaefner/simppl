@@ -399,9 +399,8 @@ struct IntrospectionHelper
 {
    static inline void eval(std::ostream& os, int i)
    {
-      os << "<arg name=\"arg" << i << "\" type=\"";
-      Codec<typename GetRealType<T>::type>::make_type_signature(os);
-      os << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
+      os << "<arg name=\"arg" << i << "\" type=\"" << signature_of<typename GetRealType<T>::type>()
+         << "\" direction=\"" << (is_in<T>::value?"in":"out") << "\"/>\n";
    }
 };
 

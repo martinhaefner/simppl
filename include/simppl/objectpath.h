@@ -74,16 +74,13 @@ struct ObjectPath
 };
 
 
-struct ObjectPathCodec
+struct ObjectPathCodec : composite_signature<signature_chars<DBUS_TYPE_OBJECT_PATH>>
 {
    static
    void encode(DBusMessageIter& iter, const ObjectPath& p);
 
    static
    void decode(DBusMessageIter& iter, ObjectPath& p);
-
-   static
-   std::ostream& make_type_signature(std::ostream& os);
 };
 
 

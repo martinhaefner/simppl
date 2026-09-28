@@ -160,13 +160,6 @@ void FileDescriptorCodec::decode(DBusMessageIter& iter, FileDescriptor& fd)
 }
 
 
-/*static*/
-std::ostream& FileDescriptorCodec::make_type_signature(std::ostream& os)
-{
-   return os << DBUS_TYPE_UNIX_FD_AS_STRING;
-}
-
-
 }   // namespace dbus
 
 }   // namespace simppl

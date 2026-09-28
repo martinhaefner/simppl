@@ -50,6 +50,7 @@ struct EnumTypeCodeHelper<T, false>
 
 template<typename T>
 struct CodecImpl<T, Pod>
+ : composite_signature<signature_chars<detail::EnumTypeCodeHelper<T, std::is_enum<T>::value>::value>>
 {
    enum { dbus_type_code = detail::EnumTypeCodeHelper<T, std::is_enum<T>::value>::value };
       
@@ -67,13 +68,6 @@ struct CodecImpl<T, Pod>
    void decode(DBusMessageIter& iter, T& t)
    {
       simppl_dbus_message_iter_get_basic(&iter, &t, dbus_type_code);
-   }
-   
-   
-   static inline
-   std::ostream& make_type_signature(std::ostream& os)
-   {
-      return os << (char)dbus_type_code;
    }
 };
 

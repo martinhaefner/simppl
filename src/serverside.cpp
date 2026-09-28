@@ -27,23 +27,7 @@ ServerMethodBase::~ServerMethodBase()
 }
 
 
-#if SIMPPL_SIGNATURE_CHECK
-const char* ServerMethodBase::get_signature() const
-{
-   if (signature_.empty())
-   {
-      std::ostringstream oss;
-      oss << "sig:";
-      get_signature(oss);
-      
-      signature_ = oss.str();
-   }
-   
-   return signature_.c_str()+4;
-}
-#endif
 
- 
 ServerPropertyBase::ServerPropertyBase(const char* name, SkeletonBase* iface, int iface_id)
  : name_(name)
  , iface_id_(iface_id)

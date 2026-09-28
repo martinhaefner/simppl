@@ -12,16 +12,13 @@ namespace dbus
 {
 
    
-struct BoolCodec
+struct BoolCodec : composite_signature<signature_chars<DBUS_TYPE_BOOLEAN>>
 {
    static 
    void encode(DBusMessageIter& iter, bool b);
 
    static 
    void decode(DBusMessageIter& iter, bool& t);
-   
-   static
-   std::ostream& make_type_signature(std::ostream& os);
 };
    
 
