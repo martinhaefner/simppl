@@ -15,11 +15,11 @@ template<typename ReturnT>
 struct deserialize_and_return_from_iter
 {
    static
-   ReturnT eval(DBusMessageIter* iter)
+   ReturnT eval(Decoder& d)
    {
       ReturnT rc;
 
-      decode(*iter, rc);
+      decode(d, rc);
 
       return rc;
    }
@@ -32,12 +32,9 @@ struct deserialize_and_return
    static
    ReturnT eval(DBusMessage* msg)
    {
-      DecodingScope scope(msg);
+      Decoder d(msg);
 
-      DBusMessageIter iter;
-      dbus_message_iter_init(msg, &iter);
-
-      return deserialize_and_return_from_iter<ReturnT>::eval(&iter);
+      return deserialize_and_return_from_iter<ReturnT>::eval(d);
    }
 };
 
@@ -64,12 +61,9 @@ struct deserialize_and_return<std::tuple<T...>>
    {
       return_type rc;
 
-      DecodingScope scope(msg);
+      Decoder d(msg);
 
-      DBusMessageIter iter;
-      dbus_message_iter_init(msg, &iter);
-
-      Codec<return_type>::decode_flattened(iter, rc);
+      Codec<return_type>::decode_flattened(d, rc);
 
       return rc;
    }

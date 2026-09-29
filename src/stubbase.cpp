@@ -185,8 +185,6 @@ void StubBase::get_all_properties_request()
 
 simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage& response, bool __throw)
 {
-    DecodingScope scope(&response);
-
     DBusMessageIter iter;
     dbus_message_iter_init(&response, &iter);
 
@@ -224,7 +222,10 @@ simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage
 
             // get value and call
             if (propiter != properties_.end())
-                propiter->first->eval(&__iter);
+            {
+                Decoder d(__iter, &response);
+                propiter->first->eval(&d);
+            }
 
             dbus_message_iter_next(&_iter);
         }
@@ -531,8 +532,6 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
 
 void StubBase::try_handle_signal(DBusMessage* msg)
 {
-   DecodingScope scope(msg);
-
    // FIXME better check -> include interface!
    if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
    {
@@ -557,7 +556,10 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          auto propiter = std::find_if(properties_.begin(), properties_.end(), [&property_name](auto& pair){ return property_name == pair.first->name_; });
 
          if (propiter != properties_.end() && propiter->second)
-            propiter->first->eval(&item_iterator);
+         {
+            Decoder d(item_iterator, msg);
+            propiter->first->eval(&d);
+         }
 
          // advance to next element
          dbus_message_iter_next(&iter);
@@ -589,10 +591,8 @@ void StubBase::try_handle_signal(DBusMessage* msg)
       {
          if (!strcmp(sig->name_, dbus_message_get_member(msg)))
          {
-            DBusMessageIter iter;
-            dbus_message_iter_init(msg, &iter);
-
-            sig->eval(iter);
+            Decoder d(msg);
+            sig->eval(d);
             break;
          }
 

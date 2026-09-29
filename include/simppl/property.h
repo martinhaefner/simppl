@@ -63,21 +63,20 @@ template<typename T>
 struct PropertyCodec
 {
    static
-   void encode(DBusMessageIter& iter, const T& t)
+   void encode(Encoder& e, const T& t)
    {
-      detail::VariantSerializer(iter).operator()(t);
+      detail::VariantSerializer(e).operator()(t);
    }
 
 
    static
-   void decode(DBusMessageIter& iter, T& t)
+   void decode(Decoder& d, T& t)
    {
-      DBusMessageIter _iter;
-      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_VARIANT);
+      Decoder variant = d.recurse(DBUS_TYPE_VARIANT);
 
-      Codec<T>::decode(_iter, t);
+      detail::decode_one<T>(variant, t);
 
-      dbus_message_iter_next(&iter);
+      d.next();
    }
 };
 

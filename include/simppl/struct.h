@@ -24,17 +24,17 @@ namespace dbus
 template<typename T1, typename T2>
 struct SerializerTuple : T1
 {
-   void encode(DBusMessageIter& iter) const
+   void encode(Encoder& e) const
    {
-      T1::encode(iter);
-      Codec<T2>::encode(iter, data_);
+      T1::encode(e);
+      detail::encode_one<T2>(e, data_);
    }
 
 
-   void decode(DBusMessageIter& iter)
+   void decode(Decoder& d)
    {
-      T1::decode(iter);
-      Codec<T2>::decode(iter, data_);
+      T1::decode(d);
+      detail::decode_one<T2>(d, data_);
    }
 
    T2 data_;
@@ -44,15 +44,15 @@ struct SerializerTuple : T1
 template<typename T>
 struct SerializerTuple<T, NilType>
 {
-   void encode(DBusMessageIter& iter) const
+   void encode(Encoder& e) const
    {
-      Codec<T>::encode(iter, data_);
+      detail::encode_one<T>(e, data_);
    }
 
 
-   void decode(DBusMessageIter& iter)
+   void decode(Decoder& d)
    {
-      Codec<T>::decode(iter, data_);
+      detail::decode_one<T>(d, data_);
    }
 
    T data_;
@@ -95,8 +95,8 @@ using fusion_signature = fusion_signature_impl<StructT, std::make_index_sequence
 struct FusionEncoder
 {
    explicit inline
-   FusionEncoder(DBusMessageIter& iter)
-    : iter_(iter)
+   FusionEncoder(Encoder& e)
+    : e_(e)
    {
       // NOOP
    }
@@ -105,18 +105,18 @@ struct FusionEncoder
    inline
    void operator()(const T& t) const
    {
-      Codec<T>::encode(iter_, t);
+      detail::encode_one<T>(e_, t);
    }
 
-   DBusMessageIter& iter_;
+   Encoder& e_;
 };
 
 
 struct FusionDecoder
 {
    explicit inline
-   FusionDecoder(DBusMessageIter& iter)
-    : iter_(iter)
+   FusionDecoder(Decoder& d)
+    : d_(d)
    {
       // NOOP
    }
@@ -125,10 +125,10 @@ struct FusionDecoder
    inline
    void operator()(T& t) const
    {
-      Codec<T>::decode(iter_, t);
+      detail::decode_one<T>(d_, t);
    }
 
-   DBusMessageIter& iter_;
+   Decoder& d_;
 };
 
 
@@ -145,36 +145,32 @@ struct StructSerializationHelper
    typedef typename StructT::serializer_type s_type;
 
    static
-   void encode(DBusMessageIter& iter, const StructT& st);
+   void encode(Encoder& e, const StructT& st);
 
    static
-   void decode(DBusMessageIter& iter, const StructT& st);
+   void decode(Decoder& d, const StructT& st);
 };
 
 
 template<typename StructT, typename SelectorT>
-void StructSerializationHelper<StructT, SelectorT>::encode(DBusMessageIter& iter, const StructT& st)
+void StructSerializationHelper<StructT, SelectorT>::encode(Encoder& e, const StructT& st)
 {
-   DBusMessageIter _iter;
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+   Encoder members = e.open_container(DBUS_TYPE_STRUCT);
 
    const s_type& tuple = *(s_type*)&st;
-   tuple.encode(_iter);
-
-   dbus_message_iter_close_container(&iter, &_iter);
+   tuple.encode(members);
 }
 
 
 template<typename StructT, typename SelectorT>
-void StructSerializationHelper<StructT, SelectorT>::decode(DBusMessageIter& iter, const StructT& st)
+void StructSerializationHelper<StructT, SelectorT>::decode(Decoder& d, const StructT& st)
 {
-   DBusMessageIter _iter;
-   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_STRUCT);
+   Decoder members = d.recurse(DBUS_TYPE_STRUCT);
 
    s_type& tuple = *(s_type*)&st;
-   tuple.decode(_iter);
+   tuple.decode(members);
 
-   dbus_message_iter_next(&iter);
+   d.next();
 }
 
 
@@ -184,25 +180,21 @@ template<typename StructT>
 struct StructSerializationHelper<StructT, boost::mpl::true_> : fusion_signature<StructT>
 {
    static inline
-   void encode(DBusMessageIter& iter, const StructT& st)
+   void encode(Encoder& e, const StructT& st)
    {
-      DBusMessageIter _iter;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+      Encoder members = e.open_container(DBUS_TYPE_STRUCT);
 
-      boost::fusion::for_each(st, FusionEncoder(_iter));
-
-      dbus_message_iter_close_container(&iter, &_iter);
+      boost::fusion::for_each(st, FusionEncoder(members));
    }
 
    static inline
-   void decode(DBusMessageIter& iter, StructT& st)
+   void decode(Decoder& d, StructT& st)
    {
-      DBusMessageIter _iter;
-      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_STRUCT);
+      Decoder members = d.recurse(DBUS_TYPE_STRUCT);
 
-      boost::fusion::for_each(st, FusionDecoder(_iter));
+      boost::fusion::for_each(st, FusionDecoder(members));
 
-      dbus_message_iter_next(&iter);
+      d.next();
    }
 };
 

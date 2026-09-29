@@ -99,28 +99,23 @@ template<>
 struct Codec<test::TestStruct>
 {
    static 
-   void encode(DBusMessageIter& iter, const test::TestStruct& s)
+   void encode(Encoder& e, const test::TestStruct& s)
    {
-      DBusMessageIter _iter;
-
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, nullptr, &_iter);
+      Encoder members = e.open_container(DBUS_TYPE_STRUCT);
       
-      simppl::dbus::encode(_iter, s.i, s.str, s.j);
-      
-      dbus_message_iter_close_container(&iter, &_iter);
+      simppl::dbus::encode(members, s.i, s.str, s.j);
    }
    
    
    static 
-   void decode(DBusMessageIter& iter, test::TestStruct& s)
+   void decode(Decoder& d, test::TestStruct& s)
    {
-      DBusMessageIter _iter;
-      dbus_message_iter_recurse(&iter, &_iter);
+      Decoder members = d.recurse(DBUS_TYPE_STRUCT);
       
-      simppl::dbus::decode(_iter, s.i, s.str, s.j);
+      simppl::dbus::decode(members, s.i, s.str, s.j);
       
       // advance to next element
-      dbus_message_iter_next(&iter);
+      d.next();
    }
    
    

@@ -58,7 +58,6 @@ struct FunctionCaller<-1, TupleT>
    static inline
    void eval_intern(FunctorT& f, const TupleT& /*tuple*/, const T&... t)
    {
-      DecodingScope user_code(nullptr);
       f(t...);
    }
 
@@ -66,7 +65,6 @@ struct FunctionCaller<-1, TupleT>
    static inline
    void eval_intern_cs(FunctorT& f, const TCallState<ErrorT>& cs, const TupleT& /*tuple*/, const T&... t)
    {
-      DecodingScope user_code(nullptr);
       f(cs, t...);
    }
 };
@@ -78,7 +76,6 @@ struct FunctionCaller<0, std::tuple<>>
    static inline
    void eval_cs(FunctorT& f, const TCallState<ErrorT>& cs, const std::tuple<>& tuple)
    {
-      DecodingScope user_code(nullptr);
       f(cs);
    }
 };
@@ -89,22 +86,22 @@ struct DeserializeAndCall : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static
-   void eval(DBusMessageIter& iter, FunctorT& f)
+   void eval(Decoder& d, FunctorT& f)
    {
       std::tuple<T> tuple;
-      Codec<std::tuple<T>>::decode_flattened(iter, tuple);
+      Codec<std::tuple<T>>::decode_flattened(d, tuple);
 
       FunctionCaller<0, std::tuple<T>>::template eval(f, tuple);
    }
 
    template<typename FunctorT, typename ErrorT>
    static
-   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
+   void evalResponse(Decoder& d, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
       std::tuple<T> tuple;
 
       if (cs)
-         Codec<std::tuple<T>>::decode_flattened(iter, tuple);
+         Codec<std::tuple<T>>::decode_flattened(d, tuple);
 
       FunctionCaller<0, std::tuple<T>>::template eval_cs(f, cs, tuple);
    }
@@ -116,22 +113,22 @@ struct DeserializeAndCall<std::tuple<T...>> : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
-   void eval(DBusMessageIter& iter, FunctorT& f)
+   void eval(Decoder& d, FunctorT& f)
    {
       std::tuple<T...> tuple;
-      Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
+      Codec<std::tuple<T...>>::decode_flattened(d, tuple);
 
       FunctionCaller<0, std::tuple<T...>>::template eval(f, tuple);
    }
 
    template<typename FunctorT, typename ErrorT>
    static
-   void evalResponse(DBusMessageIter& iter, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
+   void evalResponse(Decoder& d, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
       std::tuple<T...> tuple;
 
       if (cs)
-         Codec<std::tuple<T...>>::decode_flattened(iter, tuple);
+         Codec<std::tuple<T...>>::decode_flattened(d, tuple);
 
       FunctionCaller<0, std::tuple<T...>>::template eval_cs(f, cs, tuple);
    }
@@ -142,17 +139,15 @@ struct DeserializeAndCall0 : simppl::NonInstantiable
 {
    template<typename FunctorT>
    static inline
-   void eval(DBusMessageIter& /*iter*/, FunctorT& f)
+   void eval(Decoder& /*d*/, FunctorT& f)
    {
-      DecodingScope user_code(nullptr);
       f();
    }
 
    template<typename FunctorT, typename ErrorT>
    static inline
-   void evalResponse(DBusMessageIter& /*iter*/, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
+   void evalResponse(Decoder& /*d*/, FunctorT& f, const simppl::dbus::TCallState<ErrorT>& cs)
    {
-      DecodingScope user_code(nullptr);
       f(cs);
    }
 };

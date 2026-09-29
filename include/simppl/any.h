@@ -47,7 +47,7 @@ class Any
 {
     friend struct Codec<Any>;
 
-    typedef void(*encoder_type)(DBusMessageIter&, const std::any&);
+    typedef void(*encoder_type)(Encoder&, const std::any&);
 
     struct Local
     {
@@ -95,9 +95,9 @@ class Any
 
     template<typename T>
     static
-    void encoder(DBusMessageIter& iter, const std::any& data)
+    void encoder(Encoder& e, const std::any& data)
     {
-        Codec<T>::encode(iter, *std::any_cast<T>(&data));
+        detail::encode_one<T>(e, *std::any_cast<T>(&data));
     }
 
 
@@ -112,19 +112,18 @@ class Any
     static
     T decode_from(DBusMessage* msg, const DBusMessageIter& iter)
     {
-        // nested Anys shall refer to the message the data is decoded from
-        DecodingScope scope(msg);
-
+        // nested Anys refer to the same message
         DBusMessageIter _iter = iter;
+        Decoder d(_iter, msg);
 
         T t;
-        Codec<T>::decode(_iter, t);
+        detail::decode_one<T>(d, t);
 
         return t;
     }
 
 
-    void encode(DBusMessageIter& iter) const;
+    void encode(Encoder& e) const;
 
 
 public:
@@ -192,10 +191,12 @@ public:
             // same D-Bus type, other C++ type: convert via the wire format
             std::unique_ptr<DBusMessage, void(*)(DBusMessage*)> msg(dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL), &dbus_message_unref);
 
-            DBusMessageIter iter;
-            dbus_message_iter_init_append(msg.get(), &iter);
-            (*l->encode_)(iter, l->value_);
+            {
+                Encoder e(msg.get());
+                (*l->encode_)(e, l->value_);
+            }
 
+            DBusMessageIter iter;
             dbus_message_iter_init(msg.get(), &iter);
             return decode_from<T>(msg.get(), iter);
         }
@@ -223,14 +224,14 @@ template<>
 struct Codec<Any> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 {
     static
-    void encode(DBusMessageIter& iter, const Any& v)
+    void encode(Encoder& e, const Any& v)
     {
-        v.encode(iter);
+        v.encode(e);
     }
 
 
     static
-    void decode(DBusMessageIter& iter, Any& v);
+    void decode(Decoder& d, Any& v);
 };
 
 }   // dbus

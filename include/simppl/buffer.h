@@ -90,30 +90,26 @@ template<size_t len>
 struct Codec<FixedSizeBuffer<len>> : composite_signature<signature_chars<DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE>>
 {
    static 
-   void encode(DBusMessageIter& iter, const FixedSizeBuffer<len>& b)
+   void encode(Encoder& e, const FixedSizeBuffer<len>& b)
    {
-      DBusMessageIter _iter;
-
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &_iter);
-      dbus_message_iter_append_fixed_array(&_iter, DBUS_TYPE_BYTE, &b.buf, len);      
-      dbus_message_iter_close_container(&iter, &_iter);
+      Encoder array = e.open_container(DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING);
+      array.append_fixed_array(DBUS_TYPE_BYTE, b.buf, len);
    }
    
    
    static 
-   void decode(DBusMessageIter& iter, FixedSizeBuffer<len>& b)
+   void decode(Decoder& d, FixedSizeBuffer<len>& b)
    {
-      DBusMessageIter _iter;
-      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
+      Decoder array = d.recurse(DBUS_TYPE_ARRAY);
       
       unsigned char* buf; 
       int _len = len;
-      dbus_message_iter_get_fixed_array(&_iter, &buf, &_len);
+      dbus_message_iter_get_fixed_array(&array.native(), &buf, &_len);
       
       b.assign(buf);
       
       // advance to next element
-      dbus_message_iter_next(&iter);
+      d.next();
    }
 };
 

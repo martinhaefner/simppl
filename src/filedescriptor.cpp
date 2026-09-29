@@ -144,18 +144,18 @@ int FileDescriptor::release()
 
 
 /*static*/
-void FileDescriptorCodec::encode(DBusMessageIter& iter, const FileDescriptor& fd)
+void FileDescriptorCodec::encode(Encoder& e, const FileDescriptor& fd)
 {
    int _fd = fd.native_handle();
-   dbus_message_iter_append_basic(&iter, DBUS_TYPE_UNIX_FD, &_fd);
+   e.append_basic(DBUS_TYPE_UNIX_FD, &_fd);
 }
 
 
 /*static*/
-void FileDescriptorCodec::decode(DBusMessageIter& iter, FileDescriptor& fd)
+void FileDescriptorCodec::decode(Decoder& d, FileDescriptor& fd)
 {
    int _fd;
-   simppl_dbus_message_iter_get_basic(&iter, &_fd, DBUS_TYPE_UNIX_FD);
+   d.get_basic(&_fd, DBUS_TYPE_UNIX_FD);
    fd = _fd;
 }
 

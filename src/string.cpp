@@ -12,18 +12,18 @@ namespace dbus
    
 
 /*static*/
-void StringCodec::encode(DBusMessageIter& iter, const std::string& str)
+void StringCodec::encode(Encoder& e, const std::string& str)
 {
-   char* c_str = const_cast<char*>(str.c_str());
-   dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &c_str);
+   const char* c_str = str.c_str();
+   e.append_basic(DBUS_TYPE_STRING, &c_str);
 }
 
 
 /*static*/ 
-void StringCodec::decode(DBusMessageIter& iter, std::string& str)
+void StringCodec::decode(Decoder& d, std::string& str)
 {   
    char* c_str = nullptr;
-   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_STRING);
+   d.get_basic(&c_str, DBUS_TYPE_STRING);
    
    if (c_str)
    {
@@ -35,20 +35,19 @@ void StringCodec::decode(DBusMessageIter& iter, std::string& str)
 
 
 /*static*/ 
-void StringCodec::encode(DBusMessageIter& iter, const char* str)
+void StringCodec::encode(Encoder& e, const char* str)
 {
-   char* c_str = const_cast<char*>(str);
-   dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &c_str);
+   e.append_basic(DBUS_TYPE_STRING, &str);
 }
 
 
 /*static*/ 
-void StringCodec::decode(DBusMessageIter& iter, char*& str)
+void StringCodec::decode(Decoder& d, char*& str)
 {   
    assert(str == nullptr);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
 
    char* c_str = nullptr;
-   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_STRING);
+   d.get_basic(&c_str, DBUS_TYPE_STRING);
    
    // FIXME trouble with allocated memory in case of exception
    if (c_str)

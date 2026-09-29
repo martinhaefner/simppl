@@ -74,38 +74,33 @@ void copy_value(DBusMessageIter& from, DBusMessageIter& to)
 }   // namespace detail
 
 
-void Any::encode(DBusMessageIter& iter) const
+void Any::encode(Encoder& e) const
 {
-    DBusMessageIter variant;
-
     if (auto l = std::get_if<Local>(&value_))
     {
-        dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, l->signature_, &variant);
+        Encoder variant = e.open_container(DBUS_TYPE_VARIANT, l->signature_);
         (*l->encode_)(variant, l->value_);
     }
     else if (auto r = std::get_if<Received>(&value_))
     {
         DBusMessageIter from = r->iter_;
 
-        dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT, received_signature(*r).get(), &variant);
-        detail::copy_value(from, variant);
+        Encoder variant = e.open_container(DBUS_TYPE_VARIANT, received_signature(*r).get());
+        detail::copy_value(from, variant.native());
     }
     else
         throw std::logic_error("Cannot send an empty Any");
-
-    dbus_message_iter_close_container(&iter, &variant);
 }
 
 
 /*static*/
-void Codec<Any>::decode(DBusMessageIter& iter, Any& v)
+void Codec<Any>::decode(Decoder& d, Any& v)
 {
-    DBusMessageIter variant;
-    simppl_dbus_message_iter_recurse(&iter, &variant, DBUS_TYPE_VARIANT);
+    Decoder variant = d.recurse(DBUS_TYPE_VARIANT);
 
-    if (DBusMessage* msg = DecodingScope::current())
+    if (DBusMessage* msg = d.message())
     {
-        v.value_ = Any::Received(msg, variant);
+        v.value_ = Any::Received(msg, variant.native());
     }
     else
     {
@@ -114,13 +109,13 @@ void Codec<Any>::decode(DBusMessageIter& iter, Any& v)
 
         DBusMessageIter to;
         dbus_message_iter_init_append(copy.get(), &to);
-        detail::copy_value(variant, to);
+        detail::copy_value(variant.native(), to);
 
         dbus_message_iter_init(copy.get(), &to);
         v.value_ = Any::Received(copy.get(), to);
     }
 
-    dbus_message_iter_next(&iter);
+    d.next();
 }
 
 

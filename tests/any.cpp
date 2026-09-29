@@ -62,7 +62,8 @@ namespace test
 
          Method<in<simppl::dbus::Any>, out<simppl::dbus::Any>> echo;
          Method<in<std::map<std::string, simppl::dbus::Any>>, out<std::map<std::string, simppl::dbus::Any>>> echoDict;
-         Method<in<simppl::dbus::Any>, out<bool>> scopeInCallback;
+         Method<in<simppl::dbus::Any>> keep;
+         Method<out<simppl::dbus::Any>> kept;
 
 
          AServer()
@@ -75,7 +76,8 @@ namespace test
           , INIT(setGet)
           , INIT(echo)
           , INIT(echoDict)
-          , INIT(scopeInCallback)
+          , INIT(keep)
+          , INIT(kept)
          {
             // NOOP
          }
@@ -206,12 +208,21 @@ namespace {
          };
 
 
-         scopeInCallback >> [this](const simppl::dbus::Any&){
+         // store a received Any beyond the lifetime of the request
+         keep >> [this](const simppl::dbus::Any& a){
 
-            // user code must not see the message being dispatched
-            respond_with(scopeInCallback(simppl::dbus::DecodingScope::current() == nullptr));
+            kept_ = a;
+            respond_with(keep());
+         };
+
+
+         kept >> [this](){
+
+            respond_with(kept(kept_));
          };
       }
+
+      simppl::dbus::Any kept_;
    };
 }
 
@@ -455,7 +466,7 @@ TEST(Any, empty_cannot_be_sent)
 }
 
 
-TEST(Any, decode_without_scope)
+TEST(Any, decode_without_message)
 {
     simppl::dbus::Any a;
 
@@ -466,8 +477,7 @@ TEST(Any, decode_without_scope)
         dbus_message_iter_init_append(msg.get(), &iter);
         simppl::dbus::encode(iter, simppl::dbus::Any(std::vector<std::string>{ "a", "b" }));
 
-        EXPECT_EQ(nullptr, simppl::dbus::DecodingScope::current());
-
+        // a plain iterator does not know its message
         dbus_message_iter_init(msg.get(), &iter);
         simppl::dbus::decode(iter, a);
     }
@@ -513,7 +523,10 @@ TEST(Any, echo)
     EXPECT_EQ(1, result_inner["i"].as<int>());
     EXPECT_EQ("string", result_inner["s"].as<std::string>());
 
-    EXPECT_TRUE(stub.scopeInCallback(1));
+    typedef std::map<std::string, simppl::dbus::Any> dict_type;
+
+    stub.keep(dict_type{ { "k", 4711 } });
+    EXPECT_EQ(4711, stub.kept().as<dict_type>()["k"].as<int>());
 
     stub.stop();   // stop server
     t.join();

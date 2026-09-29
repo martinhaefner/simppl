@@ -18,37 +18,33 @@ template<typename T>
 struct Codec<std::vector<T>> : composite_signature<signature_chars<DBUS_TYPE_ARRAY>, Codec<T>>
 {
    static 
-   void encode(DBusMessageIter& s, const std::vector<T>& v)
+   void encode(Encoder& e, const std::vector<T>& v)
    {
-      DBusMessageIter iter;
-      dbus_message_iter_open_container(&s, DBUS_TYPE_ARRAY, signature_of<T>(), &iter);
+      Encoder array = e.open_container(DBUS_TYPE_ARRAY, signature_of<T>());
 
       for (auto& t : v) 
       {
-         Codec<T>::encode(iter, t);
+         detail::encode_one<T>(array, t);
       }
-
-      dbus_message_iter_close_container(&s, &iter);
    }
    
    
    static 
-   void decode(DBusMessageIter& s, std::vector<T>& v)
+   void decode(Decoder& d, std::vector<T>& v)
    {
       v.clear();
 
-      DBusMessageIter iter;
-      simppl_dbus_message_iter_recurse(&s, &iter, DBUS_TYPE_ARRAY);
+      Decoder array = d.recurse(DBUS_TYPE_ARRAY);
 
-      while(dbus_message_iter_get_arg_type(&iter) != 0)
+      while(!array.at_end())
       {
          T t;
-         Codec<T>::decode(iter, t);
+         detail::decode_one<T>(array, t);
          v.push_back(t);
       }
 
       // advance to next element
-      dbus_message_iter_next(&s);
+      d.next();
    }
 };
 

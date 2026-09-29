@@ -59,22 +59,19 @@ struct ErrorFactory
     static
     void init(ExceptionT& err, DBusMessage& msg)
     {
-        DecodingScope scope(&msg);
-
-        DBusMessageIter iter;
-        dbus_message_iter_init(&msg, &iter);
+        Decoder d(&msg);
 
         std::string text;
-        decode(iter, text);
+        decode(d, text);
 
         // set default members
         err.set_members(dbus_message_get_error_name(&msg), text.c_str(), dbus_message_get_reply_serial(&msg));
 
         // any other unexpected dbus error, e.g. exception during method body
-        if (dbus_message_iter_get_arg_type(&iter) != 0)
+        if (!d.at_end())
         {
             // and now the rest
-            decode(iter, err);
+            decode(d, err);
         }
     }
 };

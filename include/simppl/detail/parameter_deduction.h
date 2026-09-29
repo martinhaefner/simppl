@@ -139,9 +139,9 @@ template<typename...T>
 struct SerializerGenerator
 {
    static inline
-   void eval(DBusMessageIter& s, const T&... t)
+   void eval(Encoder& e, const T&... t)
    {
-      encode(s, t...);
+      encode(e, t...);
    }
 };
 

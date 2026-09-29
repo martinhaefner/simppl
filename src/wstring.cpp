@@ -12,81 +12,71 @@ namespace dbus
 
 
 /*static*/
-void WStringCodec::encode(DBusMessageIter& iter, const std::wstring& str)
+void WStringCodec::encode(Encoder& e, const std::wstring& str)
 {
    static_assert(sizeof(uint32_t) == sizeof(wchar_t), "data types mapping does not match");
 
-   DBusMessageIter _iter;
-
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &_iter);
+   Encoder array = e.open_container(DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING);
 
    for (auto& t : str) {
-      Codec<uint32_t>::encode(_iter, (uint32_t)t);
+      Codec<uint32_t>::encode(array, (uint32_t)t);
    }
-
-   dbus_message_iter_close_container(&iter, &_iter);
 }
 
 
 /*static*/
-void WStringCodec::decode(DBusMessageIter& iter, std::wstring& str)
+void WStringCodec::decode(Decoder& d, std::wstring& str)
 {
    str.clear();
 
-   DBusMessageIter _iter;
-   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
+   Decoder array = d.recurse(DBUS_TYPE_ARRAY);
 
    int count =
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 9
-       dbus_message_iter_get_array_len(&_iter) / sizeof(uint32_t);
+       dbus_message_iter_get_array_len(&array.native()) / sizeof(uint32_t);
 #else
-       dbus_message_iter_get_element_count(&iter);
+       dbus_message_iter_get_element_count(&d.native());
 #endif
    if (count > 0)
       str.reserve(count);
 
-   while(dbus_message_iter_get_arg_type(&_iter) != 0)
+   while(!array.at_end())
    {
       uint32_t t;
-      Codec<uint32_t>::decode(_iter, t);
+      Codec<uint32_t>::decode(array, t);
       str.push_back((wchar_t)t);
    }
 
    // advance to next element
-   dbus_message_iter_next(&iter);
+   d.next();
 }
 
 
 /*static*/
-void WStringCodec::encode(DBusMessageIter& iter, const wchar_t* str)
+void WStringCodec::encode(Encoder& e, const wchar_t* str)
 {
-   DBusMessageIter _iter;
-
-   dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING, &_iter);
+   Encoder array = e.open_container(DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32_AS_STRING);
 
    while(str && *str) {
-      Codec<uint32_t>::encode(_iter, (uint32_t)*str++);
+      Codec<uint32_t>::encode(array, (uint32_t)*str++);
    }
-
-   dbus_message_iter_close_container(&iter, &_iter);
 }
 
 
 /*static*/
-void WStringCodec::decode(DBusMessageIter& iter, wchar_t*& str)
+void WStringCodec::decode(Decoder& d, wchar_t*& str)
 {
    wchar_t* c_str = nullptr;
 
    //assert(str == nullptr);   // we allocate the string via Deserializer::alloc -> free with Deserializer::free
 
-   DBusMessageIter _iter;
-   simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
+   Decoder array = d.recurse(DBUS_TYPE_ARRAY);
 
    int count =
 #if DBUS_MAJOR_VERSION == 1 && DBUS_MINOR_VERSION < 9
-       dbus_message_iter_get_array_len(&_iter) / sizeof(uint32_t);
+       dbus_message_iter_get_array_len(&array.native()) / sizeof(uint32_t);
 #else
-       dbus_message_iter_get_element_count(&iter);
+       dbus_message_iter_get_element_count(&d.native());
 #endif
    if (count > 0)
    {
@@ -94,10 +84,10 @@ void WStringCodec::decode(DBusMessageIter& iter, wchar_t*& str)
       c_str[count] = 0;
 
       int i = 0;
-      while(dbus_message_iter_get_arg_type(&_iter) != 0)
+      while(!array.at_end())
       {
          uint32_t t;
-         Codec<uint32_t>::decode(_iter, t);
+         Codec<uint32_t>::decode(array, t);
          c_str[i++] = (wchar_t)t;
       }
 
@@ -107,7 +97,7 @@ void WStringCodec::decode(DBusMessageIter& iter, wchar_t*& str)
       str = nullptr;
 
    // advance to next element
-   dbus_message_iter_next(&iter);
+   d.next();
 }
 
 

@@ -25,8 +25,8 @@ namespace detail
 struct VariantSerializer
 {
    inline
-   VariantSerializer(DBusMessageIter& iter)
-    : iter_(iter)
+   VariantSerializer(Encoder& e)
+    : e_(e)
    {
        // NOOP
    }
@@ -34,12 +34,12 @@ struct VariantSerializer
    template<typename T>
    void operator()(const T& t);
 
-   DBusMessageIter& iter_;
+   Encoder& e_;
 };
 
 
 template<typename... T>
-bool try_deserialize(DBusMessageIter& iter, std::variant<T...>& v, const char* sig);
+bool try_deserialize(Decoder& d, std::variant<T...>& v, const char* sig);
 
 
 }   // namespace detail
@@ -49,34 +49,34 @@ template<typename... T>
 struct Codec<std::variant<T...>> : composite_signature<signature_chars<DBUS_TYPE_VARIANT>>
 {
    static
-   void encode(DBusMessageIter& iter, const std::variant<T...>& v)
+   void encode(Encoder& e, const std::variant<T...>& v)
    {
-      detail::VariantSerializer vs(iter);
+      detail::VariantSerializer vs(e);
       std::visit(vs, const_cast<std::variant<T...>&>(v));   // TODO need const visitor
    }
 
 
    static
-   void decode(DBusMessageIter& orig, std::variant<T...>& v)
+   void decode(Decoder& d, std::variant<T...>& v)
    {
-      DBusMessageIter iter;
-      simppl_dbus_message_iter_recurse(&orig, &iter, DBUS_TYPE_VARIANT);
+      Decoder value = d.recurse(DBUS_TYPE_VARIANT);
 
-      std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(&iter), &dbus_free);
+      std::unique_ptr<char, void(*)(void*)> sig(dbus_message_iter_get_signature(&value.native()), &dbus_free);
 
-      if (!detail::try_deserialize(iter, v, sig.get()))
-         assert(false);
+      // none of the alternatives matches the received type
+      if (!detail::try_deserialize(value, v, sig.get()))
+         throw DecoderError();
 
-      dbus_message_iter_next(&orig);
+      d.next();
    }
 };
 
 
 template<typename... T>
-bool detail::try_deserialize(DBusMessageIter& iter, std::variant<T...>& v, const char* sig)
+bool detail::try_deserialize(Decoder& d, std::variant<T...>& v, const char* sig)
 {
    // the first alternative with matching signature wins
-   return ((!strcmp(signature_of<T>(), sig) && (Codec<T>::decode(iter, v.template emplace<T>()), true)) || ...);
+   return ((!strcmp(signature_of<T>(), sig) && (detail::decode_one<T>(d, v.template emplace<T>()), true)) || ...);
 }
 
 
@@ -84,12 +84,9 @@ template<typename T>
 inline
 void detail::VariantSerializer::operator()(const T& t)   // seems to be already a reference so no copy is done
 {
-    DBusMessageIter iter;
-    dbus_message_iter_open_container(&iter_, DBUS_TYPE_VARIANT, signature_of<T>(), &iter);
+    Encoder value = e_.open_container(DBUS_TYPE_VARIANT, signature_of<T>());
 
-    Codec<T>::encode(iter, t);
-
-    dbus_message_iter_close_container(&iter_, &iter);
+    detail::encode_one<T>(value, t);
 }
 
 

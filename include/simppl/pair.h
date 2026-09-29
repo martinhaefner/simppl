@@ -19,29 +19,25 @@ struct Codec<std::pair<KeyT, ValueT>>
  : composite_signature<signature_chars<DBUS_DICT_ENTRY_BEGIN_CHAR>, Codec<KeyT>, Codec<ValueT>, signature_chars<DBUS_DICT_ENTRY_END_CHAR>>
 {
    static 
-   void encode(DBusMessageIter& iter, const std::pair<KeyT, ValueT>& p)
+   void encode(Encoder& e, const std::pair<KeyT, ValueT>& p)
    {
-      DBusMessageIter item_iterator;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_DICT_ENTRY, nullptr, &item_iterator);
+      Encoder entry = e.open_container(DBUS_TYPE_DICT_ENTRY);
 
-      Codec<KeyT>::encode(item_iterator, p.first);
-      Codec<ValueT>::encode(item_iterator, p.second);
-      
-      dbus_message_iter_close_container(&iter, &item_iterator);
+      detail::encode_one<KeyT>(entry, p.first);
+      detail::encode_one<ValueT>(entry, p.second);
    }
    
    
    static 
-   void decode(DBusMessageIter& iter, std::pair<KeyT, ValueT>& p)
+   void decode(Decoder& d, std::pair<KeyT, ValueT>& p)
    {
-      DBusMessageIter item_iterator;
-      simppl_dbus_message_iter_recurse(&iter, &item_iterator, DBUS_TYPE_DICT_ENTRY);
+      Decoder entry = d.recurse(DBUS_TYPE_DICT_ENTRY);
 
-      Codec<KeyT>::decode(item_iterator, p.first);
-      Codec<ValueT>::decode(item_iterator, p.second);
+      detail::decode_one<KeyT>(entry, p.first);
+      detail::decode_one<ValueT>(entry, p.second);
       
       // advance to next element
-      dbus_message_iter_next(&iter);
+      d.next();
    }
 };
 

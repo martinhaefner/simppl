@@ -16,16 +16,16 @@ namespace dbus
 struct WStringCodec : composite_signature<signature_chars<DBUS_TYPE_ARRAY>, Codec<uint32_t>>
 {
    static 
-   void encode(DBusMessageIter& s, const std::wstring& str);
+   void encode(Encoder& e, const std::wstring& str);
    
    static 
-   void decode(DBusMessageIter& s, std::wstring& str);
+   void decode(Decoder& d, std::wstring& str);
    
    static 
-   void encode(DBusMessageIter& s, const wchar_t* str);
+   void encode(Encoder& e, const wchar_t* str);
    
    static 
-   void decode(DBusMessageIter& s, wchar_t*& str);
+   void decode(Decoder& d, wchar_t*& str);
 };
 
    

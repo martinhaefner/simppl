@@ -77,10 +77,10 @@ struct ObjectPath
 struct ObjectPathCodec : composite_signature<signature_chars<DBUS_TYPE_OBJECT_PATH>>
 {
    static
-   void encode(DBusMessageIter& iter, const ObjectPath& p);
+   void encode(Encoder& e, const ObjectPath& p);
 
    static
-   void decode(DBusMessageIter& iter, ObjectPath& p);
+   void decode(Decoder& d, ObjectPath& p);
 };
 
 

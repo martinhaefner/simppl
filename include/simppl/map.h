@@ -19,37 +19,33 @@ struct Codec<std::map<KeyT, ValueT>>
  : composite_signature<signature_chars<DBUS_TYPE_ARRAY>, Codec<std::pair<typename std::decay<KeyT>::type, ValueT>>>
 {
    static 
-   void encode(DBusMessageIter& iter, const std::map<KeyT, ValueT>& m)
+   void encode(Encoder& e, const std::map<KeyT, ValueT>& m)
    {
-      DBusMessageIter _iter;
-      dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, signature_of<std::pair<KeyT, ValueT>>(), &_iter);
+      Encoder array = e.open_container(DBUS_TYPE_ARRAY, signature_of<std::pair<KeyT, ValueT>>());
 
-      for (auto& e : m) {
-         Codec<std::pair<KeyT, ValueT>>::encode(_iter, e);
+      for (auto& entry : m) {
+         Codec<std::pair<KeyT, ValueT>>::encode(array, entry);
       }
-
-      dbus_message_iter_close_container(&iter, &_iter);
    }
    
    
    static 
-   void decode(DBusMessageIter& iter, std::map<KeyT, ValueT>& m)
+   void decode(Decoder& d, std::map<KeyT, ValueT>& m)
    {
       m.clear();
       
-      DBusMessageIter _iter;
-      simppl_dbus_message_iter_recurse(&iter, &_iter, DBUS_TYPE_ARRAY);
+      Decoder array = d.recurse(DBUS_TYPE_ARRAY);
 
-      while(dbus_message_iter_get_arg_type(&_iter) != 0)
+      while(!array.at_end())
       {
          std::pair<KeyT, ValueT> p;
-         Codec<decltype(p)>::decode(_iter, p);
+         Codec<decltype(p)>::decode(array, p);
 
          m.insert(p);
       }
 
       // advance to next element
-      dbus_message_iter_next(&iter);
+      d.next();
    }
 };
 

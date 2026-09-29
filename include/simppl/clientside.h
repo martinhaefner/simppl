@@ -35,15 +35,15 @@ template<typename> struct InterfaceNamer;
 
 struct ClientSignalBase
 {
-   typedef void (*eval_type)(ClientSignalBase*, DBusMessageIter&);
+   typedef void (*eval_type)(ClientSignalBase*, Decoder&);
 
    template<typename, int>
    friend struct ClientProperty;
    friend struct StubBase;
 
-   void eval(DBusMessageIter& iter)
+   void eval(Decoder& d)
    {
-      eval_(this, iter);
+      eval_(this, d);
    }
 
    ClientSignalBase(const char* name, StubBase* iface, int iface_id);
@@ -104,9 +104,9 @@ struct ClientSignal : ClientSignalBase
 private:
 
    static
-   void __eval(ClientSignalBase* obj, DBusMessageIter& iter)
+   void __eval(ClientSignalBase* obj, Decoder& d)
    {
-      detail::GetCaller<args_type>::type::template eval(iter, ((ClientSignal*)(obj))->f_);
+      detail::GetCaller<args_type>::type::template eval(d, ((ClientSignal*)(obj))->f_);
    }
 
    function_type f_;
@@ -120,14 +120,15 @@ struct ClientPropertyBase
 {
    friend struct StubBase;
 
-   typedef void (*eval_type)(ClientPropertyBase*, DBusMessageIter*);
+   /// Decoder nullptr: the property was invalidated
+   typedef void (*eval_type)(ClientPropertyBase*, Decoder*);
 
 
    ClientPropertyBase(const char* name, StubBase* iface, int iface_id);
 
-   void eval(DBusMessageIter* iter)
+   void eval(Decoder* d)
    {
-      eval_(this, iter);
+      eval_(this, d);
    }
 
    /// only call this after the server is connected.
@@ -166,7 +167,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
       auto that = (PropertyT*)this;
 
       that->stub_->set_property(that->name_, [&t](DBusMessageIter& s){
-         detail::PropertyCodec<data_type>::encode(s, t);
+         Encoder e(s);
+         detail::PropertyCodec<data_type>::encode(e, t);
       });
    }
 
@@ -177,7 +179,8 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
       auto that = (PropertyT*)this;
 
       return detail::InterimCallbackHolder<holder_type>(that->stub_->set_property_async(that->name_, [&t](DBusMessageIter& s){
-         detail::PropertyCodec<data_type>::encode(s, t);
+         Encoder e(s);
+         detail::PropertyCodec<data_type>::encode(e, t);
       }));
    }
 };
@@ -229,25 +232,20 @@ struct ClientProperty
 private:
 
    static
-   void __eval(ClientPropertyBase* obj, DBusMessageIter* iter)
+   void __eval(ClientPropertyBase* obj, Decoder* dec)
    {
       ClientProperty* that = (ClientProperty*)obj;
 
       if (that->f_)
       {
-          if (iter)
+          if (dec)
           {
               data_type d;
-              detail::PropertyCodec<data_type>::decode(*iter, d);
-
-              DecodingScope user_code(nullptr);
+              detail::PropertyCodec<data_type>::decode(*dec, d);
               that->f_(CallState(42), d);
           }
           else
-          {
-              DecodingScope user_code(nullptr);
               that->f_(CallState(new Error("simppl.dbus.Invalid")), data_type());
-          }
       }
    }
 
@@ -261,13 +259,10 @@ DataT ClientProperty<DataT, Flags>::get()
 {
    message_ptr_t msg = this->stub_->get_property(this->name_);
 
-   DecodingScope scope(msg.get());
-
-   DBusMessageIter iter;
-   dbus_message_iter_init(msg.get(), &iter);
+   Decoder d(msg.get());
 
    DataT t;
-   detail::PropertyCodec<DataT>::decode(iter, t);
+   detail::PropertyCodec<DataT>::decode(d, t);
 
    return t;
 }
@@ -361,7 +356,8 @@ struct ClientMethod : ClientMethodBase
                     args_type>::value, "args mismatch");
 
       auto msg = parent_->send_request_and_block(this, [&](DBusMessageIter& s){
-         serializer_type::eval(s, t...);
+         Encoder e(s);
+         serializer_type::eval(e, t...);
       }, is_oneway);
 
       return detail::deserialize_and_return<return_type>::eval(msg.get());
@@ -377,7 +373,8 @@ struct ClientMethod : ClientMethodBase
                     args_type>::value, "args mismatch");
 
       return detail::InterimCallbackHolder<holder_type>(parent_->send_request(this, [&](DBusMessageIter& s){
-         serializer_type::eval(s, t...);
+         Encoder e(s);
+         serializer_type::eval(e, t...);
       }, false));
    }
 

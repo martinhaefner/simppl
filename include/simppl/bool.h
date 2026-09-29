@@ -15,10 +15,10 @@ namespace dbus
 struct BoolCodec : composite_signature<signature_chars<DBUS_TYPE_BOOLEAN>>
 {
    static 
-   void encode(DBusMessageIter& iter, bool b);
+   void encode(Encoder& e, bool b);
 
    static 
-   void decode(DBusMessageIter& iter, bool& t);
+   void decode(Decoder& d, bool& t);
 };
    
 

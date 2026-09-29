@@ -9,18 +9,18 @@ namespace dbus
    
 
 /*static*/ 
-void ObjectPathCodec::encode(DBusMessageIter& iter, const ObjectPath& p)
+void ObjectPathCodec::encode(Encoder& e, const ObjectPath& p)
 {
-   char* c_str = const_cast<char*>(p.path.c_str());
-   dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &c_str);
+   const char* c_str = p.path.c_str();
+   e.append_basic(DBUS_TYPE_OBJECT_PATH, &c_str);
 }
 
 
 /*static*/ 
-void ObjectPathCodec::decode(DBusMessageIter& iter, ObjectPath& p)
+void ObjectPathCodec::decode(Decoder& d, ObjectPath& p)
 {   
    char* c_str = nullptr;  
-   simppl_dbus_message_iter_get_basic(&iter, &c_str, DBUS_TYPE_OBJECT_PATH);
+   d.get_basic(&c_str, DBUS_TYPE_OBJECT_PATH);
    
    if (c_str)
    {
