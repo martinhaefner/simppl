@@ -7,32 +7,42 @@
 
 namespace simppl
 {
-   
+
 namespace dbus
 {
- 
-struct request_specific_timeout_helper
+
+/**
+ * Options for a single request.
+ */
+struct RequestOptions
 {
-   template<typename RepT, typename PeriodT>
-   int operator=(std::chrono::duration<RepT, PeriodT> duration)
-   {
-      timeout_ = duration;
-      return (1<<0);
-   }
-   
-   std::chrono::milliseconds timeout_;
+   /// 0: use the dispatcher's request timeout
+   std::chrono::milliseconds timeout_ = std::chrono::milliseconds(0);
 };
-
-
-extern __thread request_specific_timeout_helper timeout;
 
 
 namespace detail
 {
 
-extern __thread std::chrono::milliseconds request_specific_timeout;
+struct TimeoutTag
+{
+   template<typename RepT, typename PeriodT>
+   constexpr
+   RequestOptions operator=(std::chrono::duration<RepT, PeriodT> duration) const
+   {
+      return RequestOptions{ std::chrono::duration_cast<std::chrono::milliseconds>(duration) };
+   }
+};
 
 }   // namespace detail
+
+
+/**
+ * Request specific timeout, overrides the dispatcher's request timeout:
+ *
+ *    stub.method[simppl::dbus::timeout = 700ms](args...);
+ */
+inline constexpr detail::TimeoutTag timeout{};
 
 }   // namespace simppl
 

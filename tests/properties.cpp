@@ -734,7 +734,7 @@ TEST(Properties, getall_blocking)
    // now call - callbacks will be called in background
    c.get_all_properties();
 
-   c.get_all_properties[42]();
+   c.get_all_properties[simppl::dbus::timeout = 1s]();
 
    EXPECT_EQ(ival, 4711);
    EXPECT_EQ(sval, "Hallo Welt");

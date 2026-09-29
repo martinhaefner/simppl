@@ -281,6 +281,73 @@ TEST(Timeout, request_specific)
 }
 
 
+TEST(Timeout, request_specific_async)
+{
+   std::thread serverthread(&runServer);
+
+   simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<Timeout> stub(d, "tm");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   // default timeout
+   d.set_request_timeout(500ms);
+
+   auto start = std::chrono::steady_clock::now();
+   long millis = 0;
+
+   // request specific timeout -> overrides default
+   stub.eval[simppl::dbus::timeout = 700ms].async(42) >> [&](const simppl::dbus::CallState& state, double){
+      EXPECT_FALSE((bool)state);
+      EXPECT_STREQ("org.freedesktop.DBus.Error.NoReply", state.exception().name());
+
+      millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+      d.stop();
+   };
+
+   d.run();
+
+   EXPECT_GE(millis, 700);
+   EXPECT_LT(millis, 750);
+
+   // cleanup server
+   gbl_disp->stop();
+   serverthread.join();
+}
+
+
+TEST(Timeout, request_specific_only_for_one_call)
+{
+   std::thread serverthread(&runServer);
+
+   simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<Timeout> stub(d, "tm");
+
+   // wait for server to get ready
+   std::this_thread::sleep_for(200ms);
+
+   // default timeout
+   d.set_request_timeout(500ms);
+
+   // options which are not used for a call must not affect other calls
+   auto unused = stub.eval[simppl::dbus::timeout = 700ms];
+   (void)unused;
+
+   auto start = std::chrono::steady_clock::now();
+
+   EXPECT_THROW(stub.eval(42), simppl::dbus::Error);
+
+   long millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+   EXPECT_GE(millis, 500);
+   EXPECT_LT(millis, 600);
+
+   // cleanup server
+   gbl_disp->stop();
+   serverthread.join();
+}
+
+
 TEST(Timeout, blocking_api)
 {
    std::thread serverthread(&runServer);

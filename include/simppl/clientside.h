@@ -314,9 +314,39 @@ struct ClientMethodBase
 };
 
 
+namespace detail
+{
+
+/**
+ * A method call with request specific options, see ClientMethod::operator[].
+ */
+template<typename MethodT>
+struct ClientMethodWithOptions
+{
+   template<typename... T>
+   typename MethodT::return_type operator()(const T&... t)
+   {
+      return method_.call(opts_, t...);
+   }
+
+   template<typename... T>
+   auto async(const T&... t)
+   {
+      return method_.call_async(opts_, t...);
+   }
+
+   MethodT& method_;
+   RequestOptions opts_;
+};
+
+}   // namespace detail
+
+
 template<typename... ArgsT>
 struct ClientMethod : ClientMethodBase
 {
+   template<typename> friend struct detail::ClientMethodWithOptions;
+
     typedef detail::generate_argument_type<ArgsT...>  args_type_generator;
     typedef detail::generate_return_type<ArgsT...>    return_type_generator;
 
@@ -349,6 +379,35 @@ struct ClientMethod : ClientMethodBase
    template<typename... T>
    return_type operator()(const T&... t)
    {
+      return call(RequestOptions(), t...);
+   }
+
+
+   /// asynchronous call
+   template<typename... T>
+   detail::InterimCallbackHolder<holder_type> async(const T&... t)
+   {
+      return call_async(RequestOptions(), t...);
+   }
+
+
+   /**
+    * Request specific options, only valid for the call directly following:
+    *
+    *    stub.method[simppl::dbus::timeout = 700ms](args...);
+    */
+   detail::ClientMethodWithOptions<ClientMethod> operator[](const RequestOptions& opts)
+   {
+      static_assert(is_oneway == false, "it's a oneway function");
+
+      return { *this, opts };
+   }
+
+private:
+
+   template<typename... T>
+   return_type call(const RequestOptions& opts, const T&... t)
+   {
 //      std::cout << abi::__cxa_demangle(typeid(typename detail::canonify<std::tuple<T...>>::type).name(), 0, 0, 0) << std::endl;
 //      std::cout << abi::__cxa_demangle(typeid(args_type).name(), 0, 0, 0) << std::endl;
 
@@ -358,15 +417,14 @@ struct ClientMethod : ClientMethodBase
       auto msg = parent_->send_request_and_block(this, [&](DBusMessageIter& s){
          Encoder e(s);
          serializer_type::eval(e, t...);
-      }, is_oneway);
+      }, is_oneway, opts.timeout_);
 
       return detail::deserialize_and_return<return_type>::eval(msg.get());
    }
 
 
-   /// asynchronous call
    template<typename... T>
-   detail::InterimCallbackHolder<holder_type> async(const T&... t)
+   detail::InterimCallbackHolder<holder_type> call_async(const RequestOptions& opts, const T&... t)
    {
       static_assert(is_oneway == false, "it's a oneway function");
       static_assert(std::is_convertible<typename detail::canonify<std::tuple<typename std::decay<T>::type...>>::type,
@@ -375,21 +433,9 @@ struct ClientMethod : ClientMethodBase
       return detail::InterimCallbackHolder<holder_type>(parent_->send_request(this, [&](DBusMessageIter& s){
          Encoder e(s);
          serializer_type::eval(e, t...);
-      }, false));
+      }, false, opts.timeout_));
    }
 
-
-   ClientMethod& operator[](int flags)
-   {
-      static_assert(is_oneway == false, "it's a oneway function");
-
-      if (flags & (1<<0))
-         detail::request_specific_timeout = timeout.timeout_;
-
-      return *this;
-   }
-
-private:
 
    static
    void __throw(DBusMessage& msg)

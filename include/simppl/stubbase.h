@@ -2,6 +2,7 @@
 #define SIMPPL_STUBBASE_H
 
 
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "simppl/detail/holders.h"
 
 #include "simppl/connectionstate.h"
+#include "simppl/timeout.h"
 
 
 namespace simppl
@@ -38,9 +40,10 @@ struct GetAllProperties
 {
     typedef detail::InterimGetAllPropertiesCallbackHolder getall_properties_holder_type;
 
-    GetAllProperties(simppl::dbus::StubBase& stub);
+    GetAllProperties(simppl::dbus::StubBase& stub, const RequestOptions& opts = RequestOptions());
 
-    GetAllProperties& operator[](int flags);
+    /// request specific options, only valid for the call directly following
+    GetAllProperties operator[](const RequestOptions& opts);
 
     void operator()();
 
@@ -48,6 +51,7 @@ struct GetAllProperties
     async();
 
     simppl::dbus::StubBase& stub_;
+    RequestOptions opts_;
 };
 
 }
@@ -162,9 +166,11 @@ protected:
 
    void cleanup();
 
-   PendingCall send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   /// @param timeout 0: the dispatcher's request timeout
+   PendingCall send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway, std::chrono::milliseconds timeout);
 
-   message_ptr_t send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway);
+   /// @param timeout 0: the dispatcher's request timeout
+   message_ptr_t send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway, std::chrono::milliseconds timeout);
 
    void register_signal(ClientSignalBase& sigbase);
    void unregister_signal(ClientSignalBase& sigbase);
@@ -199,8 +205,8 @@ protected:
     */
    simppl::dbus::CallState get_all_properties_handle_response(DBusMessage& response, bool __throw);
 
-   void get_all_properties_request();
-   getall_properties_holder_type get_all_properties_request_async();
+   void get_all_properties_request(std::chrono::milliseconds timeout);
+   getall_properties_holder_type get_all_properties_request_async(std::chrono::milliseconds timeout);
 
    std::vector<std::string> ifaces_;
    char* objectpath_;

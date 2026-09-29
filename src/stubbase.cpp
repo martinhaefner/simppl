@@ -14,27 +14,11 @@
 
 namespace {
 
-struct TimeoutRAIIHelper
+/// @return the timeout in milliseconds for libdbus
+int effective_timeout(simppl::dbus::Dispatcher& disp, std::chrono::milliseconds timeout)
 {
-    TimeoutRAIIHelper(simppl::dbus::Dispatcher& disp)
-     : timeout_(disp.request_timeout())
-    {
-        if (simppl::dbus::detail::request_specific_timeout.count() > 0)
-            timeout_ = simppl::dbus::detail::request_specific_timeout.count();
-    }
-
-    ~TimeoutRAIIHelper()
-    {
-        simppl::dbus::detail::request_specific_timeout = std::chrono::milliseconds(0);
-    }
-
-    operator int()
-    {
-        return timeout_;
-    }
-
-    int timeout_;
-};
+    return timeout.count() > 0 ? timeout.count() : disp.request_timeout();
+}
 
 }   // namespace
 
@@ -159,7 +143,7 @@ Dispatcher& StubBase::disp()
 }
 
 
-void StubBase::get_all_properties_request()
+void StubBase::get_all_properties_request(std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "GetAll"));
     DBusPendingCall* pending = nullptr;
@@ -169,7 +153,7 @@ void StubBase::get_all_properties_request()
 
     encode(iter, iface());
 
-    dbus_connection_send_with_reply(conn(), msg.get(), &pending, TimeoutRAIIHelper(disp()));
+    dbus_connection_send_with_reply(conn(), msg.get(), &pending, effective_timeout(disp(), timeout));
 
     dbus_pending_call_block(pending);
 
@@ -235,7 +219,7 @@ simppl::dbus::CallState StubBase::get_all_properties_handle_response(DBusMessage
 }
 
 
-StubBase::getall_properties_holder_type StubBase::get_all_properties_request_async()
+StubBase::getall_properties_holder_type StubBase::get_all_properties_request_async(std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "GetAll"));
     DBusPendingCall* pending = nullptr;
@@ -247,13 +231,13 @@ StubBase::getall_properties_holder_type StubBase::get_all_properties_request_asy
         encode(iter, iface());
     }
 
-    dbus_connection_send_with_reply(conn(), msg.get(), &pending, TimeoutRAIIHelper(disp()));
+    dbus_connection_send_with_reply(conn(), msg.get(), &pending, effective_timeout(disp(), timeout));
 
     return getall_properties_holder_type(PendingCall(dbus_message_get_serial(msg.get()), pending), *this);
 }
 
 
-PendingCall StubBase::send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
+PendingCall StubBase::send_request(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway, std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method->method_name_));
     DBusPendingCall* pending = nullptr;
@@ -265,7 +249,7 @@ PendingCall StubBase::send_request(ClientMethodBase* method, std::function<void(
 
     if (!is_oneway)
     {
-        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, TimeoutRAIIHelper(disp()));
+        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, effective_timeout(disp(), timeout));
     }
     else
     {
@@ -280,7 +264,7 @@ PendingCall StubBase::send_request(ClientMethodBase* method, std::function<void(
 }
 
 
-message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway)
+message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::function<void(DBusMessageIter&)>&& f, bool is_oneway, std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), iface(), method->method_name_));
     DBusPendingCall* pending = nullptr;
@@ -293,7 +277,7 @@ message_ptr_t StubBase::send_request_and_block(ClientMethodBase* method, std::fu
 
     if (!is_oneway)
     {
-        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, TimeoutRAIIHelper(disp()));
+        dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, effective_timeout(disp(), timeout));
 
         dbus_pending_call_block(pending);
 
