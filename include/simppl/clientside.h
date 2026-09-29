@@ -146,9 +146,56 @@ protected:
 };
 
 
+namespace detail
+{
+
+/**
+ * Property access with request specific options, see ClientProperty::operator[].
+ */
+template<typename PropertyT>
+struct ClientPropertyWithOptions
+{
+   typename PropertyT::data_type get()
+   {
+      return property_.get(opts_);
+   }
+
+   auto get_async()
+   {
+      return property_.get_async(opts_);
+   }
+
+   /// writable properties only
+   void set(typename PropertyT::arg_type t)
+   {
+      property_.set(opts_, t);
+   }
+
+   /// writable properties only
+   auto set_async(typename PropertyT::arg_type t)
+   {
+      return property_.set_async(opts_, t);
+   }
+
+   /// writable properties only
+   ClientPropertyWithOptions& operator=(typename PropertyT::arg_type t)
+   {
+      set(t);
+      return *this;
+   }
+
+   PropertyT& property_;
+   RequestOptions opts_;
+};
+
+}   // namespace detail
+
+
 template<typename PropertyT, typename DataT>
 struct ClientPropertyWritableMixin : ClientPropertyBase
 {
+   template<typename> friend struct detail::ClientPropertyWithOptions;
+
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
    typedef std::function<void(const CallState&)> function_type;
@@ -164,24 +211,37 @@ struct ClientPropertyWritableMixin : ClientPropertyBase
    /// blocking version
    void set(arg_type t)
    {
-      auto that = (PropertyT*)this;
-
-      that->stub_->set_property(that->name_, [&t](DBusMessageIter& s){
-         Encoder e(s);
-         detail::PropertyCodec<data_type>::encode(e, t);
-      });
+      set(RequestOptions(), t);
    }
 
 
    /// async version
    detail::InterimCallbackHolder<holder_type> set_async(arg_type t)
    {
+      return set_async(RequestOptions(), t);
+   }
+
+private:
+
+   void set(const RequestOptions& opts, arg_type t)
+   {
+      auto that = (PropertyT*)this;
+
+      that->stub_->set_property(that->name_, [&t](DBusMessageIter& s){
+         Encoder e(s);
+         detail::PropertyCodec<data_type>::encode(e, t);
+      }, opts.timeout_);
+   }
+
+
+   detail::InterimCallbackHolder<holder_type> set_async(const RequestOptions& opts, arg_type t)
+   {
       auto that = (PropertyT*)this;
 
       return detail::InterimCallbackHolder<holder_type>(that->stub_->set_property_async(that->name_, [&t](DBusMessageIter& s){
          Encoder e(s);
          detail::PropertyCodec<data_type>::encode(e, t);
-      }));
+      }, opts.timeout_));
    }
 };
 
@@ -190,6 +250,8 @@ template<typename DataT, int Flags = Notifying|ReadOnly>
 struct ClientProperty
  : std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, ClientPropertyBase>::type
 {
+   template<typename> friend struct detail::ClientPropertyWithOptions;
+
    typedef typename std::conditional<(Flags & ReadWrite), ClientPropertyWritableMixin<ClientProperty<DataT, Flags>, DataT>, ClientPropertyBase>::type base_type;
    typedef DataT data_type;
    typedef typename CallTraits<DataT>::param_type arg_type;
@@ -213,11 +275,14 @@ struct ClientProperty
    /// only call this after the server is connected.
    ClientProperty& attach();
 
-   DataT get();
+   DataT get()
+   {
+      return get(RequestOptions());
+   }
 
    detail::InterimCallbackHolder<holder_type> get_async()
    {
-      return detail::InterimCallbackHolder<holder_type>(this->stub_->get_property_async(this->name_));
+      return get_async(RequestOptions());
    }
 
 
@@ -229,7 +294,26 @@ struct ClientProperty
    }
 
 
+   /**
+    * Request specific options, only valid for the access directly following:
+    *
+    *    int i = stub.prop[simppl::dbus::timeout = 700ms].get();
+    *    stub.prop[simppl::dbus::timeout = 700ms] = 42;
+    */
+   detail::ClientPropertyWithOptions<ClientProperty> operator[](const RequestOptions& opts)
+   {
+      return { *this, opts };
+   }
+
+
 private:
+
+   DataT get(const RequestOptions& opts);
+
+   detail::InterimCallbackHolder<holder_type> get_async(const RequestOptions& opts)
+   {
+      return detail::InterimCallbackHolder<holder_type>(this->stub_->get_property_async(this->name_, opts.timeout_));
+   }
 
    static
    void __eval(ClientPropertyBase* obj, Decoder* dec)
@@ -255,9 +339,9 @@ private:
 
 
 template<typename DataT, int Flags>
-DataT ClientProperty<DataT, Flags>::get()
+DataT ClientProperty<DataT, Flags>::get(const RequestOptions& opts)
 {
-   message_ptr_t msg = this->stub_->get_property(this->name_);
+   message_ptr_t msg = this->stub_->get_property(this->name_, opts.timeout_);
 
    Decoder d(msg.get());
 
@@ -274,7 +358,7 @@ ClientProperty<DataT, Flags>& ClientProperty<DataT, Flags>::attach()
 {
   this->stub_->attach_property(this);
 
-  dbus_pending_call_set_notify(this->stub_->get_property_async(this->name_).pending(),
+  dbus_pending_call_set_notify(this->stub_->get_property_async(this->name_, std::chrono::milliseconds(0)).pending(),
      &holder_type::pending_notify,
      new holder_type([this](const CallState& cs, const arg_type& val){
         if (f_)

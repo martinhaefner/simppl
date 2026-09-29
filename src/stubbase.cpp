@@ -414,7 +414,7 @@ void StubBase::cleanup()
 }
 
 
-PendingCall StubBase::get_property_async(const char* name)
+PendingCall StubBase::get_property_async(const char* name, std::chrono::milliseconds timeout)
 {
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
    DBusPendingCall* pending = nullptr;
@@ -424,14 +424,13 @@ PendingCall StubBase::get_property_async(const char* name)
 
    encode(iter, iface(), name);
 
-    // TODO request specific timeout handling here
-   dbus_connection_send_with_reply(conn(), msg.get(), &pending, disp().request_timeout());
+   dbus_connection_send_with_reply(conn(), msg.get(), &pending, effective_timeout(disp(), timeout));
 
    return PendingCall(dbus_message_get_serial(msg.get()), pending);
 }
 
 
-message_ptr_t StubBase::get_property(const char* name)
+message_ptr_t StubBase::get_property(const char* name, std::chrono::milliseconds timeout)
 {
    message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Get"));
 
@@ -443,8 +442,7 @@ message_ptr_t StubBase::get_property(const char* name)
    DBusError err;
    dbus_error_init(&err);
 
-   // TODO request specific timeout handling here
-   DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn(), msg.get(), disp().request_timeout(), &err);
+   DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn(), msg.get(), effective_timeout(disp(), timeout), &err);
 
    // drop original message
    msg.reset(reply);
@@ -463,7 +461,7 @@ message_ptr_t StubBase::get_property(const char* name)
 }
 
 
-void StubBase::set_property(const char* name, std::function<void(DBusMessageIter&)>&& f)
+void StubBase::set_property(const char* name, std::function<void(DBusMessageIter&)>&& f, std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
@@ -477,8 +475,7 @@ void StubBase::set_property(const char* name, std::function<void(DBusMessageIter
      DBusError err;
      dbus_error_init(&err);
 
-     // TODO request specific timeout handling here
-     DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg.get(), disp().request_timeout(), &err);
+     DBusMessage* reply = dbus_connection_send_with_reply_and_block(disp().conn_, msg.get(), effective_timeout(disp(), timeout), &err);
 
      // drop original message
      msg.reset(reply);
@@ -495,7 +492,7 @@ void StubBase::set_property(const char* name, std::function<void(DBusMessageIter
 }
 
 
-PendingCall StubBase::set_property_async(const char* name, std::function<void(DBusMessageIter&)>&& f)
+PendingCall StubBase::set_property_async(const char* name, std::function<void(DBusMessageIter&)>&& f, std::chrono::milliseconds timeout)
 {
     message_ptr_t msg = make_message(dbus_message_new_method_call(busname().c_str(), objectpath(), "org.freedesktop.DBus.Properties", "Set"));
 
@@ -507,8 +504,7 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
 
     DBusPendingCall* pending = nullptr;
 
-    // TODO request specific timeout handling here
-    dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, disp().request_timeout());
+    dbus_connection_send_with_reply(disp().conn_, msg.get(), &pending, effective_timeout(disp(), timeout));
 
     return PendingCall(dbus_message_get_serial(msg.get()), pending);
 }

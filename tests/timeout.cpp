@@ -21,10 +21,13 @@ INTERFACE(Timeout)
    Method<in<int>, out<double>> eval;
    Method<in<int>, simppl::dbus::oneway> oneway;
 
+   Property<int, simppl::dbus::ReadWrite> slow;
+
    inline
    Timeout()
     : INIT(eval)
     , INIT(oneway)
+    , INIT(slow)
    {
       // NOOP
    }
@@ -163,6 +166,16 @@ struct Server : simppl::dbus::Skeleton<Timeout>
 
          disp().stop();
          gbl_disp->stop();    // clients dispatcher
+      };
+
+      // generate timeouts on client side for property get and set
+      slow.on_read([](){
+         std::this_thread::sleep_for(1s);
+         return 42;
+      });
+
+      slow >> [](int){
+         std::this_thread::sleep_for(1s);
       };
    }
 };
@@ -345,6 +358,108 @@ TEST(Timeout, request_specific_only_for_one_call)
    // cleanup server
    gbl_disp->stop();
    serverthread.join();
+}
+
+
+namespace {
+
+long millis_since(std::chrono::steady_clock::time_point start)
+{
+   return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+}
+
+
+struct PropertyTimeout : testing::Test
+{
+   PropertyTimeout()
+    : serverthread_(&runServer)
+    , stub_(d_, "tm")
+   {
+      // wait for server to get ready
+      std::this_thread::sleep_for(200ms);
+
+      // default timeout
+      d_.set_request_timeout(500ms);
+   }
+
+   ~PropertyTimeout()
+   {
+      // cleanup server
+      gbl_disp->stop();
+      serverthread_.join();
+   }
+
+   std::thread serverthread_;
+   simppl::dbus::Dispatcher d_{ "bus:session" };
+   simppl::dbus::Stub<Timeout> stub_;
+};
+
+}   // namespace
+
+
+TEST_F(PropertyTimeout, get_default)
+{
+   auto start = std::chrono::steady_clock::now();
+
+   EXPECT_THROW(stub_.slow.get(), simppl::dbus::Error);
+
+   long millis = millis_since(start);
+   EXPECT_GE(millis, 500);
+   EXPECT_LT(millis, 600);
+}
+
+
+TEST_F(PropertyTimeout, get_request_specific)
+{
+   auto start = std::chrono::steady_clock::now();
+
+   try
+   {
+      int i = stub_.slow[simppl::dbus::timeout = 700ms].get();
+      (void)i;
+      // never arrive here!
+      EXPECT_FALSE(true);
+   }
+   catch(const simppl::dbus::Error& err)
+   {
+      EXPECT_STREQ("org.freedesktop.DBus.Error.NoReply", err.name());
+   }
+
+   long millis = millis_since(start);
+   EXPECT_GE(millis, 700);
+   EXPECT_LT(millis, 750);
+}
+
+
+TEST_F(PropertyTimeout, get_async_request_specific)
+{
+   auto start = std::chrono::steady_clock::now();
+   long millis = 0;
+
+   stub_.slow[simppl::dbus::timeout = 700ms].get_async() >> [&](const simppl::dbus::CallState& state, int){
+      EXPECT_FALSE((bool)state);
+      EXPECT_STREQ("org.freedesktop.DBus.Error.NoReply", state.exception().name());
+
+      millis = millis_since(start);
+      d_.stop();
+   };
+
+   d_.run();
+
+   EXPECT_GE(millis, 700);
+   EXPECT_LT(millis, 750);
+}
+
+
+TEST_F(PropertyTimeout, set_request_specific)
+{
+   auto start = std::chrono::steady_clock::now();
+
+   EXPECT_THROW(stub_.slow[simppl::dbus::timeout = 700ms] = 7, simppl::dbus::Error);
+
+   long millis = millis_since(start);
+   EXPECT_GE(millis, 700);
+   EXPECT_LT(millis, 750);
 }
 
 

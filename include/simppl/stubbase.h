@@ -181,21 +181,21 @@ protected:
    /**
     * Blocking call.
     */
-   message_ptr_t get_property(const char* name);
+   message_ptr_t get_property(const char* name, std::chrono::milliseconds timeout);
 
-   PendingCall get_property_async(const char* name);
+   PendingCall get_property_async(const char* name, std::chrono::milliseconds timeout);
 
    /**
     * Blocking call.
     */
-   void set_property(const char* Name, std::function<void(DBusMessageIter&)>&& f);
+   void set_property(const char* Name, std::function<void(DBusMessageIter&)>&& f, std::chrono::milliseconds timeout);
 
    /**
     * Just register the property within the stub.
     */
    void add_property(ClientPropertyBase* property);
 
-   PendingCall set_property_async(const char* Name, std::function<void(DBusMessageIter&)>&& f);
+   PendingCall set_property_async(const char* Name, std::function<void(DBusMessageIter&)>&& f, std::chrono::milliseconds timeout);
 
    /**
     * Second part of get_all_properties_async. Once the callback arrives
