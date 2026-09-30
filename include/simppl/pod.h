@@ -72,6 +72,31 @@ struct CodecImpl<T, Pod>
 };
 
 
+/**
+ * D-Bus has no single precision type, a float is transferred as double.
+ */
+template<>
+struct CodecImpl<float, Pod> : composite_signature<signature_chars<DBUS_TYPE_DOUBLE>>
+{
+   static inline
+   void encode(Encoder& e, const float& f)
+   {
+      const double d = f;
+      e.append_basic(DBUS_TYPE_DOUBLE, &d);
+   }
+
+
+   static inline
+   void decode(Decoder& d, float& f)
+   {
+      double value;
+      d.get_basic(&value, DBUS_TYPE_DOUBLE);
+
+      f = static_cast<float>(value);
+   }
+};
+
+
 }   // namespace dbus
 
 }   // namespace simppl

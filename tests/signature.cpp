@@ -136,6 +136,7 @@ static_assert(sig<int16_t>() == "n");
 static_assert(sig<uint32_t>() == "u");
 static_assert(sig<int64_t>() == "x");
 static_assert(sig<double>() == "d");
+static_assert(sig<float>() == "d");   // D-Bus has no float
 static_assert(sig<Color>() == "i");
 static_assert(sig<bool>() == "b");
 static_assert(sig<std::string>() == "s");
@@ -248,6 +249,38 @@ TEST(Signature, buffer_in_container)
 
    ASSERT_EQ(2u, out.size());
    EXPECT_EQ(0, memcmp(data, out[1].ptr(), sizeof(data)));
+}
+
+
+TEST(Signature, float_as_double)
+{
+   auto msg = make_message();
+
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+
+   simppl::dbus::encode(iter, 1.5f, std::vector<float>{ 0.25f, -2.0f });
+
+   EXPECT_STREQ("dad", dbus_message_get_signature(msg.get()));
+
+   // a float can be received as float or double
+   dbus_message_iter_init(msg.get(), &iter);
+
+   float f = 0;
+   std::vector<float> vf;
+   simppl::dbus::decode(iter, f, vf);
+
+   EXPECT_EQ(1.5f, f);
+   EXPECT_EQ((std::vector<float>{ 0.25f, -2.0f }), vf);
+
+   dbus_message_iter_init(msg.get(), &iter);
+
+   double d = 0;
+   std::vector<double> vd;
+   simppl::dbus::decode(iter, d, vd);
+
+   EXPECT_EQ(1.5, d);
+   EXPECT_EQ((std::vector<double>{ 0.25, -2.0 }), vd);
 }
 
 
