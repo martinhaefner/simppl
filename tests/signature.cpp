@@ -147,6 +147,7 @@ static_assert(sig<simppl::dbus::FixedSizeBuffer<16>>() == "ay");
 static_assert(sig<simppl::dbus::Any>() == "v");
 static_assert(sig<std::variant<int32_t, std::string>>() == "v");
 static_assert(sig<std::vector<int32_t>>() == "ai");
+static_assert(sig<std::vector<bool>>() == "ab");
 static_assert(sig<std::map<std::string, simppl::dbus::Any>>() == "a{sv}");
 static_assert(sig<std::tuple<int32_t, double, std::vector<std::string>>>() == "(idas)");
 static_assert(sig<std::vector<std::map<std::string, std::tuple<int32_t, double, std::vector<std::string>>>>>() == "aa{s(idas)}");
@@ -281,6 +282,33 @@ TEST(Signature, float_as_double)
 
    EXPECT_EQ(1.5, d);
    EXPECT_EQ((std::vector<double>{ 0.25, -2.0 }), vd);
+}
+
+
+TEST(Signature, vector_of_bool)
+{
+   const std::vector<bool> in{ true, false, false, true, true };
+
+   auto msg = make_message();
+
+   DBusMessageIter iter;
+   dbus_message_iter_init_append(msg.get(), &iter);
+
+   simppl::dbus::encode(iter, in, std::vector<bool>(), simppl::dbus::Any(in));
+
+   EXPECT_STREQ("ababv", dbus_message_get_signature(msg.get()));
+
+   dbus_message_iter_init(msg.get(), &iter);
+
+   std::vector<bool> out, empty{ true };
+   simppl::dbus::Any a;
+   simppl::dbus::decode(iter, out, empty, a);
+
+   EXPECT_EQ(in, out);
+   EXPECT_TRUE(empty.empty());
+
+   EXPECT_TRUE(a.is<std::vector<bool>>());
+   EXPECT_EQ(in, a.as<std::vector<bool>>());
 }
 
 
