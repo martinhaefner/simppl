@@ -1,8 +1,8 @@
 #include "simppl/detail/util.h"
 
+#include <algorithm>
 #include <cstring>
 #include <cassert>
-#include <cstdio>
 
 
 namespace simppl
@@ -15,33 +15,18 @@ namespace detail
 {
 
 
-char* create_objectpath(const char* iface, const char* role)
+std::string create_objectpath(const char* iface, const char* role)
 {
-   size_t capacity = strlen(role) + strlen(iface) + 3;
-
-   char* objectpath = new char[capacity];
-   sprintf(objectpath, "/%s/%s", iface, role);
-   char* p = objectpath;
-
-   while(*p)
-   {
-      if (*p == '.')
-         *p = '/';
-      ++p;
-   }
+   std::string objectpath = std::string("/") + iface + "/" + role;
+   std::replace(objectpath.begin(), objectpath.end(), '.', '/');
 
    return objectpath;
 }
 
 
-char* create_busname(const char* iface, const char* role)
+std::string create_busname(const char* iface, const char* role)
 {
-   size_t capacity = strlen(role) + strlen(iface) + 2;
-
-   char* busname = new char[capacity];
-   sprintf(busname, "%s.%s", iface, role);
-
-   return busname;
+   return std::string(iface) + "." + role;
 }
 
 std::vector<std::string> extract_interfaces(std::size_t iface_count, const char* mangled_iface_list)

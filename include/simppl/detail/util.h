@@ -16,15 +16,13 @@ namespace detail
 
 /**
  * Trivially mangle iface with role to create objectpath.
- * Must be deleted via delete[].
  */
-char* create_objectpath(const char* iface, const char* role);
+std::string create_objectpath(const char* iface, const char* role);
 
 /**
  * Trivially mangle iface with role to create busname.
- * Must be deleted via delete[].
  */
-char* create_busname(const char* iface, const char* role);
+std::string create_busname(const char* iface, const char* role);
 
 /**
  * @return dbus compatible interface names from mangled c++ name.

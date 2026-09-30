@@ -73,7 +73,6 @@ void StubBase::Connected::state_changed(ConnectionState state, bool force)
 StubBase::StubBase()
  : connected(this)
  , get_all_properties(*this)
- , objectpath_(nullptr) 
  , disp_(nullptr)
  , signals_(nullptr)
  , attached_properties_(0)
@@ -86,8 +85,6 @@ StubBase::~StubBase()
 {
    if (disp_)
       disp_->remove_client(*this);
-
-   delete[] objectpath_;
 }
 
 
@@ -98,9 +95,7 @@ void StubBase::init(char* iface, const char* busname, const char* objectpath)
 
     ifaces_ = detail::extract_interfaces(1, iface);
 
-    objectpath_ = new char[strlen(objectpath)+1];
-    strcpy(objectpath_, objectpath);
-
+    objectpath_ = objectpath;
     busname_ = busname;
 
     free(iface);
@@ -114,11 +109,7 @@ void StubBase::init(char* iface, const char* role)
     ifaces_ = detail::extract_interfaces(1, iface);
 
     objectpath_ = detail::create_objectpath(this->iface(), role);
-
-    busname_.reserve(strlen(this->iface()) + 1 + strlen(role));
-    busname_ = this->iface();
-    busname_ += ".";
-    busname_ += role;
+    busname_ = detail::create_busname(this->iface(), role);
 
     free(iface);
 }

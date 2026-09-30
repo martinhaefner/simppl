@@ -124,7 +124,7 @@ public:
    inline
    const char* objectpath() const
    {
-      return objectpath_;
+      return objectpath_.c_str();
    }
 
    Dispatcher& disp();
@@ -209,7 +209,7 @@ protected:
    getall_properties_holder_type get_all_properties_request_async(std::chrono::milliseconds timeout);
 
    std::vector<std::string> ifaces_;
-   char* objectpath_;
+   std::string objectpath_;
    std::string busname_;   
 
    Dispatcher* disp_;
