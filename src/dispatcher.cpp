@@ -8,12 +8,16 @@
 #include <map>
 #include <set>
 #include <atomic>
+#include <memory>
+#include <algorithm>
 
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
 #include "simppl/skeletonbase.h"
 #include "simppl/string.h"
 #include "simppl/vector.h"
+#include "simppl/stub.h"
+#include "simppl/api/dbus.h"
 
 #define SIMPPL_DISPATCHER_CPP
 #include "simppl/serverside.h"
@@ -380,6 +384,15 @@ struct Dispatcher::Private
 
     /// service registration's list
     std::set<std::string> busnames_;
+
+    /// bus driver stub for the dispatcher's own service tracking
+    std::unique_ptr<Stub<org::freedesktop::Bus>> tracker_;
+
+    /// bus driver stub handed out to the user via Dispatcher::bus()
+    std::unique_ptr<Stub<org::freedesktop::Bus>> bus_;
+
+    /// dispatcher is going down, no more roundtrips to the bus
+    bool closing_ = false;
 };
 
 
@@ -442,14 +455,6 @@ void Dispatcher::init(int have_introspection, const char* busname)
 
    dbus_connection_add_filter(conn_, &signal_filter, this, 0);
 
-   // register for busname change notifications
-   // response is (name, old, new)
-   dbus_error_init(&err);
-   dbus_bus_add_match(conn_, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus'", &err);
-   if (dbus_error_is_set(&err))
-      throw RuntimeError("dbus_bus_add_match", std::move(err));
-   dbus_error_free(&err);
-
    dbus_error_init(&err);
    std::ostringstream match_string;
    match_string
@@ -460,33 +465,51 @@ void Dispatcher::init(int have_introspection, const char* busname)
       throw RuntimeError("dbus_bus_add_match", std::move(err));
    dbus_error_free(&err);
 
-   // call ListNames to get list of available services on the bus
-   DBusMessage* msg = dbus_message_new_method_call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames");
+   // the bus driver is always there, stubs to it are connected right away
+   d->busnames_.insert("org.freedesktop.DBus");
 
-   dbus_error_init(&err);
-   DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn_, msg, 1000, &err);
-   assert(reply);
-   dbus_error_free(&err);
+   d->tracker_.reset(new Stub<org::freedesktop::Bus>(*this, "org.freedesktop.DBus", "/org/freedesktop/DBus"));
 
-   std::vector<std::string> busnames;
+   // created after the tracker, so the tracker's NameOwnerChanged handler
+   // is always called first (stubs_ keeps insertion order for equal keys)
+   d->bus_.reset(new Stub<org::freedesktop::Bus>(*this, "org.freedesktop.DBus", "/org/freedesktop/DBus"));
 
-   DBusMessageIter iter;
-   dbus_message_iter_init(reply, &iter);
-   decode(iter, busnames);
+   // register for busname change notifications
+   d->tracker_->NameOwnerChanged.attach() >> [this](const std::string& bus_name, const std::string& old_owner, const std::string& new_owner){
 
-   for(auto& busname : busnames)
+      // only well-known names, unique names are not bound by stubs
+      if (bus_name[0] != ':')
+      {
+         if (old_owner.empty())
+         {
+            d->busnames_.insert(bus_name);
+            notify_clients(bus_name, ConnectionState::Connected);
+         }
+         else if (new_owner.empty())
+         {
+            d->busnames_.erase(bus_name);
+            notify_clients(bus_name, ConnectionState::Disconnected);
+         }
+      }
+   };
+
+   // get list of available services on the bus
+   for(auto& busname : d->tracker_->ListNames())
    {
       if (busname[0] != ':')
          d->busnames_.insert(busname);
    }
-
-   dbus_message_unref(msg);
-   dbus_message_unref(reply);
 }
 
 
 Dispatcher::~Dispatcher()
 {
+   // connection will be closed: just drop the stubs' match rules locally
+   d->closing_ = true;
+
+   d->bus_.reset();
+   d->tracker_.reset();
+
    dbus_connection_close(conn_);
    dbus_connection_unref(conn_);
 
@@ -527,11 +550,27 @@ void Dispatcher::notify_client(const std::string& boundname, const std::string& 
 
 void Dispatcher::notify_clients(const std::string& busname, ConnectionState state)
 {
-   std::for_each(d->stubs_.begin(), d->stubs_.end(), [busname, state](auto& entry){
+   // callbacks may add or remove stubs, so iterate over a snapshot
+   std::vector<StubBase*> receivers;
 
-       if (busname == entry.second->busname())
-           entry.second->connection_state_changed(state);
-   });
+   for(auto& entry : d->stubs_)
+   {
+      if (busname == entry.second->busname())
+         receivers.push_back(entry.second);
+   }
+
+   for(auto stub : receivers)
+   {
+      if (is_registered(stub))
+         stub->connection_state_changed(state);
+   }
+}
+
+
+bool Dispatcher::is_registered(const StubBase* stub) const
+{
+   // compare pointers only, stub may already be destroyed
+   return std::any_of(d->stubs_.begin(), d->stubs_.end(), [stub](auto& entry){ return entry.second == stub; });
 }
 
 
@@ -627,6 +666,10 @@ void Dispatcher::unregister_signal_match(const std::string& match_string)
 
          d->signal_matches_.erase(iter);
 
+         // the bus drops all match rules of a connection on disconnect
+         if (d->closing_ || !dbus_connection_get_is_connected(conn_))
+            return;
+
          dbus_bus_remove_match(conn_, match_string.c_str(), &err);
          if (dbus_error_is_set(&err))
             throw RuntimeError("dbus_bus_remove_match", std::move(err));
@@ -659,48 +702,23 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
            return DBUS_HANDLER_RESULT_HANDLED;
         }
-        else if (!strcmp(dbus_message_get_member(msg), "NameOwnerChanged"))
-        {
-           // bus name, not interface
-
-           std::string bus_name;
-           std::string old_name;
-           std::string new_name;
-
-           DBusMessageIter iter;
-           dbus_message_iter_init(msg, &iter);
-
-           decode(iter, bus_name, old_name, new_name);
-
-           if (bus_name[0] != ':')
-           {
-               if (old_name.empty())
-               {
-                   d->busnames_.insert(bus_name);
-                   notify_clients(bus_name, ConnectionState::Connected);
-               }
-               else if (new_name.empty())
-               {
-                   d->busnames_.erase(bus_name);
-                   notify_clients(bus_name, ConnectionState::Disconnected);
-               }
-           }
-
-           return DBUS_HANDLER_RESULT_HANDLED;
-        }
 
         // ordinary signals...
 
-        bool handled = false;
-        auto range = d->stubs_.equal_range(dbus_message_get_path(msg));
+        // callbacks may add or remove stubs, so iterate over a snapshot
+        std::vector<StubBase*> receivers;
 
+        auto range = d->stubs_.equal_range(dbus_message_get_path(msg));
         for (auto iter = range.first; iter != range.second; ++iter)
+            receivers.push_back(iter->second);
+
+        for (auto stub : receivers)
         {
-            iter->second->try_handle_signal(msg);
-            handled = true;
+            if (is_registered(stub))
+               stub->try_handle_signal(msg);
         }
 
-        if (handled)
+        if (!receivers.empty())
             return DBUS_HANDLER_RESULT_HANDLED;
 
         // else
@@ -708,6 +726,12 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
     }
 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+
+Stub<org::freedesktop::Bus>& Dispatcher::bus()
+{
+   return *d->bus_;
 }
 
 

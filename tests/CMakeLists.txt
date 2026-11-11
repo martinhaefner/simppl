@@ -34,6 +34,7 @@ SET(UNITTEST_SOURCES
    no_interface.cpp
    utils.cpp
    any.cpp
+   bus.cpp
 )
 
 if(SIMPPL_HAVE_OBJECTMANAGER)

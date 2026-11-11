@@ -115,6 +115,29 @@ void StubBase::init(char* iface, const char* role)
 }
 
 
+void StubBase::init(std::string iface, const char* busname, const char* objectpath)
+{
+    assert(busname);
+    assert(objectpath);
+
+    ifaces_ = { std::move(iface) };
+
+    objectpath_ = objectpath;
+    busname_ = busname;
+}
+
+
+void StubBase::init(std::string iface, const char* role)
+{
+    assert(role);
+
+    ifaces_ = { std::move(iface) };
+
+    objectpath_ = detail::create_objectpath(this->iface(), role);
+    busname_ = detail::create_busname(this->iface(), role);
+}
+
+
 void StubBase::add_property(ClientPropertyBase* property)
 {
     properties_.emplace_back(property, false);

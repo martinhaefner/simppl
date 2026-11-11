@@ -1,8 +1,13 @@
 #include "simppl/detail/util.h"
+#include "simppl/detail/interfacename.h"
 
 #include <algorithm>
 #include <cstring>
 #include <cassert>
+#include <cstdlib>
+#include <memory>
+
+#include <cxxabi.h>
 
 
 namespace simppl
@@ -27,6 +32,22 @@ std::string create_objectpath(const char* iface, const char* role)
 std::string create_busname(const char* iface, const char* role)
 {
    return std::string(iface) + "." + role;
+}
+
+
+std::string interface_name_from_type(const char* mangled_type_name)
+{
+   assert(mangled_type_name);
+
+   std::unique_ptr<char, decltype(&free)> demangled(abi::__cxa_demangle(mangled_type_name, nullptr, nullptr, nullptr), &free);
+   assert(demangled);
+
+   // interfaces are always templates: "ns1::ns2::iface<0, ...>"
+   const char* begin = demangled.get();
+   const char* end = strchr(begin, '<');
+   assert(end);
+
+   return make_interface_name(begin, end);
 }
 
 std::vector<std::string> extract_interfaces(std::size_t iface_count, const char* mangled_iface_list)

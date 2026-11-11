@@ -107,6 +107,10 @@ protected:
    void init(char* iface, const char* role);
    void init(char* iface, const char* busname, const char* objectpath);
 
+   /// @param iface the resolved DBus interface name
+   void init(std::string iface, const char* role);
+   void init(std::string iface, const char* busname, const char* objectpath);
+
 
 public:  
    
