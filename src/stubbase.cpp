@@ -526,15 +526,36 @@ PendingCall StubBase::set_property_async(const char* name, std::function<void(DB
 
 void StubBase::try_handle_signal(DBusMessage* msg)
 {
-   // FIXME better check -> include interface!
-   if (!strcmp(dbus_message_get_member(msg), "PropertiesChanged"))
+   const char* interface = dbus_message_get_interface(msg);
+   const char* member = dbus_message_get_member(msg);
+
+   if (!interface || !member)
+      return;
+
+   // signals of the bus driver can't be faked by other clients: the bus
+   // sets the sender field itself, other clients can't own this name
+   if (busname_ == DBUS_SERVICE_DBUS)
    {
+      const char* sender = dbus_message_get_sender(msg);
+
+      if (!sender || strcmp(sender, DBUS_SERVICE_DBUS))
+         return;
+   }
+
+   if (!strcmp(interface, DBUS_INTERFACE_PROPERTIES))
+   {
+      if (strcmp(member, "PropertiesChanged"))
+         return;
+
       DBusMessageIter it;
       dbus_message_iter_init(msg, &it);
 
       std::string iface;
       decode(it, iface);
-      // ignore interface name for now
+
+      // equally named properties of other interfaces on the same object
+      if (iface != this->iface())
+         return;
 
       DBusMessageIter iter;
       dbus_message_iter_recurse(&it, &iter);
@@ -577,13 +598,13 @@ void StubBase::try_handle_signal(DBusMessage* msg)
          dbus_message_iter_next(&iter);
       }
    }
-   else
+   else if (!strcmp(interface, this->iface()))
    {
       auto sig = signals_;
 
       while(sig)
       {
-         if (!strcmp(sig->name_, dbus_message_get_member(msg)))
+         if (!strcmp(sig->name_, member))
          {
             Decoder d(msg);
             sig->eval(d);
