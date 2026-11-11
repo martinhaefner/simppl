@@ -673,7 +673,8 @@ void Dispatcher::unregister_signal_match(const std::string& match_string)
 
 DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 {
-    // FIXME better check!
+    // routing by object path only, each stub checks interface and sender
+    // itself, see StubBase::try_handle_signal()
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL)
     {
         //std::cout << this << ": having signal '" << dbus_message_get_member(msg) << "'" << std::endl;
