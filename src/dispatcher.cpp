@@ -522,8 +522,10 @@ void Dispatcher::notify_connected(StubBase& stub)
 	DBusMessageIter iter;
 	dbus_message_iter_init_append(msg, &iter);
 
-	// only the requesting stub is notified, see notify_client()
-	encode(iter, stub.busname(), stub.objectpath(), static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&stub)));
+	// only the requesting stub is notified, see notify_client(); unsigned long
+	// is mapped to UINT32 on this branch, so use unsigned long long for 64bit
+	// pointers
+	encode(iter, stub.busname(), stub.objectpath(), static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(&stub)));
 
 	dbus_connection_send(conn_, msg, nullptr);
 	dbus_message_unref(msg);
@@ -689,7 +691,7 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
            {
               std::string busname;
               std::string objpath;
-              uint64_t stub = 0;
+              unsigned long long stub = 0;
 
               DBusMessageIter iter;
               dbus_message_iter_init(msg, &iter);
