@@ -155,16 +155,17 @@ TEST(InterfaceName, skeleton_with_mixed_names)
 TEST(Bus, blocking_calls)
 {
    simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<org::freedesktop::Bus> bus(d, "org.freedesktop.DBus", "/org/freedesktop/DBus");
 
-   EXPECT_STREQ("org.freedesktop.DBus", d.bus().iface());
+   EXPECT_STREQ("org.freedesktop.DBus", bus.iface());
 
-   EXPECT_TRUE(d.bus().NameHasOwner("org.freedesktop.DBus"));
-   EXPECT_FALSE(d.bus().NameHasOwner("simppl.test.bus.not_there"));
+   EXPECT_TRUE(bus.NameHasOwner("org.freedesktop.DBus"));
+   EXPECT_FALSE(bus.NameHasOwner("simppl.test.bus.not_there"));
 
-   std::vector<std::string> names = d.bus().ListNames();
+   std::vector<std::string> names = bus.ListNames();
    EXPECT_NE(names.end(), std::find(names.begin(), names.end(), "org.freedesktop.DBus"));
 
-   std::string id = d.bus().GetId();
+   std::string id = bus.GetId();
    EXPECT_FALSE(id.empty());
 }
 
@@ -172,10 +173,11 @@ TEST(Bus, blocking_calls)
 TEST(Bus, connected)
 {
    simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<org::freedesktop::Bus> bus(d, "org.freedesktop.DBus", "/org/freedesktop/DBus");
 
    bool connected = false;
 
-   d.bus().connected >> [&](simppl::dbus::ConnectionState s){
+   bus.connected >> [&](simppl::dbus::ConnectionState s){
       connected = (s == simppl::dbus::ConnectionState::Connected);
    };
 
@@ -191,6 +193,7 @@ TEST(Bus, connected)
 TEST(Bus, name_owner_changed)
 {
    simppl::dbus::Dispatcher d("bus:session");
+   simppl::dbus::Stub<org::freedesktop::Bus> bus(d, "org.freedesktop.DBus", "/org/freedesktop/DBus");
 
    // service lives on its own connection, dropping that connection
    // drops the busname
@@ -204,7 +207,7 @@ TEST(Bus, name_owner_changed)
    bool client_disconnected = false;
    bool vanished = false;
 
-   d.bus().NameOwnerChanged.attach() >> [&](const std::string& name, const std::string& old_owner, const std::string& new_owner){
+   bus.NameOwnerChanged.attach() >> [&](const std::string& name, const std::string& old_owner, const std::string& new_owner){
 
       if (name != watched_busname)
          return;
@@ -293,4 +296,82 @@ TEST(Bus, destroy_stub_from_signal_callback)
    // the remaining stub still gets the vanishing service
    first_called = false;
    EXPECT_TRUE(run_until(d, [&](){ return first_called; }));
+}
+
+
+/**
+ * Several user stubs of the bus next to the dispatcher's internal one:
+ * every stub gets every signal, attaching or dropping one stub does not
+ * affect the others, and creating a stub does not re-notify existing ones.
+ */
+TEST(Bus, second_stub)
+{
+   simppl::dbus::Dispatcher d("bus:session");
+
+   auto first = std::make_unique<simppl::dbus::Stub<org::freedesktop::Bus>>(d, "org.freedesktop.DBus", "/org/freedesktop/DBus");
+
+   int first_connected = 0;
+   first->connected >> [&](simppl::dbus::ConnectionState s){
+      if (s == simppl::dbus::ConnectionState::Connected)
+         ++first_connected;
+   };
+
+   int first_changes = 0;
+   first->NameOwnerChanged.attach() >> [&](const std::string& name, const std::string&, const std::string&){
+      if (name == watched_busname)
+         ++first_changes;
+   };
+
+   EXPECT_TRUE(run_until(d, [&](){ return first_connected == 1; }));
+
+   // second stub after the first one is up and running
+   simppl::dbus::Stub<org::freedesktop::Bus> second(d, "org.freedesktop.DBus", "/org/freedesktop/DBus");
+
+   int second_connected = 0;
+   second.connected >> [&](simppl::dbus::ConnectionState s){
+      if (s == simppl::dbus::ConnectionState::Connected)
+         ++second_connected;
+   };
+
+   int second_changes = 0;
+   second.NameOwnerChanged.attach() >> [&](const std::string& name, const std::string&, const std::string&){
+      if (name == watched_busname)
+         ++second_changes;
+   };
+
+   EXPECT_TRUE(run_until(d, [&](){ return second_connected == 1; }));
+
+   auto service_cycle = [&](){
+      simppl::dbus::Dispatcher service_disp("bus:session");
+      Server service(service_disp, watched_busname, watched_objectpath);
+   };
+
+   // appear + vanish -> 2 signals for each stub
+   service_cycle();
+   EXPECT_TRUE(run_until(d, [&](){ return first_changes == 2 && second_changes == 2; }));
+
+   // drop one subscription and the stub itself, the other one keeps receiving
+   first->NameOwnerChanged.detach();
+   first.reset();
+
+   service_cycle();
+   EXPECT_TRUE(run_until(d, [&](){ return second_changes == 4; }));
+
+   // dispatcher's own tracking is unaffected: a new client still connects
+   bool client_connected = false;
+   {
+      simppl::dbus::Dispatcher service_disp("bus:session");
+      Server service(service_disp, watched_busname, watched_objectpath);
+
+      simppl::dbus::Stub<test::bus::Plain> client(d, watched_busname, watched_objectpath);
+      client.connected >> [&](simppl::dbus::ConnectionState s){
+         client_connected = (s == simppl::dbus::ConnectionState::Connected);
+      };
+
+      EXPECT_TRUE(run_until(d, [&](){ return client_connected; }));
+   }
+
+   // creating the second stub must not have re-notified the first one
+   EXPECT_EQ(1, first_connected);
+   EXPECT_EQ(1, second_connected);
 }

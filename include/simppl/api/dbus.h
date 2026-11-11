@@ -29,7 +29,19 @@ using simppl::dbus::out;
  *
  * Complete as of dbus-daemon 1.16 (bus/driver.c). The driver is reachable
  * as busname "org.freedesktop.DBus", objectpath "/org/freedesktop/DBus".
- * Each Dispatcher provides a ready-to-use stub via @c Dispatcher::bus().
+ * Watching services coming and going:
+ *
+ * @code
+ * simppl::dbus::Stub<org::freedesktop::Bus> bus(disp, "org.freedesktop.DBus", "/org/freedesktop/DBus");
+ *
+ * bus.NameOwnerChanged.attach() >> [](const std::string& name, const std::string& old_owner, const std::string& new_owner){
+ *    ...
+ * };
+ * @endcode
+ *
+ * The dispatcher's own service tracking always runs before any user
+ * callback of NameOwnerChanged, so stubs created from within that callback
+ * already see the new service.
  *
  * The C++ name differs from the DBus name since org::freedesktop::DBus
  * is already taken as namespace (e.g. by org::freedesktop::DBus::ObjectManager).

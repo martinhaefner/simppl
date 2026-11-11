@@ -10,6 +10,7 @@
 #include <atomic>
 #include <memory>
 #include <algorithm>
+#include <cstdint>
 
 #include "simppl/detail/util.h"
 #include "simppl/timeout.h"
@@ -388,9 +389,6 @@ struct Dispatcher::Private
     /// bus driver stub for the dispatcher's own service tracking
     std::unique_ptr<Stub<org::freedesktop::Bus>> tracker_;
 
-    /// bus driver stub handed out to the user via Dispatcher::bus()
-    std::unique_ptr<Stub<org::freedesktop::Bus>> bus_;
-
     /// dispatcher is going down, no more roundtrips to the bus
     bool closing_ = false;
 };
@@ -467,11 +465,9 @@ void Dispatcher::init(int have_introspection, const char* busname)
    // the bus driver is always there, stubs to it are connected right away
    d->busnames_.insert("org.freedesktop.DBus");
 
-   d->tracker_.reset(new Stub<org::freedesktop::Bus>(*this, "org.freedesktop.DBus", "/org/freedesktop/DBus"));
-
-   // created after the tracker, so the tracker's NameOwnerChanged handler
+   // created before any user stub, so the tracker's NameOwnerChanged handler
    // is always called first (stubs_ keeps insertion order for equal keys)
-   d->bus_.reset(new Stub<org::freedesktop::Bus>(*this, "org.freedesktop.DBus", "/org/freedesktop/DBus"));
+   d->tracker_.reset(new Stub<org::freedesktop::Bus>(*this, "org.freedesktop.DBus", "/org/freedesktop/DBus"));
 
    // register for busname change notifications
    d->tracker_->NameOwnerChanged.attach() >> [this](const std::string& bus_name, const std::string& old_owner, const std::string& new_owner){
@@ -506,7 +502,6 @@ Dispatcher::~Dispatcher()
    // connection will be closed: just drop the stubs' match rules locally
    d->closing_ = true;
 
-   d->bus_.reset();
    d->tracker_.reset();
 
    dbus_connection_close(conn_);
@@ -527,23 +522,20 @@ void Dispatcher::notify_connected(StubBase& stub)
 	DBusMessageIter iter;
 	dbus_message_iter_init_append(msg, &iter);
 
-	encode(iter, stub.busname(), stub.objectpath());
+	// only the requesting stub is notified, see notify_client()
+	encode(iter, stub.busname(), stub.objectpath(), static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&stub)));
 
 	dbus_connection_send(conn_, msg, nullptr);
 	dbus_message_unref(msg);
 }
 
 
-void Dispatcher::notify_client(const std::string& boundname, const std::string& objpath)
+void Dispatcher::notify_client(const std::string& boundname, const std::string& objpath, StubBase* stub)
 {
-	auto r = d->stubs_.equal_range(objpath);
-	
-	auto iter = r.first;
-	while(iter != r.second)
-	{
-		iter->second->connection_state_changed(ConnectionState::Connected, true);		
-		++iter;
-	}
+   // the stub may have been destroyed while the notification was on its way,
+   // so check before touching it
+   if (is_registered(stub) && boundname == stub->busname() && objpath == stub->objectpath())
+      stub->connection_state_changed(ConnectionState::Connected, true);
 }
 
 
@@ -688,16 +680,24 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
 
         if (!strcmp(dbus_message_get_member(msg), "notify_client"))
         {
-           std::string busname;
-           std::string objpath;
+           // only accept notifications sent by ourselves
+           const char* sender = dbus_message_get_sender(msg);
+           const char* self = dbus_bus_get_unique_name(conn_);
 
-           DBusMessageIter iter;
-           dbus_message_iter_init(msg, &iter);
+           if (sender && self && !strcmp(sender, self))
+           {
+              std::string busname;
+              std::string objpath;
+              uint64_t stub = 0;
 
-           decode(iter, busname, objpath);
+              DBusMessageIter iter;
+              dbus_message_iter_init(msg, &iter);
 
-           if (d->busnames_.find(busname) != d->busnames_.end())           
-              notify_client(busname, objpath);		   
+              decode(iter, busname, objpath, stub);
+
+              if (d->busnames_.find(busname) != d->busnames_.end())
+                 notify_client(busname, objpath, reinterpret_cast<StubBase*>(static_cast<uintptr_t>(stub)));
+           }
 
            return DBUS_HANDLER_RESULT_HANDLED;
         }
@@ -725,12 +725,6 @@ DBusHandlerResult Dispatcher::try_handle_signal(DBusMessage* msg)
     }
 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-}
-
-
-Stub<org::freedesktop::Bus>& Dispatcher::bus()
-{
-   return *d->bus_;
 }
 
 

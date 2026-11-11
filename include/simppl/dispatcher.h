@@ -12,24 +12,6 @@
 #include "simppl/detail/constants.h"
 
 
-// forward decl, see simppl/api/dbus.h
-namespace org
-{
-
-namespace freedesktop
-{
-
-template<int,
-         template<typename...> class,
-         template<typename...> class,
-         template<typename,int> class,
-         typename> struct Bus;
-
-}   // namespace freedesktop
-
-}   // namespace org
-
-
 namespace simppl
 {
 
@@ -37,13 +19,6 @@ namespace dbus
 {
 
 // forward decls
-template<template<int,
-                  template<typename...> class,
-                  template<typename...> class,
-                  template<typename,int> class,
-                  typename> class IfaceT>
-struct Stub;
-
 struct StubBase;
 struct SkeletonBase;
 struct ObjectManagerMixin;
@@ -149,25 +124,6 @@ struct Dispatcher
       return *conn_;
    }
 
-   /**
-    * Stub of the message bus driver ("org.freedesktop.DBus") on this
-    * connection, e.g. for watching services coming and going:
-    *
-    * @code
-    * #include "simppl/api/dbus.h"
-    *
-    * disp.bus().NameOwnerChanged.attach() >> [](const std::string& name, const std::string& old_owner, const std::string& new_owner){
-    *    ...
-    * };
-    * @endcode
-    *
-    * The stub is owned by the dispatcher and is free for the user. The
-    * dispatcher's own service tracking uses a separate stub and is always
-    * done before any user callback of NameOwnerChanged is called, so stubs
-    * created from within that callback already see the new service.
-    */
-   Stub<org::freedesktop::Bus>& bus();
-
 private:
 
    /**
@@ -203,7 +159,8 @@ private:
 
    /// stub is still known to the dispatcher (not destroyed meanwhile), never dereferences @c stub
    bool is_registered(const StubBase* stub) const;
-   void notify_client(const std::string& boundname, const std::string& objpath);
+   /// connect notification for exactly one stub, requested via notify_connected()
+   void notify_client(const std::string& boundname, const std::string& objpath, StubBase* stub);
 
    DBusConnection* conn_;
    int request_timeout_;    ///< default request timeout in milliseconds
