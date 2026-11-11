@@ -10,6 +10,7 @@
 #include "simppl/typelist.h"
 #include "simppl/detail/interposer.h"
 #include "simppl/detail/objectmanagerinterposer.h"
+#include "simppl/detail/interfacename.h"
 
 
 namespace simppl
@@ -42,14 +43,14 @@ struct Skeleton : public detail::Interposer<sizeof...(Is)-1,
     Skeleton(Dispatcher& disp, const char* role)
     {
         static_assert(iface_count == 1, "Generating bus and object names from a role only works with a single interface");
-        this->init(typeid(interface_list).name(), role);
+        this->init(interface_names(), role);
         dispatcher_add_skeleton(disp, *this);
     }
 
     inline
     Skeleton(Dispatcher& disp, std::string busname, std::string objectpath)
     {
-        this->init(iface_count, typeid(interface_list).name(), std::move(busname), std::move(objectpath));
+        this->init(interface_names(), std::move(busname), std::move(objectpath));
         dispatcher_add_skeleton(disp, *this);
     }
 
@@ -57,6 +58,14 @@ struct Skeleton : public detail::Interposer<sizeof...(Is)-1,
 protected:
 
     ServerRequestDescriptor current_request_;
+
+private:
+
+    static
+    std::vector<std::string> interface_names()
+    {
+        return { detail::resolve_interface_name<Is, typename detail::make_server_type<Is>::type>()... };
+    }
 };
 
 

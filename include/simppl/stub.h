@@ -11,6 +11,7 @@
 #include "simppl/typelist.h"
 
 #include "simppl/detail/constants.h"
+#include "simppl/detail/interfacename.h"
 
 
 namespace simppl
@@ -36,14 +37,14 @@ struct Stub : IfaceT<0, ClientMethod, ClientSignal, ClientProperty, StubBase>
 
 private:
 
-   using interface_list = make_typelist<IfaceT<0, ClientMethod, ClientSignal, ClientProperty, StubBase>>;
+   using instance_type = IfaceT<0, ClientMethod, ClientSignal, ClientProperty, StubBase>;
 
 public:
 
    inline
    Stub(Dispatcher& disp, const char* role)
    {
-       this->init(abi::__cxa_demangle(typeid(interface_list).name(), 0, 0, 0), role);
+       this->init(detail::resolve_interface_name<IfaceT, instance_type>(), role);
        dispatcher_add_stub(disp, *this);
    }
 
@@ -51,7 +52,7 @@ public:
    inline
    Stub(Dispatcher& disp, const char* busname, const char* objectpath)
    {
-      this->init(abi::__cxa_demangle(typeid(interface_list).name(), 0, 0, 0), busname, objectpath);
+      this->init(detail::resolve_interface_name<IfaceT, instance_type>(), busname, objectpath);
       dispatcher_add_stub(disp, *this);
    }
 };

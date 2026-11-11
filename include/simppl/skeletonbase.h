@@ -94,6 +94,10 @@ protected:
     void init(size_type iface_count, const char* mangled_iface_list, std::string busname, std::string objectpath);
     void init(std::string busname, std::string objectpath);
 
+    /// @param ifaces the resolved DBus interface names in order of declaration
+    void init(std::vector<std::string> ifaces, const char* role);
+    void init(std::vector<std::string> ifaces, std::string busname, std::string objectpath);
+
     DBusHandlerResult handle_request(DBusMessage* msg);
 #if SIMPPL_HAVE_INTROSPECTION
     DBusHandlerResult handle_introspect_request(DBusMessage* msg);

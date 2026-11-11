@@ -83,6 +83,33 @@ void SkeletonBase::init(size_type iface_count, const char* mangled_iface_list, s
 }
 
 
+void SkeletonBase::init(std::vector<std::string> ifaces, const char* role)
+{
+    assert(role);
+    assert(ifaces.size() == 1);
+
+    ifaces_ = std::move(ifaces);
+
+    // create_*() hand out memory allocated with new[]
+    std::unique_ptr<char[]> objectpath(detail::create_objectpath(ifaces_[0].c_str(), role));
+    std::unique_ptr<char[]> busname(detail::create_busname(ifaces_[0].c_str(), role));
+
+    objectpath_ = objectpath.get();
+    busname_ = busname.get();
+}
+
+
+void SkeletonBase::init(std::vector<std::string> ifaces, std::string busname, std::string objectpath)
+{
+    assert(busname.length() > 0);
+    assert(objectpath.length() > 0);
+
+    ifaces_ = std::move(ifaces);
+    busname_ = std::move(busname);
+    objectpath_ = std::move(objectpath);
+}
+
+
 void SkeletonBase::init(std::string busname, std::string objectpath)
 {
     assert(busname.length() > 0);
