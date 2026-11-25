@@ -1,9 +1,19 @@
+#include <algorithm>
 #include <any>
+#include <cerrno>
 #include <cstdint>
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <fcntl.h>
 #include <functional>
+#include <map>
+#include <memory>
+#include <new>
+#include <poll.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <limits>
 #include <string>
 #include <thread>
@@ -18,6 +28,8 @@
 #include "simppl/stub.h"
 
 #include "simppl/any.h"
+#include "simppl/filedescriptor.h"
+#include "simppl/map.h"
 #include "simppl/string.h"
 #include "simppl/struct.h"
 #include "simppl/vector.h"
@@ -658,6 +670,257 @@ TEST(Any, encode_decode_map_tuple_vector_any) {
 
     EXPECT_EQ(map.size(), resultMap.size());
   });
+}
+
+/// Verify the wire types and decode both forms of UNIX FD variant.
+TEST(Any, encode_decode_unix_fd_variants) {
+  using simppl::dbus::Any;
+  using simppl::dbus::Codec;
+  using simppl::dbus::FileDescriptor;
+  using Options = std::map<std::string, Any>;
+
+  const int fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+  ASSERT_GE(fd, 0);
+  const FileDescriptor descriptor(fd);
+  const Options options{{"array", std::vector<FileDescriptor>{descriptor}},
+                        {"single", descriptor}};
+
+  test_enc_dec_f([&options](DBusMessageIter &iter, DBusMessage *message) {
+    Codec<Options>::encode(iter, options);
+    ASSERT_TRUE(dbus_message_has_signature(message, "a{sv}"));
+    ASSERT_TRUE(dbus_message_iter_init(message, &iter));
+
+    DBusMessageIter arrayIter{};
+    DBusMessageIter entryIter{};
+    DBusMessageIter variantIter{};
+    dbus_message_iter_recurse(&iter, &arrayIter);
+    dbus_message_iter_recurse(&arrayIter, &entryIter);
+    ASSERT_TRUE(dbus_message_iter_next(&entryIter));
+    ASSERT_EQ(DBUS_TYPE_VARIANT, dbus_message_iter_get_arg_type(&entryIter));
+    dbus_message_iter_recurse(&entryIter, &variantIter);
+    EXPECT_EQ(DBUS_TYPE_ARRAY, dbus_message_iter_get_arg_type(&variantIter));
+    EXPECT_EQ(DBUS_TYPE_UNIX_FD,
+              dbus_message_iter_get_element_type(&variantIter));
+
+    Options decoded;
+    Codec<Options>::decode(iter, decoded);
+    ASSERT_EQ(2u, decoded.size());
+    EXPECT_EQ("ah", decoded.at("array").containedTypeSignature);
+    EXPECT_EQ("h", decoded.at("single").containedTypeSignature);
+    const std::vector<FileDescriptor> array =
+        decoded.at("array").as<std::vector<FileDescriptor>>();
+    ASSERT_EQ(1u, array.size());
+    EXPECT_NE(-1, fcntl(array.front().native_handle(), F_GETFD));
+    const FileDescriptor single = decoded.at("single").as<FileDescriptor>();
+    EXPECT_NE(-1, fcntl(single.native_handle(), F_GETFD));
+  });
+}
+
+namespace {
+
+/// Closes and releases one end of a private peer-to-peer connection.
+struct ConnectionDeleter {
+  void operator()(DBusConnection *connection) const {
+    dbus_connection_close(connection);
+    dbus_connection_unref(connection);
+  }
+};
+using ConnectionPtr = std::unique_ptr<DBusConnection, ConnectionDeleter>;
+
+/// Releases a libdbus message and the descriptors it still owns.
+struct MessageDeleter {
+  void operator()(DBusMessage *message) const { dbus_message_unref(message); }
+};
+using MessagePtr = std::unique_ptr<DBusMessage, MessageDeleter>;
+
+/// Owns two private libdbus peers and drives their I/O without a message bus.
+class UnixFdPeers {
+public:
+  UnixFdPeers() = default;
+  UnixFdPeers(const UnixFdPeers &) = delete;
+  UnixFdPeers &operator=(const UnixFdPeers &) = delete;
+
+  ~UnixFdPeers() {
+    if (m_listener != nullptr) {
+      dbus_server_disconnect(m_listener);
+      dbus_server_unref(m_listener);
+    }
+  }
+
+  /// Connect, authenticate, and negotiate UNIX FD passing on both ends.
+  void connect() {
+    m_listener = dbus_server_listen("unix:tmpdir=/tmp", nullptr);
+    ASSERT_NE(nullptr, m_listener) << "Could not create the D-Bus listener";
+    dbus_server_set_new_connection_function(m_listener, accept, this, nullptr);
+    ASSERT_TRUE(dbus_server_set_watch_functions(
+        m_listener, addWatch, removeWatch, nullptr, this, nullptr));
+
+    char *address = dbus_server_get_address(m_listener);
+    ASSERT_NE(nullptr, address);
+    m_sender.reset(dbus_connection_open_private(address, nullptr));
+    dbus_free(address);
+    ASSERT_NE(nullptr, m_sender.get()) << "Could not connect to the listener";
+
+    for (int attempt = 0; attempt < maxAttempts && !m_receiver; ++attempt) {
+      pollListener();
+    }
+    ASSERT_NE(nullptr, m_receiver.get()) << "Listener did not accept the peer";
+
+    for (int attempt = 0; attempt < maxAttempts && !canPassDescriptors();
+         ++attempt) {
+      dbus_connection_read_write(m_sender.get(), pollMilliseconds);
+      dbus_connection_read_write(m_receiver.get(), pollMilliseconds);
+    }
+    ASSERT_TRUE(canPassDescriptors()) << "UNIX FD negotiation did not finish";
+  }
+
+  /// Queue a message, then drive both peers until the receiver gets it.
+  MessagePtr transfer(DBusMessage *message) const {
+    if (!dbus_connection_send(m_sender.get(), message, nullptr)) {
+      return {};
+    }
+    for (int attempt = 0; attempt < maxAttempts; ++attempt) {
+      dbus_connection_read_write(m_sender.get(), pollMilliseconds);
+      dbus_connection_read_write(m_receiver.get(), pollMilliseconds);
+      MessagePtr received(dbus_connection_pop_message(m_receiver.get()));
+      if (received) {
+        return received;
+      }
+    }
+    return {};
+  }
+
+private:
+  static constexpr int maxAttempts = 100;
+  static constexpr int pollMilliseconds = 10;
+
+  /// Drive the listener until it accepts the single test connection.
+  void pollListener() {
+    const std::vector<DBusWatch *> watches = m_watches;
+    for (DBusWatch *watch : watches) {
+      if (!dbus_watch_get_enabled(watch)) {
+        continue;
+      }
+      pollfd descriptor{dbus_watch_get_unix_fd(watch), POLLIN, 0};
+      if (poll(&descriptor, 1, pollMilliseconds) > 0 &&
+          (descriptor.revents & POLLIN) != 0) {
+        dbus_watch_handle(watch, DBUS_WATCH_READABLE);
+        return;
+      }
+    }
+  }
+
+  bool canPassDescriptors() const {
+    return dbus_connection_can_send_type(m_sender.get(), DBUS_TYPE_UNIX_FD) &&
+           dbus_connection_can_send_type(m_receiver.get(), DBUS_TYPE_UNIX_FD);
+  }
+
+  static dbus_bool_t addWatch(DBusWatch *watch, void *data) {
+    auto &peers = *static_cast<UnixFdPeers *>(data);
+    try {
+      peers.m_watches.push_back(watch);
+    } catch (const std::bad_alloc &) {
+      return FALSE;
+    }
+    return TRUE;
+  }
+
+  static void removeWatch(DBusWatch *watch, void *data) {
+    auto &watches = static_cast<UnixFdPeers *>(data)->m_watches;
+    watches.erase(std::remove(watches.begin(), watches.end(), watch),
+                  watches.end());
+  }
+
+  static void accept(DBusServer *, DBusConnection *connection, void *data) {
+    // libdbus closes the connection unless the callback keeps a reference.
+    static_cast<UnixFdPeers *>(data)->m_receiver.reset(
+        dbus_connection_ref(connection));
+  }
+
+  DBusServer *m_listener{nullptr};
+  std::vector<DBusWatch *> m_watches;
+  ConnectionPtr m_sender;
+  ConnectionPtr m_receiver;
+};
+
+} // namespace
+
+/// Send an FD nested in a{sv} through the kernel and check both owners.
+TEST(Any, unix_fd_variant_round_trip_over_socket) {
+  using simppl::dbus::Any;
+  using simppl::dbus::Codec;
+  using simppl::dbus::FileDescriptor;
+  using Options = std::map<std::string, Any>;
+
+  UnixFdPeers peers;
+  ASSERT_NO_FATAL_FAILURE(peers.connect());
+
+  const std::string payload{"simppl nested unix fd payload"};
+  const ssize_t payloadSize = static_cast<ssize_t>(payload.size());
+
+  const int senderFd = memfd_create("simppl-any-fd", MFD_CLOEXEC);
+  ASSERT_GE(senderFd, 0);
+  FileDescriptor senderDescriptor(senderFd);
+  ASSERT_EQ(payloadSize, write(senderFd, payload.data(), payload.size()));
+  ASSERT_EQ(0, lseek(senderFd, 0, SEEK_SET));
+
+  MessagePtr request(dbus_message_new_method_call(
+      nullptr, "/org/example/TargetObject", "org.example.TargetInterface",
+      "TargetMethod"));
+  ASSERT_NE(nullptr, request.get());
+  dbus_message_set_no_reply(request.get(), TRUE);
+  {
+    const Options options{
+        {"fds", std::vector<FileDescriptor>{senderDescriptor}}};
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(request.get(), &iter);
+    Codec<Options>::encode(iter, options);
+  }
+  MessagePtr received = peers.transfer(request.get());
+  request.reset();
+  ASSERT_NE(nullptr, received.get()) << "The receiver did not get the message";
+  ASSERT_TRUE(dbus_message_has_signature(received.get(), "a{sv}"));
+
+  {
+    Options decoded;
+    DBusMessageIter iter;
+    ASSERT_TRUE(dbus_message_iter_init(received.get(), &iter));
+    Codec<Options>::decode(iter, decoded);
+    received.reset();
+
+    const std::vector<FileDescriptor> receivedDescriptors =
+        decoded.at("fds").as<std::vector<FileDescriptor>>();
+    ASSERT_EQ(1u, receivedDescriptors.size());
+    const int receivedFd = receivedDescriptors.front().native_handle();
+    EXPECT_NE(senderFd, receivedFd);
+    ASSERT_NE(-1, fcntl(receivedFd, F_GETFD));
+
+    struct stat senderStat {};
+    struct stat receivedStat {};
+    ASSERT_EQ(0, fstat(senderFd, &senderStat));
+    ASSERT_EQ(0, fstat(receivedFd, &receivedStat));
+    EXPECT_EQ(senderStat.st_dev, receivedStat.st_dev);
+    EXPECT_EQ(senderStat.st_ino, receivedStat.st_ino);
+
+    // read() uses the shared file offset, which the sender rewound to zero.
+    std::string receivedPayload(payload.size(), '\0');
+    ASSERT_EQ(payloadSize, read(receivedFd, receivedPayload.data(),
+                                receivedPayload.size()));
+    EXPECT_EQ(payload, receivedPayload);
+  }
+
+  // Encoding and receiver cleanup must not transfer or close the sender FD.
+  EXPECT_EQ(senderFd, senderDescriptor.native_handle());
+  ASSERT_NE(-1, fcntl(senderFd, F_GETFD));
+  std::string senderPayload(payload.size(), '\0');
+  ASSERT_EQ(payloadSize,
+            pread(senderFd, senderPayload.data(), senderPayload.size(), 0));
+  EXPECT_EQ(payload, senderPayload);
+
+  senderDescriptor = FileDescriptor();
+  errno = 0;
+  EXPECT_EQ(-1, fcntl(senderFd, F_GETFD));
+  EXPECT_EQ(EBADF, errno);
 }
 
 TEST(Any, encode_decode_object_path) {

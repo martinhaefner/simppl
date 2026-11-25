@@ -1,4 +1,5 @@
 #include "simppl/any.h"
+#include "simppl/filedescriptor.h"
 #include "simppl/map.h"
 #include "simppl/objectpath.h"
 #include "simppl/pod.h"
@@ -50,6 +51,8 @@ std::any decodeAsAny(DBusMessageIter &iter, int type) {
     return decodeAsAny<std::string>(iter);
   case DBUS_TYPE_OBJECT_PATH:
     return decodeAsAny<simppl::dbus::ObjectPath>(iter);
+  case DBUS_TYPE_UNIX_FD:
+    return decodeAsAny<FileDescriptor>(iter);
   case DBUS_TYPE_VARIANT:
     return decode2<Any>(iter);
   case DBUS_TYPE_ARRAY:
@@ -168,7 +171,7 @@ template <typename T> T decode2(DBusMessageIter &iter) {
 
 template <typename T>
 void encodeAny(DBusMessageIter &iter, const std::any &any) {
-  Codec<T>::encode(iter, std::any_cast<T>(any));
+  Codec<T>::encode(iter, std::any_cast<const T &>(any));
 }
 
 void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
@@ -205,6 +208,9 @@ void encodeAny(DBusMessageIter &iter, const std::any &any, const int anyType) {
     break;
   case DBUS_TYPE_OBJECT_PATH:
     encodeAny<simppl::dbus::ObjectPath>(iter, any);
+    break;
+  case DBUS_TYPE_UNIX_FD:
+    encodeAny<FileDescriptor>(iter, any);
     break;
   case DBUS_TYPE_VARIANT:
     encode2(iter, std::any_cast<Any>(any));

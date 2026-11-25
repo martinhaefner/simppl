@@ -54,6 +54,9 @@ private:
 };
 
 
+template<>
+struct detail::typecode_switch<FileDescriptor, void> { enum { value = DBUS_TYPE_UNIX_FD }; };
+
 struct FileDescriptorCodec
 {
    static
